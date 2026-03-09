@@ -1,0 +1,53 @@
+[project]
+name = "neo4j-agent-memory-tck"
+version = "0.1.0"
+description = "Technology Compliance Kit for neo4j-agent-memory implementations"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [{ name = "William Lyon" }]
+dependencies = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-json-report>=1.5.0",
+    "pydantic>=2.0.0",
+    "jinja2>=3.1.0",
+]
+
+[project.optional-dependencies]
+neo4j = [
+    "testcontainers[neo4j]>=4.0.0",
+    "neo4j>=5.20.0",
+]
+reference = [
+    "neo4j-agent-memory>=0.0.5",
+    "neo4j-agent-memory-tck[neo4j]",
+]
+dev = [
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+]
+
+[project.scripts]
+tck = "tck.report.compliance_report:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tck/tests"]
+markers = [
+    "bronze: Bronze tier - schema and short-term memory",
+    "silver: Silver tier - all three memory types",
+    "gold: Gold tier - SHOULD clauses and cross-memory integration",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tck"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
