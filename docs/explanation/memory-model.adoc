@@ -1,0 +1,148 @@
+= The Agent Memory Model
+:toc:
+:toclevels: 2
+
+neo4j-agent-memory organizes agent knowledge into three complementary memory types, each serving a different purpose in the agent's cognitive architecture.
+
+== The Three Memory Types
+
+----
+                      ┌─────────────────┐
+                      │   Agent Memory   │
+                      └────────┬────────┘
+              ┌────────────────┼────────────────┐
+              v                v                v
+    ┌─────────────────┐ ┌──────────────┐ ┌──────────────┐
+    │  Short-Term     │ │  Long-Term   │ │  Reasoning   │
+    │  (Conversations)│ │  (Knowledge) │ │  (Traces)    │
+    └─────────────────┘ └──────────────┘ └──────────────┘
+----
+
+=== Short-Term Memory
+
+Short-term memory stores **conversation history** — the messages exchanged between users and the agent within a session.
+
+*Graph structure:*
+
+----
+(Conversation) -[:HAS_MESSAGE]-> (Message)
+(Conversation) -[:FIRST_MESSAGE]-> (Message)
+(Message) -[:NEXT_MESSAGE]-> (Message)
+----
+
+*Key properties:*
+
+* Messages are ordered by insertion time via a `NEXT_MESSAGE` linked list.
+* Each conversation is scoped to a `session_id`.
+* Messages support `user`, `assistant`, and `system` roles.
+* Arbitrary metadata can be attached to messages.
+* Semantic search via vector embeddings enables retrieval by meaning, not just recency.
+
+*Analogies:* This is the agent's "working memory" — what it remembers from the current conversation.
+
+=== Long-Term Memory
+
+Long-term memory stores **persistent knowledge** extracted from conversations — entities, preferences, and facts that persist across sessions.
+
+*Graph structure:*
+
+----
+(Entity:Person) -[:WORKS_AT]-> (Entity:Organization)
+(Entity:Person) -[:LOCATED_AT]-> (Entity:Location)
+(Preference) -[:ABOUT]-> (Entity)
+(Fact) -[:ABOUT]-> (Entity)
+----
+
+*Three components:*
+
+[cols="1,3"]
+|===
+|Component |Purpose
+
+|**Entities**
+|Named things the agent knows about: people, organizations, locations, events, objects. Each has a type, optional description, and embedding for semantic search.
+
+|**Preferences**
+|User preferences the agent should respect: communication style, dietary restrictions, language choices. Categorized and searchable.
+
+|**Facts**
+|Subject-predicate-object triples capturing relationships and attributes: "Alice WORKS_AT Acme Corp", "Acme LOCATED_IN San Francisco".
+|===
+
+*Analogies:* This is the agent's "knowledge graph" — accumulated understanding that grows over time.
+
+=== Reasoning Memory
+
+Reasoning memory stores **decision traces** — a record of how the agent thought through a task, what tools it used, and what outcomes it achieved.
+
+*Graph structure:*
+
+----
+(ReasoningTrace) -[:HAS_STEP]-> (ReasoningStep) -[:HAS_TOOL_CALL]-> (ToolCall)
+----
+
+*Components:*
+
+[cols="1,3"]
+|===
+|Component |Purpose
+
+|**ReasoningTrace**
+|A complete record of one task: the goal, steps taken, final outcome, and whether it succeeded.
+
+|**ReasoningStep**
+|One step in the reasoning process following the ReAct pattern: thought (what the agent is thinking), action (what it decides to do), observation (what happened).
+
+|**ToolCall**
+|A specific tool invocation within a step: the tool name, arguments, result, status (success/failure/timeout/etc.), and duration.
+|===
+
+*Key properties:*
+
+* Steps are monotonically numbered within a trace.
+* Tool calls support 6 statuses: pending, success, failure, error, timeout, cancelled.
+* Aggregated tool statistics enable performance monitoring.
+* Semantic trace search finds similar past tasks to inform future decisions.
+
+*Analogies:* This is the agent's "journal" — a detailed log of its reasoning process that enables introspection and learning.
+
+== How They Work Together
+
+In practice, the three memory types form a feedback loop:
+
+. *Short-term memory* captures the conversation.
+. *Long-term memory* extracts and stores knowledge from conversations.
+. *Reasoning memory* records how the agent uses that knowledge to make decisions.
+. The next conversation can draw on all three: recent messages (short-term), accumulated knowledge (long-term), and past reasoning patterns (reasoning).
+
+=== Example Flow
+
+----
+User: "Tell me about Alice Johnson at Acme Corp"
+
+1. Short-term: Store the user message in session "session-123"
+
+2. Reasoning: Start trace "Look up Alice Johnson"
+   Step 1: Thought "Search knowledge graph for Alice"
+           Action: search_entities("Alice Johnson")
+           Tool Call: search_entities → found Entity(Alice Johnson, PERSON)
+
+   Step 2: Thought "Find her relationships"
+           Action: get_related_entities(alice.id)
+           Tool Call: get_related_entities → [Entity(Acme Corp, ORGANIZATION)]
+
+3. Long-term: Alice already exists; retrieve her description and relationships
+
+4. Short-term: Store the assistant response
+5. Reasoning: Complete trace with outcome "Alice is CTO at Acme Corp"
+----
+
+== The Context Graph
+
+All three memory types are stored in a single Neo4j graph. This means:
+
+* Entities extracted from one conversation are immediately available to all future conversations.
+* Reasoning traces can reference entities, enabling provenance queries ("how did the agent learn about Alice?").
+* Cross-agent sharing is possible — multiple agents can read and write to the same graph using different session IDs.
+
+The shared graph is the foundation for the TCK's Gold-tier multi-agent sharing tests.

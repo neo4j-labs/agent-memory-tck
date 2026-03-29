@@ -80,6 +80,38 @@ class TestAddStep:
         assert step_action.action == "Just acting"
         assert step_action.thought is None
 
+    async def test_add_step_observation_only(self, adapter):
+        """SPEC-4.2.4: add_step MUST accept observation only."""
+        trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
+        step = await adapter.add_step(trace.id, observation="I see something")
+        assert step.observation == "I see something"
+        assert step.thought is None
+        assert step.action is None
+
+    async def test_add_step_all_fields(self, adapter):
+        """SPEC-4.2.5: add_step with all fields MUST store all values."""
+        trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
+        step = await adapter.add_step(
+            trace.id,
+            thought="Think about it",
+            action="do_something",
+            observation="Result obtained",
+        )
+        assert step.thought == "Think about it"
+        assert step.action == "do_something"
+        assert step.observation == "Result obtained"
+
+    async def test_add_many_steps_maintain_numbering(self, adapter):
+        """SPEC-4.2.6: 10+ steps MUST maintain monotonic step_number."""
+        trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
+        steps = []
+        for i in range(10):
+            step = await adapter.add_step(trace.id, thought=f"Step {i}")
+            steps.append(step)
+
+        for i in range(1, len(steps)):
+            assert steps[i].step_number > steps[i - 1].step_number
+
 
 @pytest.mark.silver
 class TestRecordToolCall:
@@ -142,6 +174,61 @@ class TestRecordToolCall:
         )
         assert tc.status == ToolCallStatus.TIMEOUT
 
+    async def test_record_tool_call_error_status(self, adapter):
+        """SPEC-4.3.5: record_tool_call MUST support error status."""
+        trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
+        step = await adapter.add_step(trace.id, action="error_tool")
+        tc = await adapter.record_tool_call(
+            step.id,
+            "error_tool",
+            {},
+            status=ToolCallStatus.ERROR,
+            error="Internal error",
+        )
+        assert tc.status == ToolCallStatus.ERROR
+        assert tc.error == "Internal error"
+
+    async def test_record_tool_call_cancelled_status(self, adapter):
+        """SPEC-4.3.6: record_tool_call MUST support cancelled status."""
+        trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
+        step = await adapter.add_step(trace.id, action="cancelled_tool")
+        tc = await adapter.record_tool_call(
+            step.id,
+            "cancelled_tool",
+            {},
+            status=ToolCallStatus.CANCELLED,
+        )
+        assert tc.status == ToolCallStatus.CANCELLED
+
+    async def test_record_tool_call_pending_status(self, adapter):
+        """SPEC-4.3.7: record_tool_call MUST support pending status."""
+        trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
+        step = await adapter.add_step(trace.id, action="async_tool")
+        tc = await adapter.record_tool_call(
+            step.id,
+            "async_tool",
+            {"param": "value"},
+            status=ToolCallStatus.PENDING,
+        )
+        assert tc.status == ToolCallStatus.PENDING
+
+    async def test_record_multiple_tool_calls_per_step(self, adapter):
+        """SPEC-4.3.8: Multiple tool calls on one step MUST be stored independently."""
+        trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
+        step = await adapter.add_step(trace.id, action="multi_tool")
+
+        tc1 = await adapter.record_tool_call(step.id, "tool_a", {"x": 1}, duration_ms=100)
+        tc2 = await adapter.record_tool_call(step.id, "tool_b", {"y": 2}, duration_ms=200)
+        assert tc1.id != tc2.id
+        assert tc1.tool_name == "tool_a"
+        assert tc2.tool_name == "tool_b"
+
+        # Verify both are in the step's tool calls
+        full_trace = await adapter.get_trace_with_steps(trace.id)
+        assert full_trace is not None
+        step_calls = full_trace.steps[0].tool_calls
+        assert len(step_calls) == 2
+
 
 @pytest.mark.silver
 class TestCompleteTrace:
@@ -193,9 +280,7 @@ class TestGetTraceWithSteps:
         """SPEC-4.5.2: get_trace_with_steps MUST include tool calls in each step."""
         trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
         step = await adapter.add_step(trace.id, action="search")
-        await adapter.record_tool_call(
-            step.id, "search_entities", {"query": "Alice"}
-        )
+        await adapter.record_tool_call(step.id, "search_entities", {"query": "Alice"})
 
         full_trace = await adapter.get_trace_with_steps(trace.id)
         assert len(full_trace.steps) == 1
@@ -242,6 +327,11 @@ class TestListTraces:
         traces = await adapter.list_traces(limit=2)
         assert len(traces) <= 2
 
+    async def test_list_traces_empty(self, adapter):
+        """SPEC-4.6.4: list_traces with no traces MUST return empty list."""
+        traces = await adapter.list_traces()
+        assert traces == []
+
 
 @pytest.mark.silver
 class TestGetToolStats:
@@ -253,16 +343,25 @@ class TestGetToolStats:
         step = await adapter.add_step(trace.id, action="use tools")
 
         await adapter.record_tool_call(
-            step.id, "search_entities", {"q": "a"},
-            status=ToolCallStatus.SUCCESS, duration_ms=100,
+            step.id,
+            "search_entities",
+            {"q": "a"},
+            status=ToolCallStatus.SUCCESS,
+            duration_ms=100,
         )
         await adapter.record_tool_call(
-            step.id, "search_entities", {"q": "b"},
-            status=ToolCallStatus.SUCCESS, duration_ms=200,
+            step.id,
+            "search_entities",
+            {"q": "b"},
+            status=ToolCallStatus.SUCCESS,
+            duration_ms=200,
         )
         await adapter.record_tool_call(
-            step.id, "search_entities", {"q": "c"},
-            status=ToolCallStatus.FAILURE, error="not found",
+            step.id,
+            "search_entities",
+            {"q": "c"},
+            status=ToolCallStatus.FAILURE,
+            error="not found",
         )
 
         stats = await adapter.get_tool_stats(tool_name="search_entities")
@@ -272,3 +371,39 @@ class TestGetToolStats:
         assert tool_stat.total_calls == 3
         assert tool_stat.successful_calls == 2
         assert tool_stat.failed_calls == 1
+
+    async def test_get_tool_stats_multiple_tools(self, adapter):
+        """SPEC-4.7.2: get_tool_stats MUST return stats for different tools."""
+        trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
+        step = await adapter.add_step(trace.id, action="multi")
+
+        await adapter.record_tool_call(step.id, "tool_alpha", {}, status=ToolCallStatus.SUCCESS)
+        await adapter.record_tool_call(step.id, "tool_beta", {}, status=ToolCallStatus.SUCCESS)
+
+        stats = await adapter.get_tool_stats()
+        names = [s.name for s in stats]
+        assert "tool_alpha" in names
+        assert "tool_beta" in names
+
+    async def test_get_tool_stats_no_calls(self, adapter):
+        """SPEC-4.7.3: get_tool_stats with no calls MUST return empty list."""
+        stats = await adapter.get_tool_stats()
+        assert stats == []
+
+    async def test_get_tool_stats_success_rate(self, adapter):
+        """SPEC-4.7.4: get_tool_stats success_rate MUST be accurate."""
+        trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
+        step = await adapter.add_step(trace.id, action="stats")
+
+        await adapter.record_tool_call(step.id, "rated_tool", {}, status=ToolCallStatus.SUCCESS)
+        await adapter.record_tool_call(step.id, "rated_tool", {}, status=ToolCallStatus.SUCCESS)
+        await adapter.record_tool_call(step.id, "rated_tool", {}, status=ToolCallStatus.FAILURE)
+        await adapter.record_tool_call(step.id, "rated_tool", {}, status=ToolCallStatus.SUCCESS)
+
+        stats = await adapter.get_tool_stats(tool_name="rated_tool")
+        assert len(stats) >= 1
+        tool_stat = stats[0]
+        assert tool_stat.total_calls == 4
+        assert tool_stat.successful_calls == 3
+        assert tool_stat.failed_calls == 1
+        assert abs(tool_stat.success_rate - 0.75) < 0.01

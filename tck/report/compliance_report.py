@@ -54,8 +54,7 @@ def classify_test_tier(test: dict) -> str | None:
 def compute_tier_results(tests: list[dict]) -> dict:
     """Compute pass/fail/skip counts per tier."""
     tier_results = {
-        tier: {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "errors": 0}
-        for tier in TIERS
+        tier: {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "errors": 0} for tier in TIERS
     }
 
     for test in tests:
@@ -129,13 +128,15 @@ def generate_report(
     test_details = []
     for test in tests:
         tier = classify_test_tier(test)
-        test_details.append({
-            "nodeid": test.get("nodeid", ""),
-            "outcome": test.get("outcome", "unknown"),
-            "tier": tier,
-            "duration": test.get("duration", 0),
-            "message": test.get("call", {}).get("longrepr", "") if test.get("call") else "",
-        })
+        test_details.append(
+            {
+                "nodeid": test.get("nodeid", ""),
+                "outcome": test.get("outcome", "unknown"),
+                "tier": tier,
+                "duration": test.get("duration", 0),
+                "message": test.get("call", {}).get("longrepr", "") if test.get("call") else "",
+            }
+        )
 
     report = {
         "implementation": implementation_name,
@@ -146,9 +147,7 @@ def generate_report(
         "tiers": {
             tier_name: {
                 **results,
-                "pass_rate": (
-                    results["passed"] / max(results["total"] - results["skipped"], 1)
-                ),
+                "pass_rate": (results["passed"] / max(results["total"] - results["skipped"], 1)),
                 "status": "PASS" if determine_tier_status(tier_name, results) else "FAIL",
             }
             for tier_name, results in tier_results.items()
@@ -207,7 +206,8 @@ def main():
         help="Implementation version",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         default="compliance_report.json",
         help="Output path for JSON report",
     )

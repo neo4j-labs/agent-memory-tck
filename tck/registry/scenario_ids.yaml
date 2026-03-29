@@ -1,0 +1,1097 @@
+# neo4j-agent-memory TCK Scenario ID Registry
+# Version: 0.1.0
+#
+# Each scenario has a stable ID that is never reassigned.
+# Format: SCN-{TIER}-{NUMBER}
+#   TIER: B (Bronze), S (Silver), G (Gold)
+#   NUMBER: Three-digit sequential number
+#
+# Once published in a released version, a scenario ID is permanent.
+
+# =============================================================================
+# Bronze Tier — Schema Compliance (test_schema.py)
+# =============================================================================
+
+SCN-B-001:
+  spec_clause: SPEC-1.1.1
+  test_id: test_schema::TestSchemaConversationCreation::test_first_message_creates_conversation
+  tier: bronze
+  description: First message creates conversation node
+
+SCN-B-002:
+  spec_clause: SPEC-1.1.2
+  test_id: test_schema::TestSchemaConversationCreation::test_subsequent_messages_reuse_conversation
+  tier: bronze
+  description: Subsequent messages reuse existing conversation
+
+SCN-B-003:
+  spec_clause: SPEC-1.1.3
+  test_id: test_schema::TestSchemaSessionIsolation::test_messages_isolated_between_sessions
+  tier: bronze
+  description: Messages isolated between sessions
+
+SCN-B-004:
+  spec_clause: SPEC-1.1.4
+  test_id: test_schema::TestSchemaMessageDeletion::test_deleted_message_not_retrievable
+  tier: bronze
+  description: Deleted message not retrievable
+
+SCN-B-005:
+  spec_clause: SPEC-1.1.5
+  test_id: test_schema::TestSchemaConversationCreation::test_conversation_id_is_valid_uuid
+  tier: bronze
+  description: Conversation ID is valid UUID
+
+SCN-B-006:
+  spec_clause: SPEC-1.1.6
+  test_id: test_schema::TestSchemaConversationCreation::test_conversation_created_at_is_set
+  tier: bronze
+  description: Conversation created_at is set
+
+SCN-B-007:
+  spec_clause: SPEC-1.1.7
+  test_id: test_schema::TestSchemaConversationCreation::test_conversation_title_is_optional
+  tier: bronze
+  description: Conversation title is optional
+
+SCN-B-008:
+  spec_clause: SPEC-1.1.8
+  test_id: test_schema::TestSchemaConversationCreation::test_conversation_reuses_same_id_across_messages
+  tier: bronze
+  description: Same session yields same conversation ID
+
+SCN-B-009:
+  spec_clause: SPEC-1.1.9
+  test_id: test_schema::TestSchemaSessionIsolation::test_sessions_have_different_conversation_ids
+  tier: bronze
+  description: Different sessions produce different conversation IDs
+
+SCN-B-010:
+  spec_clause: SPEC-1.1.10
+  test_id: test_schema::TestSchemaMessageDeletion::test_deletion_does_not_affect_other_messages
+  tier: bronze
+  description: Deletion does not affect other messages
+
+SCN-B-011:
+  spec_clause: SPEC-1.1.11
+  test_id: test_schema::TestSchemaMessageProperties::test_message_has_id
+  tier: bronze
+  description: Message has non-null id
+
+SCN-B-012:
+  spec_clause: SPEC-1.1.12
+  test_id: test_schema::TestSchemaMessageProperties::test_message_has_role
+  tier: bronze
+  description: Message has role matching input
+
+SCN-B-013:
+  spec_clause: SPEC-1.1.13
+  test_id: test_schema::TestSchemaMessageProperties::test_message_has_content
+  tier: bronze
+  description: Message has content matching input
+
+SCN-B-014:
+  spec_clause: SPEC-1.1.14
+  test_id: test_schema::TestSchemaMessageProperties::test_message_has_timestamp
+  tier: bronze
+  description: Message has non-null timestamp
+
+SCN-B-015:
+  spec_clause: SPEC-1.2.1
+  test_id: test_schema::TestSchemaEntityCreation::test_entity_created_with_required_fields
+  tier: bronze
+  description: Entity has required fields
+
+SCN-B-016:
+  spec_clause: SPEC-1.2.2
+  test_id: test_schema::TestSchemaEntityCreation::test_entity_id_is_valid_uuid
+  tier: bronze
+  description: Entity ID is valid UUID
+
+SCN-B-017:
+  spec_clause: SPEC-1.2.3
+  test_id: test_schema::TestSchemaEntityCreation::test_entity_person_type_schema
+  tier: bronze
+  description: PERSON entity type preserved
+
+SCN-B-018:
+  spec_clause: SPEC-1.2.4
+  test_id: test_schema::TestSchemaEntityCreation::test_entity_organization_type_schema
+  tier: bronze
+  description: ORGANIZATION entity type preserved
+
+SCN-B-019:
+  spec_clause: SPEC-1.2.5
+  test_id: test_schema::TestSchemaEntityCreation::test_entity_location_type_schema
+  tier: bronze
+  description: LOCATION entity type preserved
+
+SCN-B-020:
+  spec_clause: SPEC-1.2.6
+  test_id: test_schema::TestSchemaEntityCreation::test_entity_event_type_schema
+  tier: bronze
+  description: EVENT entity type preserved
+
+SCN-B-021:
+  spec_clause: SPEC-1.2.7
+  test_id: test_schema::TestSchemaEntityCreation::test_entity_object_type_schema
+  tier: bronze
+  description: OBJECT entity type preserved
+
+SCN-B-022:
+  spec_clause: SPEC-1.2.8
+  test_id: test_schema::TestSchemaEntityCreation::test_entity_created_at_is_set
+  tier: bronze
+  description: Entity created_at is set
+
+SCN-B-023:
+  spec_clause: SPEC-1.3.1
+  test_id: test_schema::TestSchemaPreferenceCreation::test_preference_has_required_fields
+  tier: bronze
+  description: Preference has required fields
+
+SCN-B-024:
+  spec_clause: SPEC-1.3.2
+  test_id: test_schema::TestSchemaPreferenceCreation::test_preference_id_is_valid_uuid
+  tier: bronze
+  description: Preference ID is valid UUID
+
+SCN-B-025:
+  spec_clause: SPEC-1.4.1
+  test_id: test_schema::TestSchemaFactCreation::test_fact_has_required_fields
+  tier: bronze
+  description: Fact has required fields
+
+SCN-B-026:
+  spec_clause: SPEC-1.4.2
+  test_id: test_schema::TestSchemaFactCreation::test_fact_id_is_valid_uuid
+  tier: bronze
+  description: Fact ID is valid UUID
+
+# =============================================================================
+# Bronze Tier — Short-Term Memory (test_short_term.py)
+# =============================================================================
+
+SCN-B-027:
+  spec_clause: SPEC-2.1.1
+  test_id: test_short_term::TestAddMessage::test_add_message_returns_valid_message
+  tier: bronze
+  description: add_message returns valid TCKMessage
+
+SCN-B-028:
+  spec_clause: SPEC-2.1.2
+  test_id: test_short_term::TestAddMessage::test_add_message_user_role
+  tier: bronze
+  description: add_message accepts user role
+
+SCN-B-029:
+  spec_clause: SPEC-2.1.3
+  test_id: test_short_term::TestAddMessage::test_add_message_assistant_role
+  tier: bronze
+  description: add_message accepts assistant role
+
+SCN-B-030:
+  spec_clause: SPEC-2.1.4
+  test_id: test_short_term::TestAddMessage::test_add_message_system_role
+  tier: bronze
+  description: add_message accepts system role
+
+SCN-B-031:
+  spec_clause: SPEC-2.1.5
+  test_id: test_short_term::TestAddMessage::test_add_message_with_metadata
+  tier: bronze
+  description: add_message preserves metadata
+
+SCN-B-032:
+  spec_clause: SPEC-2.1.6
+  test_id: test_short_term::TestAddMessage::test_add_message_creates_conversation_on_first_call
+  tier: bronze
+  description: First add_message creates conversation
+
+SCN-B-033:
+  spec_clause: SPEC-2.1.7
+  test_id: test_short_term::TestAddMessage::test_add_message_empty_content
+  tier: bronze
+  description: add_message accepts empty content
+
+SCN-B-034:
+  spec_clause: SPEC-2.1.8
+  test_id: test_short_term::TestAddMessage::test_add_message_long_content
+  tier: bronze
+  description: add_message preserves 10K+ character content
+
+SCN-B-035:
+  spec_clause: SPEC-2.1.9
+  test_id: test_short_term::TestAddMessage::test_add_message_unicode_content
+  tier: bronze
+  description: add_message preserves unicode and emoji
+
+SCN-B-036:
+  spec_clause: SPEC-2.1.10
+  test_id: test_short_term::TestAddMessage::test_add_message_special_characters
+  tier: bronze
+  description: add_message preserves special characters
+
+SCN-B-037:
+  spec_clause: SPEC-2.1.11
+  test_id: test_short_term::TestAddMessage::test_add_message_empty_metadata
+  tier: bronze
+  description: add_message with empty metadata succeeds
+
+SCN-B-038:
+  spec_clause: SPEC-2.1.12
+  test_id: test_short_term::TestAddMessage::test_add_message_nested_metadata
+  tier: bronze
+  description: add_message preserves nested metadata
+
+SCN-B-039:
+  spec_clause: SPEC-2.1.13
+  test_id: test_short_term::TestAddMessage::test_add_message_null_metadata_defaults_empty
+  tier: bronze
+  description: add_message defaults metadata to empty dict
+
+SCN-B-040:
+  spec_clause: SPEC-2.1.14
+  test_id: test_short_term::TestAddMessage::test_add_message_uuid_format
+  tier: bronze
+  description: add_message returns valid UUID
+
+SCN-B-041:
+  spec_clause: SPEC-2.1.15
+  test_id: test_short_term::TestAddMessage::test_add_message_timestamp_is_recent
+  tier: bronze
+  description: add_message timestamp is recent
+
+SCN-B-042:
+  spec_clause: SPEC-2.1.16
+  test_id: test_short_term::TestAddMessage::test_add_message_rapid_succession
+  tier: bronze
+  description: 50 rapid messages all stored and ordered
+
+SCN-B-043:
+  spec_clause: SPEC-2.2.1
+  test_id: test_short_term::TestGetConversation::test_get_conversation_message_order
+  tier: bronze
+  description: get_conversation returns messages in insertion order
+
+SCN-B-044:
+  spec_clause: SPEC-2.2.2
+  test_id: test_short_term::TestGetConversation::test_get_conversation_with_limit
+  tier: bronze
+  description: get_conversation respects limit parameter
+
+SCN-B-045:
+  spec_clause: SPEC-2.2.3
+  test_id: test_short_term::TestGetConversation::test_get_conversation_empty_session
+  tier: bronze
+  description: get_conversation returns empty for non-existent session
+
+SCN-B-046:
+  spec_clause: SPEC-2.2.4
+  test_id: test_short_term::TestGetConversation::test_get_conversation_multiple_sessions_isolated
+  tier: bronze
+  description: get_conversation isolates sessions
+
+SCN-B-047:
+  spec_clause: SPEC-2.2.5
+  test_id: test_short_term::TestGetConversation::test_get_conversation_limit_exceeds_count
+  tier: bronze
+  description: Limit exceeding message count returns all
+
+SCN-B-048:
+  spec_clause: SPEC-2.2.6
+  test_id: test_short_term::TestGetConversation::test_get_conversation_limit_one
+  tier: bronze
+  description: limit=1 returns exactly one message
+
+SCN-B-049:
+  spec_clause: SPEC-2.2.7
+  test_id: test_short_term::TestGetConversation::test_get_conversation_preserves_content_fidelity
+  tier: bronze
+  description: Content fidelity preserved on retrieval
+
+SCN-B-050:
+  spec_clause: SPEC-2.2.8
+  test_id: test_short_term::TestGetConversation::test_get_conversation_preserves_metadata
+  tier: bronze
+  description: Metadata preserved on retrieval
+
+SCN-B-051:
+  spec_clause: SPEC-2.2.9
+  test_id: test_short_term::TestGetConversation::test_get_conversation_preserves_roles
+  tier: bronze
+  description: Roles preserved on retrieval
+
+SCN-B-052:
+  spec_clause: SPEC-2.2.10
+  test_id: test_short_term::TestGetConversation::test_get_conversation_twenty_messages_ordered
+  tier: bronze
+  description: 20+ messages maintain order
+
+SCN-B-053:
+  spec_clause: SPEC-2.2.11
+  test_id: test_short_term::TestGetConversation::test_get_conversation_returns_valid_conversation_id
+  tier: bronze
+  description: Conversation has valid UUID id
+
+SCN-B-054:
+  spec_clause: SPEC-2.2.12
+  test_id: test_short_term::TestGetConversation::test_get_conversation_three_sessions_fully_isolated
+  tier: bronze
+  description: Three sessions fully isolated
+
+SCN-B-055:
+  spec_clause: SPEC-2.3.1
+  test_id: test_short_term::TestSearchMessages::test_search_messages_finds_relevant
+  tier: bronze
+  description: Search finds relevant messages
+
+SCN-B-056:
+  spec_clause: SPEC-2.3.2
+  test_id: test_short_term::TestSearchMessages::test_search_messages_session_filter
+  tier: bronze
+  description: Search respects session filter
+
+SCN-B-057:
+  spec_clause: SPEC-2.3.3
+  test_id: test_short_term::TestSearchMessages::test_search_messages_respects_limit
+  tier: bronze
+  description: Search respects limit parameter
+
+SCN-B-058:
+  spec_clause: SPEC-2.3.4
+  test_id: test_short_term::TestSearchMessages::test_search_messages_no_results
+  tier: bronze
+  description: Search returns empty when nothing matches
+
+SCN-B-059:
+  spec_clause: SPEC-2.3.5
+  test_id: test_short_term::TestSearchMessages::test_search_messages_limit_one
+  tier: bronze
+  description: Search with limit=1 returns at most 1
+
+SCN-B-060:
+  spec_clause: SPEC-2.3.6
+  test_id: test_short_term::TestSearchMessages::test_search_messages_empty_database
+  tier: bronze
+  description: Search on empty database returns empty
+
+SCN-B-061:
+  spec_clause: SPEC-2.3.7
+  test_id: test_short_term::TestSearchMessages::test_search_messages_across_sessions
+  tier: bronze
+  description: Search without session_id searches all sessions
+
+SCN-B-062:
+  spec_clause: SPEC-2.4.1
+  test_id: test_short_term::TestListSessions::test_list_sessions_returns_all
+  tier: bronze
+  description: list_sessions returns all active sessions
+
+SCN-B-063:
+  spec_clause: SPEC-2.4.2
+  test_id: test_short_term::TestListSessions::test_list_sessions_includes_message_count
+  tier: bronze
+  description: list_sessions includes accurate message counts
+
+SCN-B-064:
+  spec_clause: SPEC-2.4.3
+  test_id: test_short_term::TestListSessions::test_list_sessions_empty
+  tier: bronze
+  description: list_sessions returns empty when no sessions
+
+SCN-B-065:
+  spec_clause: SPEC-2.4.4
+  test_id: test_short_term::TestListSessions::test_list_sessions_single_session
+  tier: bronze
+  description: list_sessions returns one entry for one session
+
+SCN-B-066:
+  spec_clause: SPEC-2.4.5
+  test_id: test_short_term::TestListSessions::test_list_sessions_respects_limit
+  tier: bronze
+  description: list_sessions respects limit parameter
+
+SCN-B-067:
+  spec_clause: SPEC-2.4.6
+  test_id: test_short_term::TestListSessions::test_list_sessions_created_at_present
+  tier: bronze
+  description: list_sessions entries have created_at
+
+SCN-B-068:
+  spec_clause: SPEC-2.4.7
+  test_id: test_short_term::TestListSessions::test_list_sessions_message_count_after_delete
+  tier: bronze
+  description: list_sessions reflects count after deletion
+
+SCN-B-069:
+  spec_clause: SPEC-2.4.8
+  test_id: test_short_term::TestListSessions::test_list_sessions_multiple_sessions_independent_counts
+  tier: bronze
+  description: list_sessions reports independent counts
+
+SCN-B-070:
+  spec_clause: SPEC-2.5.1
+  test_id: test_short_term::TestDeleteMessage::test_delete_message_returns_true
+  tier: bronze
+  description: delete_message returns True for existing message
+
+SCN-B-071:
+  spec_clause: SPEC-2.5.2
+  test_id: test_short_term::TestDeleteMessage::test_delete_message_removes_from_conversation
+  tier: bronze
+  description: Deleted message removed from conversation
+
+SCN-B-072:
+  spec_clause: SPEC-2.5.3
+  test_id: test_short_term::TestDeleteMessage::test_delete_message_nonexistent_returns_false
+  tier: bronze
+  description: delete_message returns False for non-existent
+
+SCN-B-073:
+  spec_clause: SPEC-2.5.4
+  test_id: test_short_term::TestDeleteMessage::test_delete_message_preserves_remaining_order
+  tier: bronze
+  description: Deletion preserves remaining message order
+
+SCN-B-074:
+  spec_clause: SPEC-2.5.5
+  test_id: test_short_term::TestDeleteMessage::test_delete_first_message
+  tier: bronze
+  description: Deleting first message preserves rest
+
+SCN-B-075:
+  spec_clause: SPEC-2.5.6
+  test_id: test_short_term::TestDeleteMessage::test_delete_last_message
+  tier: bronze
+  description: Deleting last message preserves rest
+
+SCN-B-076:
+  spec_clause: SPEC-2.5.7
+  test_id: test_short_term::TestDeleteMessage::test_delete_middle_message
+  tier: bronze
+  description: Deleting middle message repairs chain
+
+SCN-B-077:
+  spec_clause: SPEC-2.5.8
+  test_id: test_short_term::TestDeleteMessage::test_delete_all_messages_one_by_one
+  tier: bronze
+  description: Deleting all messages leaves session empty
+
+SCN-B-078:
+  spec_clause: SPEC-2.5.9
+  test_id: test_short_term::TestDeleteMessage::test_delete_same_message_twice
+  tier: bronze
+  description: Second delete of same message returns False
+
+SCN-B-079:
+  spec_clause: SPEC-2.6.1
+  test_id: test_short_term::TestClearSession::test_clear_session_removes_all_messages
+  tier: bronze
+  description: clear_session removes all messages
+
+SCN-B-080:
+  spec_clause: SPEC-2.6.2
+  test_id: test_short_term::TestClearSession::test_clear_session_preserves_other_sessions
+  tier: bronze
+  description: clear_session preserves other sessions
+
+SCN-B-081:
+  spec_clause: SPEC-2.6.3
+  test_id: test_short_term::TestClearSession::test_clear_session_idempotent_on_empty
+  tier: bronze
+  description: clear_session on empty session is safe
+
+SCN-B-082:
+  spec_clause: SPEC-2.6.4
+  test_id: test_short_term::TestClearSession::test_clear_session_then_add_new_messages
+  tier: bronze
+  description: Cleared session accepts new messages
+
+SCN-B-083:
+  spec_clause: SPEC-2.6.5
+  test_id: test_short_term::TestClearSession::test_clear_session_multiple_sessions_selective
+  tier: bronze
+  description: Clearing one session preserves others
+
+SCN-B-084:
+  spec_clause: SPEC-2.7.1
+  test_id: test_short_term::TestMessageChainStructure::test_messages_maintain_insertion_order
+  tier: bronze
+  description: Messages maintain insertion order
+
+SCN-B-085:
+  spec_clause: SPEC-2.7.2
+  test_id: test_short_term::TestMessageChainStructure::test_timestamps_are_monotonically_increasing
+  tier: bronze
+  description: Timestamps are monotonically non-decreasing
+
+SCN-B-086:
+  spec_clause: SPEC-2.7.3
+  test_id: test_short_term::TestMessageChainStructure::test_chain_with_single_message
+  tier: bronze
+  description: Single message retrievable
+
+SCN-B-087:
+  spec_clause: SPEC-2.7.4
+  test_id: test_short_term::TestMessageChainStructure::test_chain_with_two_messages
+  tier: bronze
+  description: Two messages correctly ordered
+
+SCN-B-088:
+  spec_clause: SPEC-2.7.5
+  test_id: test_short_term::TestMessageChainStructure::test_chain_integrity_after_middle_delete
+  tier: bronze
+  description: Chain integrity after middle delete
+
+SCN-B-089:
+  spec_clause: SPEC-2.7.6
+  test_id: test_short_term::TestMessageChainStructure::test_large_chain_ordering
+  tier: bronze
+  description: 100 messages maintain order
+
+SCN-B-090:
+  spec_clause: SPEC-2.7.7
+  test_id: test_short_term::TestMessageChainStructure::test_mixed_roles_maintain_order
+  tier: bronze
+  description: Mixed roles maintain insertion order
+
+SCN-B-091:
+  spec_clause: SPEC-2.8.1
+  test_id: test_short_term::TestIdempotency::test_add_message_returns_unique_ids
+  tier: bronze
+  description: Each add_message returns unique ID
+
+SCN-B-092:
+  spec_clause: SPEC-2.8.2
+  test_id: test_short_term::TestIdempotency::test_duplicate_content_stored_separately
+  tier: bronze
+  description: Duplicate content stored as separate messages
+
+SCN-B-093:
+  spec_clause: SPEC-2.8.3
+  test_id: test_short_term::TestIdempotency::test_clear_session_is_idempotent
+  tier: bronze
+  description: clear_session is idempotent
+
+# =============================================================================
+# Silver Tier — Long-Term Memory (test_long_term.py)
+# =============================================================================
+
+SCN-S-001:
+  spec_clause: SPEC-3.1.1
+  test_id: test_long_term::TestAddEntity::test_add_entity_basic
+  tier: silver
+  description: add_entity returns valid TCKEntity
+
+SCN-S-002:
+  spec_clause: SPEC-3.1.2
+  test_id: test_long_term::TestAddEntity::test_add_entity_with_description
+  tier: silver
+  description: add_entity stores description
+
+SCN-S-003:
+  spec_clause: SPEC-3.1.3
+  test_id: test_long_term::TestAddEntity::test_add_entity_person_type
+  tier: silver
+  description: add_entity accepts PERSON type
+
+SCN-S-004:
+  spec_clause: SPEC-3.1.4
+  test_id: test_long_term::TestAddEntity::test_add_entity_organization_type
+  tier: silver
+  description: add_entity accepts ORGANIZATION type
+
+SCN-S-005:
+  spec_clause: SPEC-3.1.5
+  test_id: test_long_term::TestAddEntity::test_add_entity_location_type
+  tier: silver
+  description: add_entity accepts LOCATION type
+
+SCN-S-006:
+  spec_clause: SPEC-3.1.6
+  test_id: test_long_term::TestAddEntity::test_add_entity_event_type
+  tier: silver
+  description: add_entity accepts EVENT type
+
+SCN-S-007:
+  spec_clause: SPEC-3.1.7
+  test_id: test_long_term::TestAddEntity::test_add_entity_object_type
+  tier: silver
+  description: add_entity accepts OBJECT type
+
+SCN-S-008:
+  spec_clause: SPEC-3.1.8
+  test_id: test_long_term::TestAddEntity::test_add_multiple_entities
+  tier: silver
+  description: Multiple entities independently retrievable
+
+SCN-S-009:
+  spec_clause: SPEC-3.2.1
+  test_id: test_long_term::TestAddPreference::test_add_preference_basic
+  tier: silver
+  description: add_preference returns valid TCKPreference
+
+SCN-S-010:
+  spec_clause: SPEC-3.2.2
+  test_id: test_long_term::TestAddPreference::test_add_preference_with_context
+  tier: silver
+  description: add_preference stores context
+
+SCN-S-011:
+  spec_clause: SPEC-3.2.3
+  test_id: test_long_term::TestAddPreference::test_add_multiple_preferences
+  tier: silver
+  description: Multiple preferences independently stored
+
+SCN-S-012:
+  spec_clause: SPEC-3.3.1
+  test_id: test_long_term::TestAddFact::test_add_fact_basic
+  tier: silver
+  description: add_fact returns valid TCKFact
+
+SCN-S-013:
+  spec_clause: SPEC-3.3.2
+  test_id: test_long_term::TestAddFact::test_add_multiple_facts
+  tier: silver
+  description: Multiple facts independently stored
+
+SCN-S-014:
+  spec_clause: SPEC-3.4.1
+  test_id: test_long_term::TestSearchEntities::test_search_entities_finds_relevant
+  tier: silver
+  description: search_entities finds matching entities
+
+SCN-S-015:
+  spec_clause: SPEC-3.4.2
+  test_id: test_long_term::TestSearchEntities::test_search_entities_respects_limit
+  tier: silver
+  description: search_entities respects limit
+
+SCN-S-016:
+  spec_clause: SPEC-3.5.1
+  test_id: test_long_term::TestSearchPreferences::test_search_preferences_finds_relevant
+  tier: silver
+  description: search_preferences finds matching preferences
+
+SCN-S-017:
+  spec_clause: SPEC-3.5.2
+  test_id: test_long_term::TestSearchPreferences::test_search_preferences_by_category
+  tier: silver
+  description: search_preferences filters by category
+
+SCN-S-018:
+  spec_clause: SPEC-3.6.1
+  test_id: test_long_term::TestGetEntityByName::test_get_entity_by_name_found
+  tier: silver
+  description: get_entity_by_name returns entity when found
+
+SCN-S-019:
+  spec_clause: SPEC-3.6.2
+  test_id: test_long_term::TestGetEntityByName::test_get_entity_by_name_not_found
+  tier: silver
+  description: get_entity_by_name returns None when not found
+
+SCN-S-020:
+  spec_clause: SPEC-3.7.1
+  test_id: test_long_term::TestGetRelatedEntities::test_get_related_entities_with_relationship
+  tier: silver
+  description: get_related_entities returns connected entities
+
+SCN-S-021:
+  spec_clause: SPEC-3.7.2
+  test_id: test_long_term::TestGetRelatedEntities::test_get_related_entities_empty
+  tier: silver
+  description: get_related_entities returns empty for isolated entity
+
+# =============================================================================
+# Silver Tier — Reasoning Memory (test_reasoning.py)
+# =============================================================================
+
+SCN-S-022:
+  spec_clause: SPEC-4.1.1
+  test_id: test_reasoning::TestStartTrace::test_start_trace_basic
+  tier: silver
+  description: start_trace returns valid TCKReasoningTrace
+
+SCN-S-023:
+  spec_clause: SPEC-4.1.2
+  test_id: test_reasoning::TestStartTrace::test_start_trace_unique_ids
+  tier: silver
+  description: Each trace has unique ID
+
+SCN-S-024:
+  spec_clause: SPEC-4.2.1
+  test_id: test_reasoning::TestAddStep::test_add_step_basic
+  tier: silver
+  description: add_step returns valid TCKReasoningStep
+
+SCN-S-025:
+  spec_clause: SPEC-4.2.2
+  test_id: test_reasoning::TestAddStep::test_add_step_sequential_numbering
+  tier: silver
+  description: Steps have monotonically increasing step_number
+
+SCN-S-026:
+  spec_clause: SPEC-4.2.3
+  test_id: test_reasoning::TestAddStep::test_add_step_partial_fields
+  tier: silver
+  description: add_step accepts partial fields
+
+SCN-S-027:
+  spec_clause: SPEC-4.3.1
+  test_id: test_reasoning::TestRecordToolCall::test_record_tool_call_basic
+  tier: silver
+  description: record_tool_call returns valid TCKToolCall
+
+SCN-S-028:
+  spec_clause: SPEC-4.3.2
+  test_id: test_reasoning::TestRecordToolCall::test_record_tool_call_with_result
+  tier: silver
+  description: record_tool_call stores result and duration
+
+SCN-S-029:
+  spec_clause: SPEC-4.3.3
+  test_id: test_reasoning::TestRecordToolCall::test_record_tool_call_failure_status
+  tier: silver
+  description: record_tool_call supports failure status
+
+SCN-S-030:
+  spec_clause: SPEC-4.3.4
+  test_id: test_reasoning::TestRecordToolCall::test_record_tool_call_timeout_status
+  tier: silver
+  description: record_tool_call supports timeout status
+
+SCN-S-031:
+  spec_clause: SPEC-4.4.1
+  test_id: test_reasoning::TestCompleteTrace::test_complete_trace_with_outcome
+  tier: silver
+  description: complete_trace sets outcome and success
+
+SCN-S-032:
+  spec_clause: SPEC-4.4.2
+  test_id: test_reasoning::TestCompleteTrace::test_complete_trace_failure
+  tier: silver
+  description: complete_trace supports failure outcomes
+
+SCN-S-033:
+  spec_clause: SPEC-4.5.1
+  test_id: test_reasoning::TestGetTraceWithSteps::test_get_trace_with_steps
+  tier: silver
+  description: get_trace_with_steps returns full trace
+
+SCN-S-034:
+  spec_clause: SPEC-4.5.2
+  test_id: test_reasoning::TestGetTraceWithSteps::test_get_trace_includes_tool_calls
+  tier: silver
+  description: get_trace_with_steps includes tool calls
+
+SCN-S-035:
+  spec_clause: SPEC-4.5.3
+  test_id: test_reasoning::TestGetTraceWithSteps::test_get_trace_nonexistent
+  tier: silver
+  description: get_trace_with_steps returns None for nonexistent
+
+SCN-S-036:
+  spec_clause: SPEC-4.6.1
+  test_id: test_reasoning::TestListTraces::test_list_traces_all
+  tier: silver
+  description: list_traces returns all traces
+
+SCN-S-037:
+  spec_clause: SPEC-4.6.2
+  test_id: test_reasoning::TestListTraces::test_list_traces_by_session
+  tier: silver
+  description: list_traces filters by session
+
+SCN-S-038:
+  spec_clause: SPEC-4.6.3
+  test_id: test_reasoning::TestListTraces::test_list_traces_respects_limit
+  tier: silver
+  description: list_traces respects limit
+
+SCN-S-039:
+  spec_clause: SPEC-4.7.1
+  test_id: test_reasoning::TestGetToolStats::test_get_tool_stats_after_calls
+  tier: silver
+  description: get_tool_stats returns accurate statistics
+
+SCN-S-040:
+  spec_clause: SPEC-3.1.9
+  test_id: test_long_term::TestAddEntity::test_add_entity_without_description
+  tier: silver
+  description: add_entity works without description
+
+SCN-S-041:
+  spec_clause: SPEC-3.1.10
+  test_id: test_long_term::TestAddEntity::test_add_entity_duplicate_name_different_type
+  tier: silver
+  description: add_entity allows duplicate name with different type
+
+SCN-S-042:
+  spec_clause: SPEC-3.1.11
+  test_id: test_long_term::TestAddEntity::test_add_entity_special_characters_in_name
+  tier: silver
+  description: add_entity preserves special characters in name
+
+SCN-S-043:
+  spec_clause: SPEC-3.1.12
+  test_id: test_long_term::TestAddEntity::test_add_entity_id_is_uuid
+  tier: silver
+  description: add_entity returns valid UUID id
+
+SCN-S-044:
+  spec_clause: SPEC-3.2.4
+  test_id: test_long_term::TestAddPreference::test_add_preference_without_context
+  tier: silver
+  description: add_preference works without context
+
+SCN-S-045:
+  spec_clause: SPEC-3.2.5
+  test_id: test_long_term::TestAddPreference::test_add_preference_long_text
+  tier: silver
+  description: add_preference preserves long text
+
+SCN-S-046:
+  spec_clause: SPEC-3.2.6
+  test_id: test_long_term::TestAddPreference::test_add_preference_same_category_multiple
+  tier: silver
+  description: add_preference allows multiple in same category
+
+SCN-S-047:
+  spec_clause: SPEC-3.2.7
+  test_id: test_long_term::TestAddPreference::test_add_preference_id_is_uuid
+  tier: silver
+  description: add_preference returns valid UUID id
+
+SCN-S-048:
+  spec_clause: SPEC-3.3.3
+  test_id: test_long_term::TestAddFact::test_add_fact_special_characters
+  tier: silver
+  description: add_fact preserves special characters
+
+SCN-S-049:
+  spec_clause: SPEC-3.3.4
+  test_id: test_long_term::TestAddFact::test_add_fact_id_is_uuid
+  tier: silver
+  description: add_fact returns valid UUID id
+
+SCN-S-050:
+  spec_clause: SPEC-3.3.5
+  test_id: test_long_term::TestAddFact::test_add_fact_same_subject_multiple_facts
+  tier: silver
+  description: add_fact allows multiple facts for same subject
+
+SCN-S-051:
+  spec_clause: SPEC-3.4.3
+  test_id: test_long_term::TestSearchEntities::test_search_entities_empty_database
+  tier: silver
+  description: search_entities returns empty on empty database
+
+SCN-S-052:
+  spec_clause: SPEC-3.4.4
+  test_id: test_long_term::TestSearchEntities::test_search_entities_no_match
+  tier: silver
+  description: search_entities returns empty when nothing matches
+
+SCN-S-053:
+  spec_clause: SPEC-3.5.3
+  test_id: test_long_term::TestSearchPreferences::test_search_preferences_empty_database
+  tier: silver
+  description: search_preferences returns empty on empty database
+
+SCN-S-054:
+  spec_clause: SPEC-3.5.4
+  test_id: test_long_term::TestSearchPreferences::test_search_preferences_no_match
+  tier: silver
+  description: search_preferences returns empty when nothing matches
+
+SCN-S-055:
+  spec_clause: SPEC-3.7.3
+  test_id: test_long_term::TestGetRelatedEntities::test_get_related_entities_with_type_filter
+  tier: silver
+  description: get_related_entities filters by relationship type
+
+SCN-S-056:
+  spec_clause: SPEC-3.7.4
+  test_id: test_long_term::TestGetRelatedEntities::test_get_related_entities_multiple_relationships
+  tier: silver
+  description: get_related_entities returns multiple related entities
+
+SCN-S-057:
+  spec_clause: SPEC-4.2.4
+  test_id: test_reasoning::TestAddStep::test_add_step_observation_only
+  tier: silver
+  description: add_step accepts observation only
+
+SCN-S-058:
+  spec_clause: SPEC-4.2.5
+  test_id: test_reasoning::TestAddStep::test_add_step_all_fields
+  tier: silver
+  description: add_step accepts all fields populated
+
+SCN-S-059:
+  spec_clause: SPEC-4.2.6
+  test_id: test_reasoning::TestAddStep::test_add_many_steps_maintain_numbering
+  tier: silver
+  description: Many steps maintain sequential numbering
+
+SCN-S-060:
+  spec_clause: SPEC-4.3.5
+  test_id: test_reasoning::TestRecordToolCall::test_record_tool_call_error_status
+  tier: silver
+  description: record_tool_call supports error status
+
+SCN-S-061:
+  spec_clause: SPEC-4.3.6
+  test_id: test_reasoning::TestRecordToolCall::test_record_tool_call_cancelled_status
+  tier: silver
+  description: record_tool_call supports cancelled status
+
+SCN-S-062:
+  spec_clause: SPEC-4.3.7
+  test_id: test_reasoning::TestRecordToolCall::test_record_tool_call_pending_status
+  tier: silver
+  description: record_tool_call supports pending status
+
+SCN-S-063:
+  spec_clause: SPEC-4.3.8
+  test_id: test_reasoning::TestRecordToolCall::test_record_multiple_tool_calls_per_step
+  tier: silver
+  description: Multiple tool calls recorded per step
+
+SCN-S-064:
+  spec_clause: SPEC-4.6.4
+  test_id: test_reasoning::TestListTraces::test_list_traces_empty
+  tier: silver
+  description: list_traces returns empty when no traces exist
+
+SCN-S-065:
+  spec_clause: SPEC-4.7.2
+  test_id: test_reasoning::TestGetToolStats::test_get_tool_stats_multiple_tools
+  tier: silver
+  description: get_tool_stats handles multiple tools
+
+SCN-S-066:
+  spec_clause: SPEC-4.7.3
+  test_id: test_reasoning::TestGetToolStats::test_get_tool_stats_no_calls
+  tier: silver
+  description: get_tool_stats returns empty when no calls
+
+SCN-S-067:
+  spec_clause: SPEC-4.7.4
+  test_id: test_reasoning::TestGetToolStats::test_get_tool_stats_success_rate
+  tier: silver
+  description: get_tool_stats calculates correct success rate
+
+# =============================================================================
+# Gold Tier — Cross-Memory Integration (test_cross_memory.py)
+# =============================================================================
+
+SCN-G-001:
+  spec_clause: SPEC-5.1.1
+  test_id: test_cross_memory::TestCrossMemoryEntityReferences::test_entity_in_long_term_and_reasoning
+  tier: gold
+  description: Entity referenceable across memory types
+
+SCN-G-002:
+  spec_clause: SPEC-5.1.2
+  test_id: test_cross_memory::TestCrossMemoryEntityReferences::test_end_to_end_conversation_with_entities_and_reasoning
+  tier: gold
+  description: End-to-end flow across all memory types
+
+SCN-G-003:
+  spec_clause: SPEC-5.2.1
+  test_id: test_cross_memory::TestAddRelationship::test_add_relationship_between_entities
+  tier: gold
+  description: add_relationship creates typed edge
+
+SCN-G-004:
+  spec_clause: SPEC-5.2.2
+  test_id: test_cross_memory::TestAddRelationship::test_add_relationship_bidirectional_traversal
+  tier: gold
+  description: Related entities discoverable from source
+
+SCN-G-005:
+  spec_clause: SPEC-5.3.1
+  test_id: test_cross_memory::TestMergeDuplicateEntities::test_merge_duplicate_entities
+  tier: gold
+  description: merge_duplicate_entities combines two entities
+
+SCN-G-006:
+  spec_clause: SPEC-5.4.1
+  test_id: test_cross_memory::TestGetSimilarTraces::test_get_similar_traces
+  tier: gold
+  description: get_similar_traces returns similar traces
+
+SCN-G-007:
+  spec_clause: SPEC-5.1.3
+  test_id: test_cross_memory::TestCrossMemoryEntityReferences::test_entity_enriched_across_sessions
+  tier: gold
+  description: Entity enriched across sessions
+
+SCN-G-008:
+  spec_clause: SPEC-5.1.4
+  test_id: test_cross_memory::TestCrossMemoryEntityReferences::test_fact_references_entity_names
+  tier: gold
+  description: Fact references entity names
+
+SCN-G-009:
+  spec_clause: SPEC-5.1.5
+  test_id: test_cross_memory::TestCrossMemoryEntityReferences::test_preference_stored_alongside_entity
+  tier: gold
+  description: Preference stored alongside entity
+
+SCN-G-010:
+  spec_clause: SPEC-5.1.6
+  test_id: test_cross_memory::TestCrossMemoryEntityReferences::test_reasoning_trace_references_conversation
+  tier: gold
+  description: Reasoning trace references conversation
+
+SCN-G-011:
+  spec_clause: SPEC-5.2.3
+  test_id: test_cross_memory::TestAddRelationship::test_add_relationship_multiple_types
+  tier: gold
+  description: Add relationship with multiple types
+
+SCN-G-012:
+  spec_clause: SPEC-5.2.4
+  test_id: test_cross_memory::TestAddRelationship::test_add_relationship_returns_valid_id
+  tier: gold
+  description: Add relationship returns valid ID
+
+SCN-G-013:
+  spec_clause: SPEC-5.3.2
+  test_id: test_cross_memory::TestMergeDuplicateEntities::test_merge_preserves_relationships
+  tier: gold
+  description: Merge preserves relationships
+
+SCN-G-014:
+  spec_clause: SPEC-5.4.2
+  test_id: test_cross_memory::TestGetSimilarTraces::test_get_similar_traces_respects_limit
+  tier: gold
+  description: get_similar_traces respects limit
+
+SCN-G-015:
+  spec_clause: SPEC-5.4.3
+  test_id: test_cross_memory::TestGetSimilarTraces::test_get_similar_traces_empty_database
+  tier: gold
+  description: get_similar_traces on empty database
+
+SCN-G-016:
+  spec_clause: SPEC-5.5.1
+  test_id: test_cross_memory::TestMultiAgentMemorySharing::test_entity_created_by_one_session_visible_to_another
+  tier: gold
+  description: Entity created by one session visible to another
+
+SCN-G-017:
+  spec_clause: SPEC-5.5.2
+  test_id: test_cross_memory::TestMultiAgentMemorySharing::test_reasoning_traces_isolated_by_session
+  tier: gold
+  description: Reasoning traces isolated by session
+
+SCN-G-018:
+  spec_clause: SPEC-5.5.3
+  test_id: test_cross_memory::TestMultiAgentMemorySharing::test_conversations_isolated_but_entities_shared
+  tier: gold
+  description: Conversations isolated but entities shared

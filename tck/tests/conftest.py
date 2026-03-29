@@ -15,6 +15,10 @@ Example:
         await adapter.setup()
         yield adapter
         await adapter.teardown()
+
+For cross-language testing via the HTTP bridge:
+
+    pytest -m bronze --bridge-url http://localhost:3001
 """
 
 from uuid import uuid4
@@ -27,6 +31,16 @@ from tck.fixtures.mocks import MockEmbedder
 _NO_ADAPTER = object()
 
 
+def pytest_addoption(parser):
+    """Add TCK-specific CLI options."""
+    parser.addoption(
+        "--bridge-url",
+        default=None,
+        help="URL of the HTTP bridge conformance server (e.g., http://localhost:3001). "
+        "When set, uses HTTPBridgeAdapter instead of requiring a Python adapter fixture.",
+    )
+
+
 def pytest_configure(config):
     """Register TCK markers."""
     config.addinivalue_line("markers", "bronze: Bronze tier - schema and short-term memory")
@@ -37,13 +51,23 @@ def pytest_configure(config):
 
 
 @pytest.fixture(scope="session")
-def adapter():
-    """Override this fixture to provide your BaseAdapter implementation.
+async def adapter(request):
+    """Provide a BaseAdapter implementation.
 
-    Must be session-scoped. The adapter should call setup() before
-    yielding and teardown() after.
+    If --bridge-url is set, uses HTTPBridgeAdapter. Otherwise, override
+    this fixture in your own conftest.py.
     """
-    return _NO_ADAPTER
+    bridge_url = request.config.getoption("--bridge-url", default=None)
+
+    if bridge_url:
+        from tck.adapters.http_bridge import HTTPBridgeAdapter
+
+        adapter = HTTPBridgeAdapter(bridge_url)
+        await adapter.setup()
+        yield adapter
+        await adapter.teardown()
+    else:
+        yield _NO_ADAPTER
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +75,8 @@ async def _check_adapter_and_clean(adapter):
     """Skip tests if no adapter is configured, otherwise clean state."""
     if adapter is _NO_ADAPTER:
         pytest.skip(
-            "No adapter configured. Provide an 'adapter' fixture in your conftest.py. "
+            "No adapter configured. Provide an 'adapter' fixture in your conftest.py, "
+            "or use --bridge-url to test against an HTTP conformance server. "
             "See tck/tests/conftest.py or docs/writing-an-adapter.md for examples."
         )
     await adapter.clear_all_data()

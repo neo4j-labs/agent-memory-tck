@@ -1,0 +1,181 @@
+= Writing a TCK Adapter
+:toc:
+:toclevels: 2
+:source-highlighter: rouge
+
+This guide covers implementing a `BaseAdapter` for each compliance tier.
+
+== Choose Your Tier
+
+[cols="1,1,3"]
+|===
+|Tier |Methods |Scope
+
+|Bronze
+|9
+|Lifecycle (3) + short-term memory (6)
+
+|Silver
+|23
+|Bronze + long-term memory (7) + reasoning memory (7)
+
+|Gold
+|26
+|Silver + cross-memory operations (3)
+|===
+
+== Bronze Tier: Short-Term Memory
+
+Bronze requires 9 methods — the lifecycle methods plus short-term memory operations.
+
+=== Lifecycle Methods
+
+[source,python]
+----
+async def setup(self) -> None:
+    """Connect to your backend, create schema if needed."""
+
+async def teardown(self) -> None:
+    """Close connections, release resources."""
+
+async def clear_all_data(self) -> None:
+    """Delete ALL data. Called before each test for isolation."""
+----
+
+IMPORTANT: `clear_all_data` must be thorough. Any leftover data from a previous test will cause failures.
+
+=== Short-Term Memory Methods
+
+[cols="2,3"]
+|===
+|Method |Contract
+
+|`add_message(session_id, role, content, *, metadata=None) -> TCKMessage`
+|Store a message. Create the conversation if the session is new. Return a `TCKMessage` with a valid UUID `id` and `timestamp`.
+
+|`get_conversation(session_id, *, limit=None) -> TCKConversation`
+|Return all messages for the session in insertion order. Empty sessions return `TCKConversation` with an empty `messages` list.
+
+|`search_messages(query, *, session_id=None, limit=10, threshold=0.7) -> list[TCKMessage]`
+|Semantic search across messages. Filter by `session_id` if provided. Return at most `limit` results.
+
+|`list_sessions(*, limit=100) -> list[TCKSessionInfo]`
+|Return all sessions with accurate `message_count` values.
+
+|`delete_message(message_id) -> bool`
+|Delete the message and repair the chain. Return `True` if deleted, `False` if not found.
+
+|`clear_session(session_id) -> None`
+|Remove all messages for the session. Must be idempotent (safe to call on empty/nonexistent sessions).
+|===
+
+=== Critical Bronze Requirements
+
+* Messages must maintain **insertion order** (verified with up to 100 messages)
+* Message timestamps must be **monotonically non-decreasing**
+* Content fidelity: **unicode**, **emoji**, **10K+ character strings**, and **nested metadata** must round-trip exactly
+* Each `add_message` call must return a **unique UUID**
+* Deleting a middle message must **preserve order** of remaining messages
+* Duplicate content must be stored as **separate messages** (not deduplicated)
+
+== Silver Tier: Long-Term + Reasoning Memory
+
+Silver adds 14 methods across two memory types.
+
+=== Long-Term Memory Methods
+
+[cols="2,3"]
+|===
+|Method |Contract
+
+|`add_entity(name, entity_type, *, description=None) -> TCKEntity`
+|Create an entity. Must accept types: PERSON, ORGANIZATION, LOCATION, EVENT, OBJECT.
+
+|`add_preference(category, preference, *, context=None) -> TCKPreference`
+|Store a user preference with optional context.
+
+|`add_fact(subject, predicate, obj) -> TCKFact`
+|Store a subject-predicate-object triple.
+
+|`search_entities(query, *, limit=10) -> list[TCKEntity]`
+|Semantic entity search. Empty database must return `[]`.
+
+|`search_preferences(query, *, category=None, limit=10) -> list[TCKPreference]`
+|Semantic preference search with optional category filter.
+
+|`get_entity_by_name(name) -> TCKEntity \| None`
+|Exact name lookup. Return `None` when not found.
+
+|`get_related_entities(entity_id, *, relationship_type=None, depth=1) -> list[TCKEntity]`
+|Traverse relationships from an entity. Isolated entities return `[]`.
+|===
+
+=== Reasoning Memory Methods
+
+[cols="2,3"]
+|===
+|Method |Contract
+
+|`start_trace(session_id, task) -> TCKReasoningTrace`
+|Start a trace. `completed_at`, `outcome`, and `success` must be `None`.
+
+|`add_step(trace_id, *, thought=None, action=None, observation=None) -> TCKReasoningStep`
+|Add a step with monotonically increasing `step_number`. All fields are optional.
+
+|`record_tool_call(step_id, tool_name, arguments, *, result, status, duration_ms, error) -> TCKToolCall`
+|Record a tool invocation. Must support all 6 statuses: pending, success, failure, error, timeout, cancelled.
+
+|`complete_trace(trace_id, *, outcome=None, success=None) -> TCKReasoningTrace`
+|Set `outcome`, `success`, and `completed_at`. Must support failure outcomes.
+
+|`get_trace_with_steps(trace_id) -> TCKReasoningTrace \| None`
+|Return the full trace with all steps and tool calls. Return `None` for nonexistent IDs.
+
+|`list_traces(*, session_id=None, limit=100) -> list[TCKReasoningTrace]`
+|List traces, optionally filtered by session.
+
+|`get_tool_stats(tool_name=None) -> list[TCKToolStats]`
+|Return aggregated statistics with accurate `success_rate`.
+|===
+
+== Gold Tier: Cross-Memory Operations
+
+Gold adds 3 optional methods with default `NotImplementedError` implementations:
+
+[source,python]
+----
+async def add_relationship(self, source_id, target_id, relationship_type, *, properties=None) -> TCKRelationship:
+    """Create a typed relationship between entities."""
+
+async def merge_duplicate_entities(self, source_id, target_id, *, canonical_name=None) -> TCKEntity:
+    """Merge two entities, preserving all relationships."""
+
+async def get_similar_traces(self, task, *, limit=5, success_only=True) -> list[TCKReasoningTrace]:
+    """Find traces with similar tasks via semantic search."""
+----
+
+Gold tests also verify multi-agent sharing semantics: entities are shared across sessions while conversations and traces are session-isolated.
+
+== Running Tests Against Your Adapter
+
+[source,bash]
+----
+# Bronze only
+uv run pytest -m bronze -v
+
+# Silver (includes Bronze prerequisites)
+uv run pytest -m silver -v
+
+# All tiers
+uv run pytest -v
+
+# Generate compliance report
+uv run pytest --json-report --json-report-file=results.json
+uv run tck results.json --name "My Impl" --version "1.0" -o report.json --html report.html
+----
+
+== See Also
+
+* xref:../reference/base-adapter.adoc[BaseAdapter Interface Reference] — complete method signatures
+* xref:../reference/compliance-tiers.adoc[Compliance Tier Definitions] — pass rate requirements
+* xref:certification.adoc[Obtaining TCK Certification] — submitting your results

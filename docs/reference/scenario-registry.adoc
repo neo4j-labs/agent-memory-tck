@@ -1,0 +1,106 @@
+= Scenario ID Registry Format
+:toc:
+:toclevels: 2
+:source-highlighter: rouge
+
+Every test scenario in the TCK has a stable, permanent identifier. This document describes the registry format and stability guarantees.
+
+== ID Format
+
+----
+SCN-{TIER}-{NUMBER}
+----
+
+[cols="1,2,3"]
+|===
+|Component |Values |Example
+
+|Prefix
+|`SCN` (Scenario)
+|Always `SCN`
+
+|Tier
+|`B` (Bronze), `S` (Silver), `G` (Gold)
+|`B` for Bronze
+
+|Number
+|Three-digit sequential
+|`001`, `042`, `093`
+|===
+
+Examples: `SCN-B-001`, `SCN-S-042`, `SCN-G-018`
+
+== Stability Guarantee
+
+Once a scenario ID is published in a released TCK version:
+
+* The ID is *never reassigned* to a different scenario.
+* The scenario's behavioral contract is *never changed* (only deprecated and replaced).
+* Implementations can report compliance by scenario ID, enabling precise tracking.
+
+== Registry File
+
+The registry lives at `tck/registry/scenario_ids.yaml`:
+
+[source,yaml]
+----
+SCN-B-001:
+  spec_clause: SPEC-1.1.1
+  test_id: test_schema::TestSchemaConversationCreation::test_first_message_creates_conversation
+  tier: bronze
+  description: First message creates conversation node
+
+SCN-B-002:
+  spec_clause: SPEC-1.1.2
+  test_id: test_schema::TestSchemaConversationCreation::test_subsequent_messages_reuse_conversation
+  tier: bronze
+  description: Subsequent messages reuse existing conversation
+----
+
+=== Fields
+
+[cols="1,3"]
+|===
+|Field |Description
+
+|`spec_clause`
+|The SPEC.md requirement this scenario tests (e.g., `SPEC-2.1.1`)
+
+|`test_id`
+|The pytest node ID: `{module}::{class}::{method}`
+
+|`tier`
+|One of: `bronze`, `silver`, `gold`
+
+|`description`
+|One-line description of the tested behavior
+|===
+
+== Current Counts
+
+[cols="1,1,1"]
+|===
+|Tier |Range |Count
+
+|Bronze |SCN-B-001 to SCN-B-093 |93
+|Silver |SCN-S-001 to SCN-S-067 |67
+|Gold |SCN-G-001 to SCN-G-018 |18
+|*Total* | |*178*
+|===
+
+== Validation
+
+The registry is validated in CI and can be checked locally:
+
+[source,bash]
+----
+uv run python -m tck.registry.validator
+----
+
+The validator checks:
+
+. Every test function has a corresponding scenario ID.
+. Every scenario ID maps to an existing test function.
+. No duplicate scenario IDs exist.
+
+It uses AST parsing to discover test functions, so it works without importing the test modules.

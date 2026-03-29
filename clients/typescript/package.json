@@ -1,0 +1,64 @@
+{
+  "name": "@neo4j-labs/agent-memory",
+  "version": "0.1.0",
+  "description": "TypeScript client for neo4j-agent-memory — shared memory layer for AI agents backed by Neo4j",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Neo4j Labs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neo4j-labs/agent-memory-tck",
+    "directory": "clients/typescript"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./middleware/vercel-ai": {
+      "import": "./dist/middleware/vercel-ai.js",
+      "types": "./dist/middleware/vercel-ai.d.ts"
+    },
+    "./mcp": {
+      "import": "./dist/mcp/index.js",
+      "types": "./dist/mcp/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:tck": "vitest run --project tck",
+    "tck:bronze": "vitest run --project tck -- --grep Bronze",
+    "lint": "tsc --noEmit && eslint src/",
+    "conformance:server": "tsx conformance/server.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "tsup": "^8.0.0",
+    "vitest": "^2.0.0",
+    "tsx": "^4.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "peerDependencies": {
+    "neo4j-driver": "^5.20.0"
+  },
+  "peerDependenciesMeta": {
+    "neo4j-driver": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

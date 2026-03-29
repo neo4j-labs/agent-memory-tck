@@ -1,0 +1,69 @@
+= neo4j-agent-memory TCK Documentation
+:author: Neo4j Labs
+:revnumber: 1.0.0
+:revdate: March 2026
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+:sectanchors:
+:sectlinks:
+:experimental:
+
+The neo4j-agent-memory Technology Compatibility Kit (TCK) provides a formal specification, executable test suite, and compliance framework for the neo4j-agent-memory ecosystem.
+
+This documentation follows the https://diataxis.fr/[Diataxis framework], organized into four sections:
+
+[cols="1,3"]
+|===
+|Section |Purpose
+
+|<<tutorials,Tutorials>>
+|Step-by-step lessons for getting started
+
+|<<how-to,How-To Guides>>
+|Goal-oriented recipes for specific tasks
+
+|<<reference,Reference>>
+|Technical descriptions of the machinery
+
+|<<explanation,Explanation>>
+|Background and context for understanding the system
+|===
+
+[[tutorials]]
+== Tutorials
+
+Learning-oriented guides that walk you through a complete task from start to finish.
+
+* xref:tutorials/getting-started.adoc[Getting Started with the TCK] — Install the TCK, write your first adapter, and run the test suite
+* xref:tutorials/first-typescript-agent.adoc[Building Your First TypeScript Agent with Memory] — Use `@neo4j-labs/agent-memory` to add memory to a Vercel AI SDK application
+
+[[how-to]]
+== How-To Guides
+
+Task-oriented guides for accomplishing specific goals.
+
+* xref:how-to/writing-an-adapter.adoc[Writing a TCK Adapter] — Implement `BaseAdapter` for your memory system
+* xref:how-to/cross-language-testing.adoc[Cross-Language Conformance Testing] — Test TypeScript or Go implementations via the HTTP bridge
+* xref:how-to/ci-integration.adoc[Adding TCK to Your CI Pipeline] — Run conformance tests in GitHub Actions
+* xref:how-to/certification.adoc[Obtaining TCK Certification] — Generate compliance reports and submit to the registry
+
+[[reference]]
+== Reference
+
+Technical descriptions of types, protocols, and interfaces.
+
+* xref:reference/base-adapter.adoc[BaseAdapter Interface Reference] — All 26 abstract methods with signatures, parameters, and return types
+* xref:reference/bridge-protocol.adoc[HTTP Bridge Protocol Specification] — Endpoints, request/response schemas, and data types
+* xref:reference/compliance-tiers.adoc[Compliance Tier Definitions] — Bronze, Silver, and Gold requirements
+* xref:reference/scenario-registry.adoc[Scenario ID Registry Format] — Stable scenario ID scheme and registry structure
+
+[[explanation]]
+== Explanation
+
+Background concepts and architectural decisions.
+
+* xref:explanation/architecture.adoc[TCK Architecture and Design Decisions] — Why pytest over Gherkin, the adapter pattern, and the bridge protocol
+* xref:explanation/memory-model.adoc[The Agent Memory Model] — Short-term, long-term, and reasoning memory explained
+* xref:explanation/multi-agent-sharing.adoc[Cross-Agent Memory Sharing] — How agents in different languages share the same Neo4j graph

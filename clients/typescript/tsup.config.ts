@@ -1,0 +1,16 @@
+import { defineConfig } from "tsup";
+
+export default defineConfig({
+  entry: {
+    index: "src/index.ts",
+    "middleware/vercel-ai": "src/middleware/vercel-ai.ts",
+    "mcp/index": "src/mcp/index.ts",
+  },
+  format: ["esm"],
+  dts: true,
+  sourcemap: true,
+  clean: true,
+  target: "es2022",
+  splitting: true,
+  treeshake: true,
+});

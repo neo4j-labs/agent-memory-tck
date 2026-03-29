@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TCK Certification Registry",
+  "type": "object",
+  "required": ["tck_version", "certifications"],
+  "properties": {
+    "tck_version": {
+      "type": "string",
+      "description": "TCK version this registry is compatible with"
+    },
+    "certifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "version", "language", "tier", "tck_version", "certified_at"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Implementation name"
+          },
+          "version": {
+            "type": "string",
+            "description": "Implementation version"
+          },
+          "language": {
+            "type": "string",
+            "description": "Implementation language (Python, TypeScript, Go, etc.)"
+          },
+          "tier": {
+            "type": "string",
+            "enum": ["bronze", "silver", "gold"],
+            "description": "Highest achieved compliance tier"
+          },
+          "tck_version": {
+            "type": "string",
+            "description": "TCK version tested against"
+          },
+          "report_url": {
+            "type": "string",
+            "description": "Path to compliance report JSON"
+          },
+          "repository": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the implementation repository"
+          },
+          "certified_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Certification timestamp"
+          }
+        }
+      }
+    }
+  }
+}

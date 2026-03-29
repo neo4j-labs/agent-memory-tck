@@ -1,0 +1,24 @@
+{
+  "name": "agent-memory-dashboard",
+  "version": "0.1.0",
+  "description": "Real-time dashboard for multi-agent memory visualization",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "@neo4j-nvl/react": "^0.3.0",
+    "@neo4j-nvl/base": "^0.3.0",
+    "neo4j-driver": "^5.20.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0"
+  }
+}
