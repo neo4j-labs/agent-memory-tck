@@ -45,5 +45,20 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  sage:
+    build:
+      context: ../../
+      dockerfile: demo/agents/sage/Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      MEMORY_ENDPOINT: ${MEMORY_ENDPOINT:-http://host.docker.internal:3001}
+      PORT: "8005"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   neo4j_data:

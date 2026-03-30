@@ -5,10 +5,11 @@
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5+-blue.svg?logo=typescript)](https://www.typescriptlang.org/)
 [![Go 1.21+](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?logo=go)](https://go.dev/)
+[![.NET 8](https://img.shields.io/badge/.NET-8.0+-512bd4.svg?logo=dotnet)](https://dotnet.microsoft.com/)
 
 Technology Compatibility Kit for [neo4j-agent-memory](https://github.com/neo4j-labs/agent-memory) implementations.
 
-The TCK provides a formal behavioral specification, 178 executable test scenarios, and a compliance framework that enables any implementation — in any language — to verify conformance with the neo4j-agent-memory data model. It also includes TypeScript and Go client libraries and a multi-agent reference demo.
+The TCK provides a formal behavioral specification, 178 executable test scenarios, and a compliance framework that enables any implementation — in any language — to verify conformance with the neo4j-agent-memory data model. It also includes TypeScript, Go, and C# client libraries and a multi-agent reference demo.
 
 > **Neo4j Labs Project** — This project is maintained by Neo4j Labs as an experimental, community-supported project. It is not officially supported by Neo4j. For community support, use [GitHub Issues](https://github.com/neo4j-labs/agent-memory-tck/issues).
 
@@ -22,7 +23,8 @@ agent-memory-tck/
   tck/                  Python TCK specification + 178 test scenarios
   clients/typescript/   @neo4j-labs/agent-memory npm package
   clients/go/           agent-memory-go module
-  demo/                 4-agent polyglot demo (Python, TypeScript, Go)
+  clients/csharp/       Neo4j.AgentMemory .NET package
+  demo/                 5-agent polyglot demo (Python, TypeScript, Go, C#)
   docs/                 AsciiDoc documentation (Diataxis framework)
   SPEC.md               Normative specification v1.0.0
 ```
@@ -34,7 +36,8 @@ agent-memory-tck/
 | **HTTP Bridge** | Cross-language conformance protocol enabling the Python test suite to validate TypeScript, Go, or any implementation |
 | **TypeScript Client** | `@neo4j-labs/agent-memory` with `MemoryClient`, Vercel AI SDK middleware, and MCP tool definitions |
 | **Go Client** | `memory` package with context-aware API, functional options, generic `Entity[T]`, and MCP handler |
-| **Multi-Agent Demo** | Lenny (Python/PydanticAI), Scout (TypeScript/Vercel AI SDK), Forge (Go), Atlas (Python/LangGraph) |
+| **C# Client** | `Neo4j.AgentMemory` .NET 8 package with async/await API and `IAsyncDisposable` lifecycle |
+| **Multi-Agent Demo** | Lenny (Python/PydanticAI), Scout (TypeScript/Vercel AI SDK), Forge (Go), Atlas (Python/LangGraph), Sage (C#/Semantic Kernel) |
 | **Documentation** | AsciiDoc docs following the Diataxis framework: tutorials, how-to guides, reference, explanation |
 
 ## Compliance Tiers
@@ -161,9 +164,27 @@ trace, _ := client.Reasoning.StartTrace(ctx, "session-1", "Research task")
 
 Includes [MCP handler](clients/go/memory/mcp_handler.go) (`http.Handler`). See the [Go client README](clients/go/README.md).
 
+## C# Client
+
+```csharp
+await using var client = new MemoryClient(new MemoryClientOptions { Endpoint = "https://memory.cypherlite.cloud" });
+await client.ConnectAsync();
+
+// Short-term memory
+await client.ShortTerm.AddMessageAsync("session-1", MessageRole.User, "Hello!");
+
+// Long-term memory
+await client.LongTerm.AddEntityAsync("Alice", "PERSON", description: "Engineer");
+
+// Reasoning memory
+var trace = await client.Reasoning.StartTraceAsync("session-1", "Research task");
+```
+
+See the [C# client README](clients/csharp/README.md).
+
 ## Multi-Agent Demo
 
-Four agents in three languages sharing one Neo4j graph:
+Five agents in four languages sharing one Neo4j graph:
 
 | Agent | Language | Framework | Role |
 |-------|----------|-----------|------|
@@ -171,6 +192,7 @@ Four agents in three languages sharing one Neo4j graph:
 | **Scout** | TypeScript | Vercel AI SDK | Web search, graph enrichment |
 | **Forge** | Go | Custom HTTP | Data pipeline, property enrichment |
 | **Atlas** | Python | LangGraph | Orchestrator, cross-agent synthesis |
+| **Sage** | C# | Semantic Kernel | Knowledge validation, conflict detection |
 
 ```bash
 cd demo/infra

@@ -29,7 +29,7 @@ The repository began with a single commit containing:
 | Silver tests | ~26 | 67 | +158% |
 | Gold tests | ~6 | 18 | +200% |
 | Source files | ~15 | 107 | +613% |
-| Languages | 1 (Python) | 4 (Python, TypeScript, Go, TSX) | +3 |
+| Languages | 1 (Python) | 5 (Python, TypeScript, Go, C#, TSX) | +4 |
 
 ---
 
@@ -188,6 +188,30 @@ These items were specified in the PRD but were intentionally deferred or are bey
 ---
 
 ## Future Roadmap
+
+## Phase 6: C# Client + Sage Agent — Complete
+
+**Goal:** Add a C# client library and a 5th demo agent using Microsoft Semantic Kernel.
+
+### Delivered
+
+- **C# client library** (`clients/csharp/`) — .NET 8.0 class library with `MemoryClient` composing `ShortTerm`, `LongTerm`, and `Reasoning` sub-clients
+  - `ITransport` + `HttpTransport` abstraction mirroring TS/Go pattern
+  - All 26 BaseAdapter methods implemented as async/await with CancellationToken
+  - `IAsyncDisposable` lifecycle management
+  - Custom exception hierarchy: `MemoryException`, `TransportException`, `ConnectionException`, `AuthenticationException`
+  - System.Text.Json serialization with `[JsonPropertyName]` for wire format
+- **Conformance server** (`conformance/Neo4j.AgentMemory.Conformance/`) — ASP.NET Minimal API mapping all 26 bridge endpoints
+- **Unit tests** (`tests/Neo4j.AgentMemory.Tests/`) — xUnit tests with NSubstitute mocks for ShortTerm, LongTerm, and Reasoning
+- **Sage agent** (`demo/agents/sage/`) — C#/Semantic Kernel knowledge validation agent:
+  - ConflictDetector: Detects type mismatches and contradictions between entity facts
+  - KnowledgeAuditor: Audits graph integrity, entity counts, session activity
+  - Works without LLM key (like Forge) for programmatic validation
+  - Port 8005, session prefix `sage-`
+- **Infrastructure updates**: Docker Compose, dashboard agent registry, integration test, seed data
+- **Documentation updates**: README, CLAUDE.md, ROADMAP.md, demo README, C# client README
+
+---
 
 ### v1.0.1 — Completion (Weeks 21-22)
 
