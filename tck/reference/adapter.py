@@ -94,9 +94,7 @@ class ReferenceAdapter(BaseAdapter):
 
     async def clear_all_data(self) -> None:
         if self._client and self._client._client:
-            await self._client._client.execute_write(
-                "MATCH (n) DETACH DELETE n", {}
-            )
+            await self._client._client.execute_write("MATCH (n) DETACH DELETE n", {})
 
     # --- Short-Term Memory ---
 
@@ -130,9 +128,7 @@ class ReferenceAdapter(BaseAdapter):
         *,
         limit: int | None = None,
     ) -> TCKConversation:
-        conv = await self._client.short_term.get_conversation(
-            session_id, limit=limit
-        )
+        conv = await self._client.short_term.get_conversation(session_id, limit=limit)
         messages = [
             TCKMessage(
                 id=m.id,
@@ -272,9 +268,7 @@ class ReferenceAdapter(BaseAdapter):
         *,
         limit: int = 10,
     ) -> list[TCKEntity]:
-        results = await self._client.long_term.search_entities(
-            query, limit=limit, threshold=0.0
-        )
+        results = await self._client.long_term.search_entities(query, limit=limit, threshold=0.0)
         return [
             TCKEntity(
                 id=e.id,
@@ -296,9 +290,7 @@ class ReferenceAdapter(BaseAdapter):
         category: str | None = None,
         limit: int = 10,
     ) -> list[TCKPreference]:
-        results = await self._client.long_term.search_preferences(
-            query, limit=limit
-        )
+        results = await self._client.long_term.search_preferences(query, limit=limit)
         if category:
             results = [r for r in results if r.category == category]
         return [
@@ -457,7 +449,9 @@ class ReferenceAdapter(BaseAdapter):
                         tool_name=tc.tool_name,
                         arguments=tc.arguments or {},
                         result=tc.result,
-                        status=ToolCallStatus(tc.status.value if hasattr(tc.status, "value") else tc.status),
+                        status=ToolCallStatus(
+                            tc.status.value if hasattr(tc.status, "value") else tc.status
+                        ),
                         duration_ms=tc.duration_ms,
                         error=tc.error,
                     )
@@ -495,7 +489,9 @@ class ReferenceAdapter(BaseAdapter):
                         tool_name=tc.tool_name,
                         arguments=tc.arguments or {},
                         result=tc.result,
-                        status=ToolCallStatus(tc.status.value if hasattr(tc.status, "value") else tc.status),
+                        status=ToolCallStatus(
+                            tc.status.value if hasattr(tc.status, "value") else tc.status
+                        ),
                         duration_ms=tc.duration_ms,
                         error=tc.error,
                     )
@@ -521,9 +517,7 @@ class ReferenceAdapter(BaseAdapter):
         session_id: str | None = None,
         limit: int = 100,
     ) -> list[TCKReasoningTrace]:
-        traces = await self._client.reasoning.list_traces(
-            session_id=session_id, limit=limit
-        )
+        traces = await self._client.reasoning.list_traces(session_id=session_id, limit=limit)
         return [
             TCKReasoningTrace(
                 id=t.id,
@@ -585,9 +579,7 @@ class ReferenceAdapter(BaseAdapter):
         *,
         canonical_name: str | None = None,
     ) -> TCKEntity:
-        result = await self._client.long_term.merge_duplicate_entities(
-            source_id, target_id
-        )
+        result = await self._client.long_term.merge_duplicate_entities(source_id, target_id)
         if result is None:
             raise ValueError(f"Merge failed: entities {source_id} or {target_id} not found")
         _source, target = result

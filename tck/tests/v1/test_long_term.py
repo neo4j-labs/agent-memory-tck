@@ -4,6 +4,8 @@ These tests verify the behavioral contracts for long-term memory,
 including entity management, preferences, facts, and search.
 """
 
+from uuid import UUID
+
 import pytest
 
 from tck.adapters.base_adapter import TCKEntity, TCKFact, TCKPreference
@@ -16,9 +18,7 @@ class TestAddEntity:
 
     async def test_add_entity_basic(self, adapter):
         """SPEC-3.1.1: add_entity MUST return a TCKEntity with a valid UUID."""
-        entity = await adapter.add_entity(
-            name="Alice Johnson", entity_type="PERSON"
-        )
+        entity = await adapter.add_entity(name="Alice Johnson", entity_type="PERSON")
         assert isinstance(entity, TCKEntity)
         assert entity.id is not None
         assert entity.name == "Alice Johnson"
@@ -74,6 +74,30 @@ class TestAddEntity:
         names = {e.name for e in entities}
         assert names == {d["name"] for d in ENTITIES}
 
+    async def test_add_entity_without_description(self, adapter):
+        """SPEC-3.1.9: add_entity MUST succeed without a description."""
+        entity = await adapter.add_entity(name="NoDesc", entity_type="PERSON")
+        assert entity.name == "NoDesc"
+        assert entity.description is None or entity.description == ""
+
+    async def test_add_entity_duplicate_name_different_type(self, adapter):
+        """SPEC-3.1.10: Entities with same name but different type MUST be created."""
+        e1 = await adapter.add_entity(name="Mercury", entity_type="OBJECT")
+        e2 = await adapter.add_entity(name="Mercury", entity_type="LOCATION")
+        assert e1.id != e2.id
+        assert e1.type == "OBJECT"
+        assert e2.type == "LOCATION"
+
+    async def test_add_entity_special_characters_in_name(self, adapter):
+        """SPEC-3.1.11: add_entity MUST preserve unicode in entity name."""
+        entity = await adapter.add_entity(name="Caf\u00e9 de \u4e16\u754c", entity_type="LOCATION")
+        assert entity.name == "Caf\u00e9 de \u4e16\u754c"
+
+    async def test_add_entity_id_is_uuid(self, adapter):
+        """SPEC-3.1.12: add_entity MUST return a valid UUID for the id."""
+        entity = await adapter.add_entity(name="UUIDCheck", entity_type="PERSON")
+        assert isinstance(entity.id, UUID)
+
 
 @pytest.mark.silver
 class TestAddPreference:
@@ -111,6 +135,30 @@ class TestAddPreference:
             prefs.append(p)
         assert len(prefs) == len(PREFERENCES)
 
+    async def test_add_preference_without_context(self, adapter):
+        """SPEC-3.2.4: add_preference MUST succeed without context."""
+        pref = await adapter.add_preference(category="color", preference="Likes blue")
+        assert pref.preference == "Likes blue"
+        assert pref.context is None or pref.context == ""
+
+    async def test_add_preference_long_text(self, adapter):
+        """SPEC-3.2.5: add_preference MUST preserve long preference text."""
+        long_pref = "Prefers " + "very " * 500 + "detailed explanations"
+        pref = await adapter.add_preference(category="style", preference=long_pref)
+        assert pref.preference == long_pref
+
+    async def test_add_preference_same_category_multiple(self, adapter):
+        """SPEC-3.2.6: Multiple preferences in same category MUST be stored separately."""
+        p1 = await adapter.add_preference(category="food", preference="Likes pizza")
+        p2 = await adapter.add_preference(category="food", preference="Dislikes sushi")
+        assert p1.id != p2.id
+        assert p1.preference != p2.preference
+
+    async def test_add_preference_id_is_uuid(self, adapter):
+        """SPEC-3.2.7: add_preference MUST return a valid UUID for the id."""
+        pref = await adapter.add_preference(category="test", preference="UUID check")
+        assert isinstance(pref.id, UUID)
+
 
 @pytest.mark.silver
 class TestAddFact:
@@ -140,6 +188,28 @@ class TestAddFact:
             )
             facts.append(f)
         assert len(facts) == len(FACTS)
+
+    async def test_add_fact_special_characters(self, adapter):
+        """SPEC-3.3.3: add_fact MUST preserve unicode in subject/predicate/object."""
+        fact = await adapter.add_fact(
+            subject="Caf\u00e9 \u4e16\u754c",
+            predicate="LOCATED_IN",
+            obj="Par\u00eds",
+        )
+        assert fact.subject == "Caf\u00e9 \u4e16\u754c"
+        assert fact.object == "Par\u00eds"
+
+    async def test_add_fact_id_is_uuid(self, adapter):
+        """SPEC-3.3.4: add_fact MUST return a valid UUID for the id."""
+        fact = await adapter.add_fact(subject="A", predicate="KNOWS", obj="B")
+        assert isinstance(fact.id, UUID)
+
+    async def test_add_fact_same_subject_multiple_facts(self, adapter):
+        """SPEC-3.3.5: Multiple facts with the same subject MUST be stored independently."""
+        f1 = await adapter.add_fact(subject="Alice", predicate="WORKS_AT", obj="Acme")
+        f2 = await adapter.add_fact(subject="Alice", predicate="LIVES_IN", obj="San Francisco")
+        assert f1.id != f2.id
+        assert f1.predicate != f2.predicate
 
 
 @pytest.mark.silver
@@ -171,6 +241,17 @@ class TestSearchEntities:
         results = await adapter.search_entities("entity", limit=2)
         assert len(results) <= 2
 
+    async def test_search_entities_empty_database(self, adapter):
+        """SPEC-3.4.3: search_entities on empty database MUST return empty list."""
+        results = await adapter.search_entities("anything", limit=10)
+        assert results == []
+
+    async def test_search_entities_no_match(self, adapter):
+        """SPEC-3.4.4: search_entities MUST return empty when nothing matches."""
+        await adapter.add_entity(name="Alice", entity_type="PERSON")
+        results = await adapter.search_entities("quantum cryptography algorithms", limit=10)
+        assert isinstance(results, list)
+
 
 @pytest.mark.silver
 class TestSearchPreferences:
@@ -196,11 +277,20 @@ class TestSearchPreferences:
                 preference=data["preference"],
             )
 
-        results = await adapter.search_preferences(
-            "preference", category="language", limit=10
-        )
+        results = await adapter.search_preferences("preference", category="language", limit=10)
         for pref in results:
             assert pref.category == "language"
+
+    async def test_search_preferences_empty_database(self, adapter):
+        """SPEC-3.5.3: search_preferences on empty database MUST return empty list."""
+        results = await adapter.search_preferences("anything", limit=10)
+        assert results == []
+
+    async def test_search_preferences_no_match(self, adapter):
+        """SPEC-3.5.4: search_preferences MUST return empty when nothing matches."""
+        await adapter.add_preference(category="food", preference="Likes pizza")
+        results = await adapter.search_preferences("quantum physics", limit=10)
+        assert isinstance(results, list)
 
 
 @pytest.mark.silver
@@ -209,9 +299,7 @@ class TestGetEntityByName:
 
     async def test_get_entity_by_name_found(self, adapter):
         """SPEC-3.6.1: get_entity_by_name MUST return the entity when it exists."""
-        await adapter.add_entity(
-            name="Alice Johnson", entity_type="PERSON", description="Engineer"
-        )
+        await adapter.add_entity(name="Alice Johnson", entity_type="PERSON", description="Engineer")
         entity = await adapter.get_entity_by_name("Alice Johnson")
         assert entity is not None
         assert entity.name == "Alice Johnson"
@@ -230,9 +318,7 @@ class TestGetRelatedEntities:
         """SPEC-3.7.1: get_related_entities MUST return connected entities."""
         alice = await adapter.add_entity(name="Alice", entity_type="PERSON")
         acme = await adapter.add_entity(name="Acme", entity_type="ORGANIZATION")
-        await adapter.add_relationship(
-            alice.id, acme.id, "WORKS_AT"
-        )
+        await adapter.add_relationship(alice.id, acme.id, "WORKS_AT")
 
         related = await adapter.get_related_entities(alice.id)
         assert len(related) > 0
@@ -244,3 +330,29 @@ class TestGetRelatedEntities:
         entity = await adapter.add_entity(name="Lonely", entity_type="PERSON")
         related = await adapter.get_related_entities(entity.id)
         assert related == []
+
+    async def test_get_related_entities_with_type_filter(self, adapter):
+        """SPEC-3.7.3: get_related_entities with relationship_type MUST filter by type."""
+        alice = await adapter.add_entity(name="Alice", entity_type="PERSON")
+        bob = await adapter.add_entity(name="Bob", entity_type="PERSON")
+        acme = await adapter.add_entity(name="Acme", entity_type="ORGANIZATION")
+        await adapter.add_relationship(alice.id, bob.id, "KNOWS")
+        await adapter.add_relationship(alice.id, acme.id, "WORKS_AT")
+
+        related_knows = await adapter.get_related_entities(alice.id, relationship_type="KNOWS")
+        related_names = [e.name for e in related_knows]
+        assert "Bob" in related_names
+
+    async def test_get_related_entities_multiple_relationships(self, adapter):
+        """SPEC-3.7.4: get_related_entities MUST return all connected entities."""
+        alice = await adapter.add_entity(name="Alice", entity_type="PERSON")
+        bob = await adapter.add_entity(name="Bob", entity_type="PERSON")
+        carol = await adapter.add_entity(name="Carol", entity_type="PERSON")
+        await adapter.add_relationship(alice.id, bob.id, "KNOWS")
+        await adapter.add_relationship(alice.id, carol.id, "KNOWS")
+
+        related = await adapter.get_related_entities(alice.id)
+        assert len(related) >= 2
+        related_names = [e.name for e in related]
+        assert "Bob" in related_names
+        assert "Carol" in related_names

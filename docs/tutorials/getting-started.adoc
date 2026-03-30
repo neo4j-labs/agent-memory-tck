@@ -1,0 +1,123 @@
+= Getting Started with the TCK
+:toc:
+:toclevels: 2
+:source-highlighter: rouge
+
+This tutorial walks you through installing the TCK, writing a minimal adapter, and running the test suite for the first time.
+
+== Prerequisites
+
+* Python 3.10 or later
+* https://docs.astral.sh/uv/[uv] package manager (recommended) or pip
+* A running Neo4j instance (local or Aura) _or_ access to the hosted Cypherlite Cloud service
+
+== Step 1: Install the TCK
+
+[source,bash]
+----
+# Using uv (recommended)
+uv add neo4j-agent-memory-tck
+
+# Or with pip
+pip install neo4j-agent-memory-tck
+----
+
+For development, install with extras:
+
+[source,bash]
+----
+uv sync --extra dev        # Includes ruff, mypy
+uv sync --extra reference  # Includes neo4j-agent-memory Python package
+uv sync --extra bridge     # Includes httpx, aiohttp for HTTP bridge
+----
+
+== Step 2: Understand the Adapter Pattern
+
+The TCK tests your implementation through an **adapter** — a class that bridges the TCK's abstract interface to your concrete implementation.
+
+[source,python]
+----
+from tck.adapters.base_adapter import BaseAdapter, TCKMessage
+
+class MyAdapter(BaseAdapter):
+    """Maps TCK operations to your memory implementation."""
+
+    async def setup(self) -> None:
+        # Connect to your backend
+        pass
+
+    async def teardown(self) -> None:
+        # Close connections
+        pass
+
+    async def clear_all_data(self) -> None:
+        # Delete all data (called before each test)
+        pass
+
+    async def add_message(self, session_id, role, content, *, metadata=None) -> TCKMessage:
+        # Store a message and return a TCKMessage
+        pass
+
+    # ... implement remaining methods for your target tier
+----
+
+== Step 3: Register Your Adapter
+
+Create a `conftest.py` file that provides the adapter to the test suite:
+
+[source,python]
+----
+# my_project/tests/conftest.py
+import pytest
+from my_project.adapter import MyAdapter
+
+@pytest.fixture(scope="session")
+async def adapter():
+    adapter = MyAdapter(uri="bolt://localhost:7687")
+    await adapter.setup()
+    yield adapter
+    await adapter.teardown()
+----
+
+== Step 4: Run the Tests
+
+[source,bash]
+----
+# Run Bronze tier tests (schema + short-term memory)
+uv run pytest -m bronze -v
+
+# Run all tiers
+uv run pytest -v
+
+# See what tests would run without executing
+uv run pytest --collect-only -m bronze -q
+----
+
+If no adapter is configured, all tests skip with:
+
+----
+SKIPPED: No adapter configured. Provide an 'adapter' fixture...
+----
+
+== Step 5: Generate a Compliance Report
+
+[source,bash]
+----
+# Run tests with JSON output
+uv run pytest --json-report --json-report-file=results.json -v
+
+# Generate the compliance report
+uv run tck results.json \
+  --name "My Implementation" \
+  --version "1.0.0" \
+  --output report.json \
+  --html report.html
+----
+
+Open `report.html` in your browser to see a tier-by-tier pass/fail breakdown.
+
+== Next Steps
+
+* link:../how-to/writing-an-adapter.html[Writing a TCK Adapter] — full guide covering all tiers
+* link:../reference/compliance-tiers.html[Compliance Tier Definitions] — Bronze, Silver, and Gold requirements
+* link:../how-to/certification.html[Obtaining TCK Certification] — submit your results to the public registry

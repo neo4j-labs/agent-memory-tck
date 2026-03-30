@@ -1,0 +1,22 @@
+{
+  "name": "scout-agent",
+  "version": "0.1.0",
+  "description": "Web search agent using Vercel AI SDK — reads/writes to shared graph",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "ai": "^4.0.0",
+    "@ai-sdk/openai": "^1.0.0",
+    "@neo4j-labs/agent-memory": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "tsx": "^4.0.0",
+    "@types/node": "^20.0.0"
+  }
+}

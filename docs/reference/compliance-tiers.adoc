@@ -1,0 +1,127 @@
+= Compliance Tier Definitions
+:toc:
+:toclevels: 2
+
+The TCK defines three compliance tiers. Each is a strict superset of the tier below it.
+
+== Bronze -- Core Schema + Short-Term Memory
+
+*93 test scenarios*
+
+Bronze verifies that an implementation correctly handles the core graph schema and conversational memory.
+
+=== Required Behaviors
+
+[cols="1,3"]
+|===
+|Area |Requirements
+
+|Schema
+|Conversation auto-creation on first message. Session isolation. Message properties (`id`, `role`, `content`, `timestamp`). Entity/Preference/Fact creation with required fields and valid UUIDs.
+
+|Short-Term Memory
+|Store messages with all three roles (`user`, `assistant`, `system`). Retrieve in insertion order. Respect `limit` parameter. Preserve unicode, emoji, 10K+ content, nested metadata. Session isolation across 3+ sessions.
+
+|Search
+|Semantic message search. Session-scoped and cross-session search. Limit enforcement. Empty results on no match.
+
+|Sessions
+|List sessions with accurate message counts. Count updates after deletion.
+
+|Deletion
+|Single message deletion. Chain repair after middle deletion. Idempotent delete (second call returns `false`). Clear session is idempotent and preserves other sessions.
+
+|Ordering
+|Insertion order maintained for 100+ messages. Monotonically non-decreasing timestamps. Mixed roles preserve order.
+
+|Idempotency
+|Unique IDs per `add_message` call. Duplicate content stored separately. Repeated `clear_session` is safe.
+|===
+
+=== Pass Requirement
+
+*100%* of Bronze scenarios must pass.
+
+== Silver -- Full Memory Primitives
+
+*67 test scenarios*
+
+Silver adds long-term memory (entities, preferences, facts) and reasoning memory (traces, steps, tool calls).
+
+=== Required Behaviors (in addition to Bronze)
+
+[cols="1,3"]
+|===
+|Area |Requirements
+
+|Entities
+|Create entities with 5 types (PERSON, ORGANIZATION, LOCATION, EVENT, OBJECT). Optional description. Unicode names. Duplicate names with different types are separate. UUID IDs.
+
+|Preferences
+|Store with category and optional context. Long text. Multiple per category. UUID IDs.
+
+|Facts
+|Store subject-predicate-object triples. Unicode support. Multiple facts per subject. UUID IDs.
+
+|Entity Search
+|Semantic search. Empty database returns `[]`. Limit enforcement.
+
+|Entity Lookup
+|Exact name lookup. Returns `None` when not found.
+
+|Relationships
+|Traverse relationships from an entity. Type filtering. Multiple relationships. Isolated entities return `[]`.
+
+|Reasoning Traces
+|Start/complete traces with outcome and success. Unique trace IDs.
+
+|Steps
+|Monotonically increasing `step_number`. Partial fields (thought-only, action-only, observation-only). 10+ steps maintain numbering.
+
+|Tool Calls
+|All 6 statuses: `pending`, `success`, `failure`, `error`, `timeout`, `cancelled`. Multiple calls per step. Duration and error recording.
+
+|Tool Stats
+|Accurate aggregated statistics. Correct `success_rate` calculation. Multiple tools. Empty stats.
+
+|Trace Retrieval
+|Full trace with steps and tool calls. `None` for nonexistent ID. Session-scoped listing. Limit enforcement.
+|===
+
+=== Pass Requirement
+
+*100%* of Bronze + *100%* of Silver scenarios must pass.
+
+== Gold -- Full Specification
+
+*18 test scenarios*
+
+Gold adds cross-memory integration, entity relationship management, and multi-agent sharing semantics.
+
+=== Required Behaviors (in addition to Silver)
+
+[cols="1,3"]
+|===
+|Area |Requirements
+
+|Cross-Memory References
+|Entity created in long-term memory is referenceable in reasoning. Full flow: conversation -> entity -> reasoning. Entities visible across sessions. Facts/preferences stored alongside entities. Traces creatable in same session as messages.
+
+|Entity Relationships
+|Create typed relationships (WORKS_AT, KNOWS, LOCATED_AT). Bidirectional traversal. Multiple relationship types. Valid UUID IDs.
+
+|Entity Merging
+|Merge duplicate entities into one. Merged entity retains all relationships.
+
+|Similar Traces
+|Semantic trace search. Limit enforcement. Empty database returns `[]`.
+
+|Multi-Agent Sharing
+|Entity created by one agent visible to another. Reasoning traces filterable by session (per-agent isolation). Conversations isolated while entities shared.
+|===
+
+=== Pass Requirement
+
+*100%* Bronze + *100%* Silver + *80%* Gold scenarios must pass.
+
+NOTE: Gold allows 80% because some scenarios test optional `SHOULD` behaviors. Implementations that raise `NotImplementedError` for Gold methods will have those tests skipped (not failed).

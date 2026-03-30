@@ -1,0 +1,132 @@
+name: TCK Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    services:
+      neo4j:
+        image: neo4j:5-community
+        env:
+          NEO4J_AUTH: neo4j/testpassword
+          NEO4J_PLUGINS: '["apoc"]'
+        ports:
+          - 7687:7687
+          - 7474:7474
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p testpassword 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: testpassword
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --extra reference --extra dev
+
+      - name: Run Bronze tier tests
+        run: |
+          uv run pytest -m bronze \
+            --json-report --json-report-file=bronze-results.json \
+            -v
+
+      - name: Run Silver tier tests
+        run: |
+          uv run pytest -m silver \
+            --json-report --json-report-file=silver-results.json \
+            -v
+        continue-on-error: true
+
+      - name: Run Gold tier tests
+        run: |
+          uv run pytest -m gold \
+            --json-report --json-report-file=gold-results.json \
+            -v
+        continue-on-error: true
+
+      - name: Run full test suite
+        run: |
+          uv run pytest \
+            --json-report --json-report-file=full-results.json \
+            -v
+
+      - name: Generate compliance report
+        if: always()
+        run: |
+          uv run tck full-results.json \
+            --name "neo4j-agent-memory (reference)" \
+            --version "0.0.5" \
+            --output compliance-report.json \
+            --html compliance-report.html
+        continue-on-error: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tck-results-py${{ matrix.python-version }}
+          path: |
+            *-results.json
+            compliance-report.*
+
+  validate-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Validate scenario registry
+        run: uv run python -m tck.registry.validator
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run ruff check
+        run: uv run ruff check .
+
+      - name: Run ruff format check
+        run: uv run ruff format --check .
+
+      - name: Run mypy
+        run: uv run mypy tck/
+        continue-on-error: true

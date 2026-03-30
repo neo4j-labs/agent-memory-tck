@@ -1,0 +1,126 @@
+= Cross-Agent Memory Sharing
+:toc:
+:toclevels: 2
+
+One of the TCK's core goals is enabling agents written in different languages and frameworks to share the same Neo4j memory graph. This document explains how that works and why the TCK makes it possible.
+
+== The Problem
+
+Without a shared specification:
+
+* A Python agent using PydanticAI writes entities with one property naming convention.
+* A TypeScript agent using Vercel AI SDK writes entities with a different convention.
+* A Go agent writes reasoning traces with an incompatible structure.
+
+When all three connect to the same Neo4j Aura instance, their writes are *silently incompatible*. The Python agent can't read what the TypeScript agent wrote.
+
+== The Solution: Schema Compatibility via TCK
+
+The TCK defines the *exact graph schema* that all implementations must produce:
+
+* Node labels: `Conversation`, `Message`, `Entity`, `Preference`, `Fact`, `ReasoningTrace`, `ReasoningStep`, `ToolCall`
+* Property names: `id`, `session_id`, `role`, `content`, `timestamp`, `entity_type`, `step_number`, etc.
+* Relationship types: `HAS_MESSAGE`, `NEXT_MESSAGE`, `WORKS_AT`, `KNOWS`, `HAS_STEP`, `HAS_TOOL_CALL`, etc.
+
+If two implementations both pass the TCK, their graph writes are guaranteed to be compatible.
+
+== Namespace Model
+
+The TCK supports two namespace concepts:
+
+=== Session Namespace (Per-Agent Isolation)
+
+Each agent uses its own session IDs:
+
+----
+Lenny: session_id = "lenny-task-001"
+Scout: session_id = "scout-search-042"
+Forge: session_id = "forge-enrich-007"
+Atlas: session_id = "atlas-synth-003"
+----
+
+**Conversations and reasoning traces are isolated by session.** Lenny's conversation history is not visible when querying Scout's session.
+
+=== Entity Namespace (Shared Knowledge)
+
+Entities, preferences, and facts are *shared across all sessions*:
+
+----
+Lenny creates: Entity("Alice Johnson", PERSON)
+Scout can read: get_entity_by_name("Alice Johnson") → Entity found!
+Forge enriches: add_fact("Alice Johnson", "ROLE", "CTO")
+Atlas queries: search_entities("Alice") → Entity with all enrichments
+----
+
+This is the fundamental value proposition: **conversations are private, knowledge is shared.**
+
+== TCK Verification
+
+The Gold tier includes tests that verify this sharing model:
+
+[cols="1,3"]
+|===
+|Test |What It Verifies
+
+|`test_entity_enriched_across_sessions`
+|Entity created in session A is retrievable from session B context
+
+|`test_reasoning_traces_isolated_by_session`
+|Traces are filterable by session — each agent sees only its own traces
+
+|`test_conversations_isolated_but_entities_shared`
+|Two sessions have separate conversations but both see the same entity
+|===
+
+== The Multi-Agent Demo
+
+The repository includes a four-agent demo proving this architecture:
+
+[cols="1,1,1,2"]
+|===
+|Agent |Language |Framework |Role
+
+|*Lenny*
+|Python
+|PydanticAI
+|Podcast research — creates Person and Organization entities from transcripts
+
+|*Scout*
+|TypeScript
+|Vercel AI SDK
+|Web search — reads shared entities, enriches with web results
+
+|*Forge*
+|Go
+|Custom HTTP
+|Data pipeline — adds structured properties (role, company, domain) as facts
+
+|*Atlas*
+|Python
+|LangGraph
+|Orchestrator — reads all agents' reasoning traces, produces cross-agent synthesis
+|===
+
+=== Data Flow
+
+----
+Lenny (Python) ──creates──> Entity("Alice Johnson", PERSON)
+                                    │
+Scout (TypeScript) ──reads──────────┤──enriches──> Fact("Alice Johnson", ENRICHED_BY, "...")
+                                    │
+Forge (Go) ──reads──────────────────┤──enriches──> Fact("Alice Johnson", ROLE, "CTO")
+                                    │
+Atlas (Python) ──reads all traces───┴──synthesizes──> Summary of all agents' work
+----
+
+Each agent runs as a separate service (Cloud Run or Docker container), all connecting to the same Neo4j instance. The TCK guarantees that Lenny's Python writes are readable by Scout's TypeScript reads and Forge's Go reads — because they all implement the same schema.
+
+== Why This Matters
+
+The polyglot memory architecture addresses the most common skepticism about multi-language agent systems:
+
+> "Will the TypeScript SDK really produce graph structures compatible with what the Python SDK writes?"
+
+The TCK's answer: **yes, by definition.** If both pass the TCK, they are compatible. The multi-agent demo proves it live.
+
+This is the same principle behind the openCypher TCK: a query written for one Cypher engine is portable to another because they both pass the same compatibility suite.

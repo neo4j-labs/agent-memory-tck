@@ -1,0 +1,152 @@
+= Adding TCK to Your CI Pipeline
+:toc:
+:toclevels: 2
+:source-highlighter: rouge
+
+This guide shows how to run TCK conformance tests automatically in CI/CD.
+
+== GitHub Actions: Python Adapter
+
+For implementations with a native Python adapter:
+
+[source,yaml]
+----
+name: TCK Compliance
+on: [push, pull_request]
+
+jobs:
+  tck:
+    runs-on: ubuntu-latest
+    services:
+      neo4j:
+        image: neo4j:5-community
+        env:
+          NEO4J_AUTH: neo4j/testpassword
+        ports:
+          - "7687:7687"
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p testpassword 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run Bronze tier
+        run: uv run pytest -m bronze -v
+
+      - name: Run full suite with report
+        run: |
+          uv run pytest \
+            --json-report --json-report-file=results.json -v
+
+      - name: Generate compliance report
+        if: always()
+        run: |
+          uv run tck results.json \
+            --name "My Implementation" \
+            --version "${{ github.sha }}" \
+            -o report.json --html report.html
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tck-report
+          path: |
+            report.json
+            report.html
+----
+
+== GitHub Actions: HTTP Bridge (TypeScript/Go)
+
+For non-Python implementations, start your conformance server first:
+
+=== TypeScript
+
+[source,yaml]
+----
+jobs:
+  tck:
+    runs-on: ubuntu-latest
+    services:
+      neo4j:
+        image: neo4j:5-community
+        env:
+          NEO4J_AUTH: neo4j/testpassword
+        ports: ["7687:7687"]
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p testpassword 'RETURN 1'"
+          --health-interval 10s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install TypeScript deps
+        run: cd clients/typescript && npm install
+
+      - name: Start conformance server
+        run: |
+          cd clients/typescript
+          MEMORY_ENDPOINT=bolt://localhost:7687 npm run conformance:server &
+          sleep 3  # wait for server to start
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Run TCK via bridge
+        run: |
+          uv sync --extra bridge
+          uv run pytest -m bronze --bridge-url http://localhost:3001 -v
+----
+
+=== Go
+
+[source,yaml]
+----
+    steps:
+      # ... (Neo4j service same as above)
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Start Go conformance server
+        run: |
+          cd clients/go
+          MEMORY_ENDPOINT=bolt://localhost:7687 go run ./conformance &
+          sleep 3
+
+      - name: Run TCK via bridge
+        run: |
+          uv sync --extra bridge
+          uv run pytest -m bronze --bridge-url http://localhost:3001 -v
+----
+
+== Adding a Compliance Badge
+
+After CI passes, add the appropriate tier badge to your README:
+
+[source,markdown]
+----
+![Bronze Certified](https://img.shields.io/badge/agent--memory--tck-Bronze-F97316?logo=neo4j)
+![Silver Certified](https://img.shields.io/badge/agent--memory--tck-Silver-22C55E?logo=neo4j)
+![Gold Certified](https://img.shields.io/badge/agent--memory--tck-Gold-6366F1?logo=neo4j)
+----
+
+== See Also
+
+* link:cross-language-testing.html[Cross-Language Conformance Testing] — bridge protocol details
+* link:certification.html[Obtaining TCK Certification] — submitting results to the registry

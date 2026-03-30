@@ -1,0 +1,49 @@
+# Multi-agent memory demo — local development
+#
+# Usage:
+#   docker compose up neo4j        # Start Neo4j only
+#   docker compose up              # Start all services
+#
+# Endpoints:
+#   Neo4j Browser: http://localhost:7474
+#   Forge (Go):    http://localhost:8003/health
+#
+# The agents connect to a memory service endpoint. For local dev, run
+# the Python bridge server:
+#   cd ../.. && uv run python -m tck.bridge.reference_server
+# Then MEMORY_ENDPOINT defaults to http://host.docker.internal:3001
+
+services:
+  neo4j:
+    image: neo4j:5-community
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/password
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "password", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  forge:
+    build:
+      context: ../../
+      dockerfile: demo/agents/forge/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      MEMORY_ENDPOINT: ${MEMORY_ENDPOINT:-http://host.docker.internal:3001}
+      PORT: "8003"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  neo4j_data:

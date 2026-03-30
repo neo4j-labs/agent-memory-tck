@@ -1,0 +1,105 @@
+= Obtaining TCK Certification
+:toc:
+:toclevels: 2
+:source-highlighter: rouge
+
+This guide walks you through generating a compliance report and submitting it to the public certification registry.
+
+== Compliance Tiers
+
+[cols="1,2,1,2"]
+|===
+|Tier |Scope |Pass Rate |Badge
+
+|Bronze
+|Schema + short-term memory
+|100%
+|image:https://img.shields.io/badge/agent--memory--tck-Bronze-F97316?logo=neo4j[]
+
+|Silver
+|Bronze + long-term + reasoning memory
+|100% Bronze, 100% Silver
+|image:https://img.shields.io/badge/agent--memory--tck-Silver-22C55E?logo=neo4j[]
+
+|Gold
+|Silver + cross-memory + multi-agent
+|100% Bronze, 100% Silver, 80% Gold
+|image:https://img.shields.io/badge/agent--memory--tck-Gold-6366F1?logo=neo4j[]
+|===
+
+NOTE: Bronze and Silver require 100% pass rate. Gold allows 80% because some Gold scenarios test optional `SHOULD` behaviors.
+
+== Step 1: Run the Test Suite
+
+[source,bash]
+----
+# Run all tiers and generate JSON output
+uv run pytest \
+  --json-report --json-report-file=results.json \
+  -v
+----
+
+For cross-language implementations, use the bridge:
+
+[source,bash]
+----
+uv run pytest \
+  --json-report --json-report-file=results.json \
+  --bridge-url http://localhost:3001 \
+  -v
+----
+
+== Step 2: Generate the Compliance Report
+
+[source,bash]
+----
+uv run tck results.json \
+  --name "My Implementation" \
+  --version "1.0.0" \
+  --output compliance-report.json \
+  --html compliance-report.html
+----
+
+The report includes:
+
+* Per-tier pass/fail/skip counts and pass rates
+* Achieved tier (highest tier where all requirements are met)
+* Individual test results with SPEC clause references
+
+== Step 3: Submit to the Registry
+
+. Fork the `neo4j-labs/agent-memory-tck` repository.
+. Copy your `compliance-report.json` to `certifications/submissions/your-implementation-name.json`.
+. Open a pull request with:
+** Your compliance report JSON
+** A brief description of your implementation (language, framework, target environment)
+** The tier you are claiming
+
+A Neo4j Labs maintainer will review the report and, if valid, add an entry to `certifications/registry.json`.
+
+== Registry Entry Format
+
+[source,json]
+----
+{
+  "name": "My Implementation",
+  "version": "1.0.0",
+  "language": "TypeScript",
+  "tier": "bronze",
+  "tck_version": "1.0.0",
+  "report_url": "certifications/submissions/my-implementation.json",
+  "repository": "https://github.com/org/repo",
+  "certified_at": "2026-03-29T00:00:00Z"
+}
+----
+
+== Maintaining Certification
+
+* Certification is tied to a specific TCK version.
+* When a new TCK version is released, re-run the suite and resubmit.
+* If your pass rate drops below the tier threshold after a TCK update, your registry entry will be flagged until updated.
+
+== See Also
+
+* link:../reference/compliance-tiers.html[Compliance Tier Definitions] — detailed requirements
+* link:ci-integration.html[Adding TCK to Your CI Pipeline] — automate compliance testing

@@ -9,6 +9,22 @@ SESSION_A = "tck-session-alpha"
 SESSION_B = "tck-session-beta"
 SESSION_C = "tck-session-gamma"
 
+# Edge-case test strings
+LONG_CONTENT = "x" * 10_000  # 10K character string
+UNICODE_CONTENT = "Hello \u4e16\u754c \ud83c\udf0d \u00e9\u00e8\u00ea \u00fc\u00f6\u00e4 \u2603\ufe0f \u2764\ufe0f\u200d\ud83d\udd25"
+SPECIAL_CHARS_CONTENT = "Line1\nLine2\tTabbed \"quoted\" 'single' back\\slash"
+EMPTY_CONTENT = ""
+
+# Nested metadata for round-trip tests
+NESTED_METADATA = {
+    "source": "test",
+    "priority": "high",
+    "tags": ["memory", "tck", "bronze"],
+    "nested": {"level2": {"level3": "deep_value"}},
+    "count": 42,
+    "active": True,
+}
+
 # Entity test data
 ENTITIES = [
     {"name": "Alice Johnson", "type": "PERSON", "description": "Software engineer at Acme Corp"},
@@ -20,7 +36,11 @@ ENTITIES = [
 
 # Preference test data
 PREFERENCES = [
-    {"category": "language", "preference": "Prefers Python over JavaScript", "context": "programming"},
+    {
+        "category": "language",
+        "preference": "Prefers Python over JavaScript",
+        "context": "programming",
+    },
     {"category": "communication", "preference": "Prefers async communication", "context": "work"},
     {"category": "food", "preference": "Vegetarian diet", "context": "dietary restrictions"},
 ]
@@ -37,7 +57,10 @@ CONVERSATION_MESSAGES = [
     {"role": "user", "content": "Hello, I'm working on the agent memory project."},
     {"role": "assistant", "content": "I can help with the agent memory project. What do you need?"},
     {"role": "user", "content": "I need to add entity extraction for people and organizations."},
-    {"role": "assistant", "content": "Entity extraction can identify people like Alice and organizations like Acme Corp from text."},
+    {
+        "role": "assistant",
+        "content": "Entity extraction can identify people like Alice and organizations like Acme Corp from text.",
+    },
     {"role": "user", "content": "Great, let's start with the Person entity type."},
 ]
 

@@ -1,0 +1,117 @@
+= TCK Architecture and Design Decisions
+:toc:
+:toclevels: 2
+
+This document explains the architectural choices behind the TCK and the rationale for key design decisions.
+
+== Why a TCK?
+
+The neo4j-agent-memory ecosystem is expanding beyond a single Python package. TypeScript, Go, and hosted service implementations need a shared definition of "compatible." Without a TCK:
+
+* Each language implementation will diverge in behavior, especially in edge cases.
+* Agents in different languages cannot safely share the same Neo4j graph.
+* The hosted service has no conformance guarantee.
+* Third-party contributors have no reference beyond reading Python source code.
+
+The TCK fills this gap, inspired by the https://opencypher.org/[openCypher TCK] which enabled multiple independent Cypher engines to achieve interoperability through shared scenario definitions.
+
+== Pytest over Gherkin
+
+The PRD specified Gherkin `.feature` files. The implementation chose *pytest classes with markers* instead.
+
+=== Rationale
+
+[cols="1,1"]
+|===
+|Gherkin Approach |Pytest Approach
+
+|`.feature` files define scenarios in plain English
+|Test docstrings reference SPEC clauses (e.g., `"""SPEC-2.1.1: add_message MUST...""`)
+
+|Step definitions map Gherkin to Python
+|Tests call `BaseAdapter` methods directly
+
+|Requires pytest-bdd dependency and step definition layer
+|Uses standard pytest with no additional abstraction
+
+|Scenario IDs embedded in `.feature` files
+|Scenario IDs tracked in a separate YAML registry
+|===
+
+The key insight: pytest docstrings referencing SPEC clauses provide the same traceability as Gherkin, and the scenario ID registry provides the same stability guarantee. The pytest approach avoids a rewrite of existing tests and eliminates the step-definition binding layer.
+
+== The Adapter Pattern
+
+The TCK does not test implementations directly. Instead, it tests through an *adapter* — an intermediary that maps the TCK's abstract interface to a concrete implementation.
+
+----
+TCK Test Suite
+    |
+    v
+BaseAdapter (abstract)    <-- The contract
+    |
+    +-- ReferenceAdapter   <-- Wraps neo4j-agent-memory Python package
+    +-- HTTPBridgeAdapter  <-- Proxies to HTTP conformance server
+    +-- YourAdapter        <-- Your implementation
+----
+
+This design means:
+
+* Tests are implementation-agnostic — they test *behavior*, not *code*.
+* The same test suite validates Python, TypeScript, Go, or any other implementation.
+* TCK data models (`TCKMessage`, `TCKEntity`, etc.) are the common language.
+
+== The HTTP Bridge
+
+The bridge protocol is the critical enabler for cross-language testing. It avoids duplicating test logic in three languages.
+
+=== How It Works
+
+. Each non-Python implementation provides a *conformance server* — a thin HTTP server (~200 lines) that maps bridge protocol requests to native client calls.
+. The Python `HTTPBridgeAdapter` serializes each `BaseAdapter` method as `POST /{method_name}` with JSON parameters.
+. The conformance server calls the native client, serializes the result to JSON, and returns it.
+. The Python test suite sees identical behavior whether testing a Python adapter or an HTTP bridge.
+
+=== Why Not Native Tests in Each Language?
+
+Native test suites in TypeScript (Vitest) and Go (`testing`) are planned as *secondary validation*. The Python suite remains the single source of truth because:
+
+* One test definition means one place to update when behavior changes.
+* Cross-language consistency is guaranteed — all languages pass the exact same assertions.
+* The bridge protocol itself is simple and unlikely to introduce bugs.
+
+== Compliance Tiers
+
+The three-tier model (Bronze/Silver/Gold) allows implementations to claim honest partial compliance:
+
+* *Bronze*: "We handle conversations." (9 methods, 93 scenarios)
+* *Silver*: "We handle the full memory model." (23 methods, 67 additional scenarios)
+* *Gold*: "We handle everything including cross-agent sharing." (26 methods, 18 additional scenarios)
+
+This is preferable to a binary pass/fail that would either force all implementations to implement everything before claiming any compatibility, or allow implementations to claim compatibility while silently skipping features.
+
+== Monorepo Structure
+
+The TCK, TypeScript client, Go client, and demo all live in one repository. This enables:
+
+* *Atomic updates*: A SPEC change, test update, and client fix can land in one PR.
+* *Shared CI*: One pipeline validates the spec, tests, and all implementations.
+* *Cross-references*: TypeScript and Go test data (`testdata.ts`, `testdata.go`) mirror the Python fixtures exactly.
+
+The trade-off is a more complex repository. Go module paths are longer (`github.com/neo4j-labs/agent-memory-tck/clients/go/memory`) than they would be in a standalone repo.
+
+== SPEC Clause Numbering
+
+SPEC clauses follow the pattern `SPEC-{Volume}.{Section}.{Number}`:
+
+* *Volume 1*: Context Graph Schema (SPEC-1.x)
+* *Volume 2*: Short-Term Memory Contracts (SPEC-2.x)
+* *Volume 3*: Long-Term Memory Contracts (SPEC-3.x)
+* *Volume 4*: Reasoning Memory Contracts (SPEC-4.x)
+* *Volume 5*: Cross-Memory and Multi-Agent Contracts (SPEC-5.x)
+
+Clauses use RFC 2119 keywords:
+
+* **MUST**: Required for compliance at the stated tier.
+* **SHOULD**: Expected behavior; tested in Gold tier with 80% threshold.
+* **MAY**: Optional behavior; not tested but documented.

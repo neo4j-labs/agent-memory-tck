@@ -1,0 +1,117 @@
+= Cross-Language Conformance Testing
+:toc:
+:toclevels: 2
+:source-highlighter: rouge
+
+This guide explains how to test TypeScript, Go, or any non-Python implementation against the Python TCK test suite using the HTTP bridge protocol.
+
+== How It Works
+
+The HTTP bridge enables the Python TCK to validate implementations in any language:
+
+. Your implementation runs a thin HTTP **conformance server** that maps bridge protocol requests to your native client API.
+. The Python test suite uses `HTTPBridgeAdapter` to proxy every `BaseAdapter` method call as an HTTP POST.
+. Test results are identical to running a native Python adapter — same reports, same compliance tiers.
+
+----
+ Python TCK Tests
+       |
+       v
+ HTTPBridgeAdapter ──HTTP POST──> Conformance Server (TS/Go/etc.)
+                                        |
+                                        v
+                                  Your Native Client
+                                        |
+                                        v
+                                   Neo4j / Service
+----
+
+== Running the TypeScript Conformance Server
+
+[source,bash]
+----
+cd clients/typescript
+
+# Set the upstream memory service endpoint
+export MEMORY_ENDPOINT=http://localhost:7474
+
+# Start the conformance server (default port 3001)
+npm run conformance:server
+----
+
+Then in another terminal:
+
+[source,bash]
+----
+# Run the Python TCK against it
+uv run pytest -m bronze --bridge-url http://localhost:3001 -v
+----
+
+== Running the Go Conformance Server
+
+[source,bash]
+----
+cd clients/go
+
+# Set the upstream memory service endpoint
+export MEMORY_ENDPOINT=http://localhost:7474
+
+# Start the conformance server
+go run ./conformance
+----
+
+Then:
+
+[source,bash]
+----
+uv run pytest -m bronze --bridge-url http://localhost:3001 -v
+----
+
+== Building Your Own Conformance Server
+
+To test an implementation in any language:
+
+. Create an HTTP server listening on a configurable port (default 3001).
+. Implement POST handlers for each `BaseAdapter` method. See link:../reference/bridge-protocol.html[Bridge Protocol Specification] for the full endpoint list.
+. Map incoming JSON parameters to your client's native API calls.
+. Return JSON responses matching the TCK data model schemas.
+
+=== Minimal Example (Pseudocode)
+
+[source]
+----
+POST /add_message
+  Body: {"session_id": "...", "role": "user", "content": "Hello", "metadata": {}}
+  Response: {"id": "uuid", "role": "user", "content": "Hello", "timestamp": "ISO-8601", "metadata": {}}
+
+POST /clear_all_data
+  Response: 204 No Content
+
+POST /delete_message
+  Body: {"message_id": "uuid"}
+  Response: {"deleted": true}
+----
+
+=== Key Protocol Rules
+
+* **Method names** match `BaseAdapter` methods exactly (snake_case).
+* **UUIDs** are serialized as strings.
+* **Timestamps** are ISO 8601 strings.
+* **Null/undefined** values are omitted from request bodies.
+* **Void methods** (like `clear_session`) return HTTP 204.
+* **Not-found results** (like `get_entity_by_name` with no match) return `null`.
+
+== Configuring the Bridge Port
+
+Set the `TCK_BRIDGE_PORT` environment variable to change from the default 3001:
+
+[source,bash]
+----
+TCK_BRIDGE_PORT=4000 go run ./conformance
+uv run pytest -m bronze --bridge-url http://localhost:4000
+----
+
+== See Also
+
+* link:../reference/bridge-protocol.html[HTTP Bridge Protocol Specification] — full endpoint and data type reference
+* link:ci-integration.html[Adding TCK to Your CI Pipeline] — automate bridge testing in CI

@@ -1,0 +1,158 @@
+= Building Your First TypeScript Agent with Memory
+:toc:
+:toclevels: 2
+:source-highlighter: rouge
+
+This tutorial shows you how to add persistent memory to a TypeScript AI application using `@neo4j-labs/agent-memory` and the Vercel AI SDK.
+
+== What You'll Build
+
+A simple chat application where the AI assistant remembers conversation history across sessions, stores entities it learns about, and records its reasoning process.
+
+== Prerequisites
+
+* Node.js 20+ or Bun
+* An OpenAI API key
+* Access to a neo4j-agent-memory service endpoint (or local Neo4j instance)
+
+== Step 1: Create the Project
+
+[source,bash]
+----
+mkdir my-memory-agent && cd my-memory-agent
+npm init -y
+npm install @neo4j-labs/agent-memory ai @ai-sdk/openai
+----
+
+== Step 2: Connect the Memory Client
+
+[source,typescript]
+----
+// index.ts
+import { MemoryClient } from "@neo4j-labs/agent-memory";
+
+const client = new MemoryClient({
+  endpoint: process.env.MEMORY_ENDPOINT ?? "http://localhost:3001",
+});
+
+await client.connect();
+console.log("Connected to memory service");
+----
+
+== Step 3: Store and Retrieve Messages
+
+[source,typescript]
+----
+// Store a message
+const msg = await client.shortTerm.addMessage(
+  "session-1",
+  "user",
+  "My name is Alice and I work at Acme Corp"
+);
+console.log(`Stored message: ${msg.id}`);
+
+// Retrieve the conversation
+const conv = await client.shortTerm.getConversation("session-1");
+console.log(`Messages: ${conv.messages.length}`);
+
+// Search across all messages
+const results = await client.shortTerm.searchMessages("Alice", {
+  limit: 5,
+  threshold: 0.0,
+});
+console.log(`Found ${results.length} matching messages`);
+----
+
+== Step 4: Build a Knowledge Graph
+
+[source,typescript]
+----
+// Store entities
+const alice = await client.longTerm.addEntity("Alice Johnson", "PERSON", {
+  description: "Software engineer at Acme Corp",
+});
+
+const acme = await client.longTerm.addEntity("Acme Corp", "ORGANIZATION", {
+  description: "Technology company",
+});
+
+// Create a relationship
+await client.longTerm.addRelationship(alice.id, acme.id, "WORKS_AT");
+
+// Store facts
+await client.longTerm.addFact("Alice Johnson", "ROLE", "Software Engineer");
+
+// Search the graph
+const entities = await client.longTerm.searchEntities("Alice");
+console.log(`Found: ${entities.map(e => e.name).join(", ")}`);
+----
+
+== Step 5: Record Reasoning Traces
+
+[source,typescript]
+----
+// Start a reasoning trace
+const trace = await client.reasoning.startTrace(
+  "session-1",
+  "Find Alice's employer"
+);
+
+// Record each step
+const step = await client.reasoning.addStep(trace.id, {
+  thought: "I need to look up Alice in the entity graph",
+  action: "search_entities",
+});
+
+// Record tool calls
+await client.reasoning.recordToolCall(step.id, "search_entities", {
+  query: "Alice Johnson",
+}, {
+  result: { found: true },
+  durationMs: 42,
+});
+
+// Complete the trace
+await client.reasoning.completeTrace(trace.id, {
+  outcome: "Alice works at Acme Corp",
+  success: true,
+});
+----
+
+== Step 6: Add Vercel AI SDK Middleware
+
+The middleware auto-injects conversation history and persists assistant responses:
+
+[source,typescript]
+----
+import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { agentMemoryMiddleware } from "@neo4j-labs/agent-memory/middleware/vercel-ai";
+
+const middleware = agentMemoryMiddleware(client, {
+  sessionId: "session-1",
+  includeHistory: 20,  // inject last 20 messages as context
+});
+
+const result = await generateText({
+  model: openai("gpt-4o-mini"),
+  experimental_middleware: middleware,
+  prompt: "What do you know about my role?",
+});
+
+console.log(result.text);
+// The assistant sees the full conversation history and can reference
+// that Alice works at Acme Corp as a software engineer.
+----
+
+== Step 7: Clean Up
+
+[source,typescript]
+----
+await client.close();
+----
+
+== Next Steps
+
+* link:../reference/base-adapter.html[BaseAdapter Interface Reference] — all available memory operations
+* link:../explanation/memory-model.html[The Agent Memory Model] — understanding short-term, long-term, and reasoning memory
+* link:../explanation/multi-agent-sharing.html[Cross-Agent Memory Sharing] — how multiple agents share one graph

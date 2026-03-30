@@ -1,0 +1,350 @@
+= HTTP Bridge Protocol Specification
+:toc:
+:toclevels: 3
+:source-highlighter: rouge
+
+Version 0.1.0
+
+The HTTP bridge protocol enables the Python TCK test suite to validate implementations in any language by proxying `BaseAdapter` method calls over HTTP.
+
+== Overview
+
+A **conformance server** is a lightweight HTTP server that:
+
+. Listens on a configurable port (default: 3001)
+. Accepts POST requests mapping 1:1 to `BaseAdapter` methods
+. Returns JSON responses matching the TCK data model
+
+== Request Format
+
+----
+POST /{method_name}
+Content-Type: application/json
+
+{
+  "param1": "value1",
+  "param2": "value2"
+}
+----
+
+* Method names match `BaseAdapter` methods exactly (snake_case).
+* Parameters are serialized as a flat JSON object.
+* UUIDs are serialized as strings.
+* Datetimes are serialized as ISO 8601 strings.
+* `None`/`null` values are omitted from the request body.
+
+== Response Formats
+
+=== Success: Single Object
+
+[source,json]
+----
+HTTP 200 OK
+Content-Type: application/json
+
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "role": "user",
+  "content": "Hello",
+  "timestamp": "2026-03-21T10:00:00Z",
+  "metadata": {}
+}
+----
+
+=== Success: List
+
+[source,json]
+----
+HTTP 200 OK
+Content-Type: application/json
+
+[
+  {"id": "...", ...},
+  {"id": "...", ...}
+]
+----
+
+=== Success: Boolean (e.g., `delete_message`)
+
+[source,json]
+----
+HTTP 200 OK
+Content-Type: application/json
+
+{"deleted": true}
+----
+
+=== Success: Void (e.g., `clear_session`)
+
+----
+HTTP 204 No Content
+----
+
+=== Null Result (e.g., `get_entity_by_name` not found)
+
+[source,json]
+----
+HTTP 200 OK
+Content-Type: application/json
+
+null
+----
+
+=== Error
+
+[source,json]
+----
+HTTP 400/500
+Content-Type: application/json
+
+{"error": "Description of what went wrong"}
+----
+
+== Endpoints
+
+=== Lifecycle
+
+[cols="2,3,2"]
+|===
+|Endpoint |Parameters |Returns
+
+|`POST /setup`
+|(none)
+|`{"ok": true}`
+
+|`POST /teardown`
+|(none)
+|204
+
+|`POST /clear_all_data`
+|(none)
+|204
+|===
+
+=== Short-Term Memory (Bronze)
+
+[cols="2,3,2"]
+|===
+|Endpoint |Parameters |Returns
+
+|`POST /add_message`
+|`session_id`, `role`, `content`, `metadata?`
+|Message
+
+|`POST /get_conversation`
+|`session_id`, `limit?`
+|Conversation
+
+|`POST /search_messages`
+|`query`, `session_id?`, `limit?`, `threshold?`
+|Message[]
+
+|`POST /list_sessions`
+|`limit?`
+|SessionInfo[]
+
+|`POST /delete_message`
+|`message_id`
+|`{"deleted": bool}`
+
+|`POST /clear_session`
+|`session_id`
+|204
+|===
+
+=== Long-Term Memory (Silver)
+
+[cols="2,3,2"]
+|===
+|Endpoint |Parameters |Returns
+
+|`POST /add_entity`
+|`name`, `entity_type`, `description?`
+|Entity
+
+|`POST /add_preference`
+|`category`, `preference`, `context?`
+|Preference
+
+|`POST /add_fact`
+|`subject`, `predicate`, `obj`
+|Fact
+
+|`POST /search_entities`
+|`query`, `limit?`
+|Entity[]
+
+|`POST /search_preferences`
+|`query`, `category?`, `limit?`
+|Preference[]
+
+|`POST /get_entity_by_name`
+|`name`
+|Entity or `null`
+
+|`POST /get_related_entities`
+|`entity_id`, `relationship_type?`, `depth?`
+|Entity[]
+|===
+
+=== Reasoning Memory (Silver)
+
+[cols="2,3,2"]
+|===
+|Endpoint |Parameters |Returns
+
+|`POST /start_trace`
+|`session_id`, `task`
+|ReasoningTrace
+
+|`POST /add_step`
+|`trace_id`, `thought?`, `action?`, `observation?`
+|ReasoningStep
+
+|`POST /record_tool_call`
+|`step_id`, `tool_name`, `arguments`, `result?`, `status?`, `duration_ms?`, `error?`
+|ToolCall
+
+|`POST /complete_trace`
+|`trace_id`, `outcome?`, `success?`
+|ReasoningTrace
+
+|`POST /get_trace_with_steps`
+|`trace_id`
+|ReasoningTrace or `null`
+
+|`POST /list_traces`
+|`session_id?`, `limit?`
+|ReasoningTrace[]
+
+|`POST /get_tool_stats`
+|`tool_name?`
+|ToolStats[]
+|===
+
+=== Gold Tier
+
+[cols="2,3,2"]
+|===
+|Endpoint |Parameters |Returns
+
+|`POST /add_relationship`
+|`source_id`, `target_id`, `relationship_type`, `properties?`
+|Relationship
+
+|`POST /merge_duplicate_entities`
+|`source_id`, `target_id`, `canonical_name?`
+|Entity
+
+|`POST /get_similar_traces`
+|`task`, `limit?`, `success_only?`
+|ReasoningTrace[]
+|===
+
+== Data Type Schemas
+
+All JSON response objects use the field names shown in the link:base-adapter.html[BaseAdapter Interface Reference]. Key rules:
+
+* **IDs**: UUID strings (e.g., `"550e8400-e29b-41d4-a716-446655440000"`)
+* **Timestamps**: ISO 8601 (e.g., `"2026-03-21T10:00:00Z"`)
+* **Enums**: Lowercase strings (e.g., `"user"`, `"success"`, `"pending"`)
+* **Optional fields**: Omitted or `null` when not set
+* **Metadata/Arguments/Properties**: JSON objects (`{}`)
+
+=== Message
+
+[source,json]
+----
+{
+  "id": "uuid-string",
+  "role": "user|assistant|system",
+  "content": "string",
+  "timestamp": "ISO-8601",
+  "embedding": [0.1, 0.2] | null,
+  "metadata": {}
+}
+----
+
+=== Conversation
+
+[source,json]
+----
+{
+  "id": "uuid-string",
+  "session_id": "string",
+  "messages": [Message, ...],
+  "title": "string" | null,
+  "created_at": "ISO-8601",
+  "updated_at": "ISO-8601" | null
+}
+----
+
+=== Entity
+
+[source,json]
+----
+{
+  "id": "uuid-string",
+  "name": "string",
+  "type": "PERSON|ORGANIZATION|LOCATION|EVENT|OBJECT",
+  "subtype": "string" | null,
+  "description": "string" | null,
+  "embedding": [...] | null,
+  "canonical_name": "string" | null,
+  "created_at": "ISO-8601"
+}
+----
+
+=== ReasoningTrace
+
+[source,json]
+----
+{
+  "id": "uuid-string",
+  "session_id": "string",
+  "task": "string",
+  "steps": [ReasoningStep, ...],
+  "outcome": "string" | null,
+  "success": true | false | null,
+  "started_at": "ISO-8601",
+  "completed_at": "ISO-8601" | null
+}
+----
+
+=== ReasoningStep
+
+[source,json]
+----
+{
+  "id": "uuid-string",
+  "trace_id": "uuid-string",
+  "step_number": 1,
+  "thought": "string" | null,
+  "action": "string" | null,
+  "observation": "string" | null,
+  "tool_calls": [ToolCall, ...]
+}
+----
+
+=== ToolCall
+
+[source,json]
+----
+{
+  "id": "uuid-string",
+  "tool_name": "string",
+  "arguments": {},
+  "result": any | null,
+  "status": "pending|success|failure|error|timeout|cancelled",
+  "duration_ms": 150 | null,
+  "error": "string" | null
+}
+----
+
+== Implementations
+
+Reference conformance servers are provided in the repository:
+
+* *Python*: `tck/bridge/reference_server.py` (aiohttp)
+* *TypeScript*: `clients/typescript/conformance/server.ts` (Node.js http)
+* *Go*: `clients/go/conformance/main.go` (net/http)
