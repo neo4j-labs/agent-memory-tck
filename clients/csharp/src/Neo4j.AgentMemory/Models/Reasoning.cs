@@ -78,6 +78,7 @@ public class ToolCall
     public object? Result { get; set; }
 
     [JsonPropertyName("status")]
+    [JsonConverter(typeof(LowercaseEnumConverter<ToolCallStatus>))]
     public ToolCallStatus Status { get; set; } = ToolCallStatus.Pending;
 
     [JsonPropertyName("duration_ms")]

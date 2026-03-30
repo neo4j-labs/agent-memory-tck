@@ -1,40 +1,39 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Neo4j.AgentMemory.Models;
 
 /// <summary>Message role in a conversation.</summary>
-[JsonConverter(typeof(JsonStringEnumConverter<MessageRole>))]
 public enum MessageRole
 {
-    [JsonStringEnumMemberName("user")]
     User,
-
-    [JsonStringEnumMemberName("assistant")]
     Assistant,
-
-    [JsonStringEnumMemberName("system")]
     System
 }
 
 /// <summary>Status of a tool call.</summary>
-[JsonConverter(typeof(JsonStringEnumConverter<ToolCallStatus>))]
 public enum ToolCallStatus
 {
-    [JsonStringEnumMemberName("pending")]
     Pending,
-
-    [JsonStringEnumMemberName("success")]
     Success,
-
-    [JsonStringEnumMemberName("failure")]
     Failure,
-
-    [JsonStringEnumMemberName("error")]
     Error,
-
-    [JsonStringEnumMemberName("timeout")]
     Timeout,
-
-    [JsonStringEnumMemberName("cancelled")]
     Cancelled
+}
+
+/// <summary>JSON converter that serializes enums as lowercase strings.</summary>
+public class LowercaseEnumConverter<T> : JsonConverter<T> where T : struct, Enum
+{
+    public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var value = reader.GetString();
+        if (value == null) return default;
+        return Enum.TryParse<T>(value, ignoreCase: true, out var result) ? result : default;
+    }
+
+    public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString().ToLowerInvariant());
+    }
 }
