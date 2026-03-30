@@ -1,6 +1,8 @@
 using Neo4j.AgentMemory.Models;
 using Neo4j.AgentMemory.Transport;
 using NSubstitute;
+using Xunit;
+using FactAttribute = Xunit.FactAttribute;
 
 namespace Neo4j.AgentMemory.Tests;
 
@@ -29,8 +31,8 @@ public class LongTermTests
     [Fact]
     public async Task AddFact_SendsSubjectPredicateObj()
     {
-        var expected = new Fact { Id = "f-1", Subject = "Alice", Predicate = "WORKS_AT", Object = "Acme" };
-        _transport.RequestAsync<Fact>("add_fact", Arg.Any<Dictionary<string, object?>?>(), Arg.Any<CancellationToken>())
+        var expected = new Models.Fact { Id = "f-1", Subject = "Alice", Predicate = "WORKS_AT", Object = "Acme" };
+        _transport.RequestAsync<Models.Fact>("add_fact", Arg.Any<Dictionary<string, object?>?>(), Arg.Any<CancellationToken>())
             .Returns(expected);
 
         var result = await _client.LongTerm.AddFactAsync("Alice", "WORKS_AT", "Acme");

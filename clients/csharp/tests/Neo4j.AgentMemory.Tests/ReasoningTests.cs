@@ -1,6 +1,8 @@
 using Neo4j.AgentMemory.Models;
 using Neo4j.AgentMemory.Transport;
 using NSubstitute;
+using Xunit;
+using FactAttribute = Xunit.FactAttribute;
 
 namespace Neo4j.AgentMemory.Tests;
 
