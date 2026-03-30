@@ -10,9 +10,21 @@ build/
 
 # Testing
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 *.json-report
 htmlcov/
 .coverage
+
+# Node.js
+node_modules/
+.next/
+.turbo/
+package-lock.json
+
+# Go
+*.exe
+*.test
 
 # IDE
 .idea/
@@ -21,6 +33,12 @@ htmlcov/
 
 # OS
 .DS_Store
+Thumbs.db
 
 # uv
 uv.lock
+
+# Reports / generated
+compliance-report.*
+results.json
+*-results.json
