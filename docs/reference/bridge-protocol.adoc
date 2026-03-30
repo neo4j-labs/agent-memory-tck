@@ -243,7 +243,7 @@ Content-Type: application/json
 
 == Data Type Schemas
 
-All JSON response objects use the field names shown in the xref:base-adapter.adoc[BaseAdapter Interface Reference]. Key rules:
+All JSON response objects use the field names shown in the link:base-adapter.html[BaseAdapter Interface Reference]. Key rules:
 
 * **IDs**: UUID strings (e.g., `"550e8400-e29b-41d4-a716-446655440000"`)
 * **Timestamps**: ISO 8601 (e.g., `"2026-03-21T10:00:00Z"`)

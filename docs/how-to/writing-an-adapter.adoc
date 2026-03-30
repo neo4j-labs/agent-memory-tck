@@ -176,6 +176,6 @@ uv run tck results.json --name "My Impl" --version "1.0" -o report.json --html r
 
 == See Also
 
-* xref:../reference/base-adapter.adoc[BaseAdapter Interface Reference] — complete method signatures
-* xref:../reference/compliance-tiers.adoc[Compliance Tier Definitions] — pass rate requirements
-* xref:certification.adoc[Obtaining TCK Certification] — submitting your results
+* link:../reference/base-adapter.html[BaseAdapter Interface Reference] — complete method signatures
+* link:../reference/compliance-tiers.html[Compliance Tier Definitions] — pass rate requirements
+* link:certification.html[Obtaining TCK Certification] — submitting your results

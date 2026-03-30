@@ -72,7 +72,7 @@ uv run pytest -m bronze --bridge-url http://localhost:3001 -v
 To test an implementation in any language:
 
 . Create an HTTP server listening on a configurable port (default 3001).
-. Implement POST handlers for each `BaseAdapter` method. See xref:../reference/bridge-protocol.adoc[Bridge Protocol Specification] for the full endpoint list.
+. Implement POST handlers for each `BaseAdapter` method. See link:../reference/bridge-protocol.html[Bridge Protocol Specification] for the full endpoint list.
 . Map incoming JSON parameters to your client's native API calls.
 . Return JSON responses matching the TCK data model schemas.
 
@@ -113,5 +113,5 @@ uv run pytest -m bronze --bridge-url http://localhost:4000
 
 == See Also
 
-* xref:../reference/bridge-protocol.adoc[HTTP Bridge Protocol Specification] — full endpoint and data type reference
-* xref:ci-integration.adoc[Adding TCK to Your CI Pipeline] — automate bridge testing in CI
+* link:../reference/bridge-protocol.html[HTTP Bridge Protocol Specification] — full endpoint and data type reference
+* link:ci-integration.html[Adding TCK to Your CI Pipeline] — automate bridge testing in CI

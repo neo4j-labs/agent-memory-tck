@@ -101,5 +101,5 @@ A Neo4j Labs maintainer will review the report and, if valid, add an entry to `c
 
 == See Also
 
-* xref:../reference/compliance-tiers.adoc[Compliance Tier Definitions] — detailed requirements
-* xref:ci-integration.adoc[Adding TCK to Your CI Pipeline] — automate compliance testing
+* link:../reference/compliance-tiers.html[Compliance Tier Definitions] — detailed requirements
+* link:ci-integration.html[Adding TCK to Your CI Pipeline] — automate compliance testing

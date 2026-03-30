@@ -153,6 +153,6 @@ await client.close();
 
 == Next Steps
 
-* xref:../reference/base-adapter.adoc[BaseAdapter Interface Reference] — all available memory operations
-* xref:../explanation/memory-model.adoc[The Agent Memory Model] — understanding short-term, long-term, and reasoning memory
-* xref:../explanation/multi-agent-sharing.adoc[Cross-Agent Memory Sharing] — how multiple agents share one graph
+* link:../reference/base-adapter.html[BaseAdapter Interface Reference] — all available memory operations
+* link:../explanation/memory-model.html[The Agent Memory Model] — understanding short-term, long-term, and reasoning memory
+* link:../explanation/multi-agent-sharing.html[Cross-Agent Memory Sharing] — how multiple agents share one graph

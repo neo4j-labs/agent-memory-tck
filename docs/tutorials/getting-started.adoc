@@ -118,6 +118,6 @@ Open `report.html` in your browser to see a tier-by-tier pass/fail breakdown.
 
 == Next Steps
 
-* xref:../how-to/writing-an-adapter.adoc[Writing a TCK Adapter] — full guide covering all tiers
-* xref:../reference/compliance-tiers.adoc[Compliance Tier Definitions] — Bronze, Silver, and Gold requirements
-* xref:../how-to/certification.adoc[Obtaining TCK Certification] — submit your results to the public registry
+* link:../how-to/writing-an-adapter.html[Writing a TCK Adapter] — full guide covering all tiers
+* link:../reference/compliance-tiers.html[Compliance Tier Definitions] — Bronze, Silver, and Gold requirements
+* link:../how-to/certification.html[Obtaining TCK Certification] — submit your results to the public registry

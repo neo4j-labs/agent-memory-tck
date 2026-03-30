@@ -148,5 +148,5 @@ After CI passes, add the appropriate tier badge to your README:
 
 == See Also
 
-* xref:cross-language-testing.adoc[Cross-Language Conformance Testing] — bridge protocol details
-* xref:certification.adoc[Obtaining TCK Certification] — submitting results to the registry
+* link:cross-language-testing.html[Cross-Language Conformance Testing] — bridge protocol details
+* link:certification.html[Obtaining TCK Certification] — submitting results to the registry

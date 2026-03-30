@@ -36,34 +36,34 @@ This documentation follows the https://diataxis.fr/[Diataxis framework], organiz
 
 Learning-oriented guides that walk you through a complete task from start to finish.
 
-* xref:tutorials/getting-started.adoc[Getting Started with the TCK] — Install the TCK, write your first adapter, and run the test suite
-* xref:tutorials/first-typescript-agent.adoc[Building Your First TypeScript Agent with Memory] — Use `@neo4j-labs/agent-memory` to add memory to a Vercel AI SDK application
+* link:tutorials/getting-started.html[Getting Started with the TCK] — Install the TCK, write your first adapter, and run the test suite
+* link:tutorials/first-typescript-agent.html[Building Your First TypeScript Agent with Memory] — Use `@neo4j-labs/agent-memory` to add memory to a Vercel AI SDK application
 
 [[how-to]]
 == How-To Guides
 
 Task-oriented guides for accomplishing specific goals.
 
-* xref:how-to/writing-an-adapter.adoc[Writing a TCK Adapter] — Implement `BaseAdapter` for your memory system
-* xref:how-to/cross-language-testing.adoc[Cross-Language Conformance Testing] — Test TypeScript or Go implementations via the HTTP bridge
-* xref:how-to/ci-integration.adoc[Adding TCK to Your CI Pipeline] — Run conformance tests in GitHub Actions
-* xref:how-to/certification.adoc[Obtaining TCK Certification] — Generate compliance reports and submit to the registry
+* link:how-to/writing-an-adapter.html[Writing a TCK Adapter] — Implement `BaseAdapter` for your memory system
+* link:how-to/cross-language-testing.html[Cross-Language Conformance Testing] — Test TypeScript or Go implementations via the HTTP bridge
+* link:how-to/ci-integration.html[Adding TCK to Your CI Pipeline] — Run conformance tests in GitHub Actions
+* link:how-to/certification.html[Obtaining TCK Certification] — Generate compliance reports and submit to the registry
 
 [[reference]]
 == Reference
 
 Technical descriptions of types, protocols, and interfaces.
 
-* xref:reference/base-adapter.adoc[BaseAdapter Interface Reference] — All 26 abstract methods with signatures, parameters, and return types
-* xref:reference/bridge-protocol.adoc[HTTP Bridge Protocol Specification] — Endpoints, request/response schemas, and data types
-* xref:reference/compliance-tiers.adoc[Compliance Tier Definitions] — Bronze, Silver, and Gold requirements
-* xref:reference/scenario-registry.adoc[Scenario ID Registry Format] — Stable scenario ID scheme and registry structure
+* link:reference/base-adapter.html[BaseAdapter Interface Reference] — All 26 abstract methods with signatures, parameters, and return types
+* link:reference/bridge-protocol.html[HTTP Bridge Protocol Specification] — Endpoints, request/response schemas, and data types
+* link:reference/compliance-tiers.html[Compliance Tier Definitions] — Bronze, Silver, and Gold requirements
+* link:reference/scenario-registry.html[Scenario ID Registry Format] — Stable scenario ID scheme and registry structure
 
 [[explanation]]
 == Explanation
 
 Background concepts and architectural decisions.
 
-* xref:explanation/architecture.adoc[TCK Architecture and Design Decisions] — Why pytest over Gherkin, the adapter pattern, and the bridge protocol
-* xref:explanation/memory-model.adoc[The Agent Memory Model] — Short-term, long-term, and reasoning memory explained
-* xref:explanation/multi-agent-sharing.adoc[Cross-Agent Memory Sharing] — How agents in different languages share the same Neo4j graph
+* link:explanation/architecture.html[TCK Architecture and Design Decisions] — Why pytest over Gherkin, the adapter pattern, and the bridge protocol
+* link:explanation/memory-model.html[The Agent Memory Model] — Short-term, long-term, and reasoning memory explained
+* link:explanation/multi-agent-sharing.html[Cross-Agent Memory Sharing] — How agents in different languages share the same Neo4j graph
