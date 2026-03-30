@@ -38,19 +38,27 @@ async def extract_entities_tool(
     stored = []
 
     for name, etype, desc in zip(names, entity_types, descriptions):
-        await _memory_call(endpoint, "add_entity", {
-            "name": name,
-            "entity_type": etype,
-            "description": desc,
-        })
+        await _memory_call(
+            endpoint,
+            "add_entity",
+            {
+                "name": name,
+                "entity_type": etype,
+                "description": desc,
+            },
+        )
         stored.append(f"{name} ({etype})")
 
         # Also record a message about the extraction
-        await _memory_call(endpoint, "add_message", {
-            "session_id": ctx.deps.session_id,
-            "role": "assistant",
-            "content": f"Extracted entity: {name} ({etype}) - {desc}",
-        })
+        await _memory_call(
+            endpoint,
+            "add_message",
+            {
+                "session_id": ctx.deps.session_id,
+                "role": "assistant",
+                "content": f"Extracted entity: {name} ({etype}) - {desc}",
+            },
+        )
 
     return f"Stored {len(stored)} entities: {', '.join(stored)}"
 
@@ -65,10 +73,14 @@ async def search_knowledge_tool(
         query: Search query for entities.
     """
     endpoint = ctx.deps.memory_endpoint
-    results = await _memory_call(endpoint, "search_entities", {
-        "query": query,
-        "limit": 5,
-    })
+    results = await _memory_call(
+        endpoint,
+        "search_entities",
+        {
+            "query": query,
+            "limit": 5,
+        },
+    )
 
     if not results:
         return "No entities found."

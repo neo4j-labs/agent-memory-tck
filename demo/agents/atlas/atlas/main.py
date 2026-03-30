@@ -33,13 +33,15 @@ async def synthesize(request: SynthesisRequest) -> SynthesisResponse:
     """Synthesize knowledge from all agents' memory contributions."""
     session_id = f"atlas-{uuid.uuid4().hex[:8]}"
 
-    result = await atlas_graph.ainvoke({
-        "query": request.query,
-        "session_id": session_id,
-        "entities": [],
-        "traces": [],
-        "synthesis": "",
-    })
+    result = await atlas_graph.ainvoke(
+        {
+            "query": request.query,
+            "session_id": session_id,
+            "entities": [],
+            "traces": [],
+            "synthesis": "",
+        }
+    )
 
     return SynthesisResponse(
         session_id=session_id,

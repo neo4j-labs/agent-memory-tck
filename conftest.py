@@ -1,6 +1,7 @@
 # Root conftest — registers the --bridge-url CLI option.
 # The tck/tests/conftest.py handles fixtures and markers.
 
+
 def pytest_addoption(parser):
     """Add TCK-specific CLI options."""
     parser.addoption(
