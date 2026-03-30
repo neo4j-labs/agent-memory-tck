@@ -12,6 +12,9 @@ The TCK provides a formal behavioral specification, 178 executable test scenario
 
 > **Neo4j Labs Project** — This project is maintained by Neo4j Labs as an experimental, community-supported project. It is not officially supported by Neo4j. For community support, use [GitHub Issues](https://github.com/neo4j-labs/agent-memory-tck/issues).
 
+
+![multi agent neo4j agent memory demo app screenshot](img/demo.png)
+
 ## Repository Contents
 
 ```
