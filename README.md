@@ -8,7 +8,7 @@
 
 Technology Compatibility Kit for [neo4j-agent-memory](https://github.com/neo4j-labs/agent-memory) implementations.
 
-The TCK provides a formal behavioral specification, 178 executable test scenarios, and a compliance framework that enables any implementation — in any language — to verify conformance with the neo4j-agent-memory data model. It also includes production-ready TypeScript and Go client libraries and a multi-agent reference demo.
+The TCK provides a formal behavioral specification, 178 executable test scenarios, and a compliance framework that enables any implementation — in any language — to verify conformance with the neo4j-agent-memory data model. It also includes TypeScript and Go client libraries and a multi-agent reference demo.
 
 > **Neo4j Labs Project** — This project is maintained by Neo4j Labs as an experimental, community-supported project. It is not officially supported by Neo4j. For community support, use [GitHub Issues](https://github.com/neo4j-labs/agent-memory-tck/issues).
 
