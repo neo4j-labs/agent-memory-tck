@@ -206,11 +206,7 @@ class HTTPBridgeAdapter(BaseAdapter):
 
     def __init__(self, base_url: str, timeout: float = 30.0):
         self._base_url = base_url.rstrip("/")
-        self._client = httpx.AsyncClient(
-            base_url=self._base_url,
-            timeout=timeout,
-            headers={"Content-Type": "application/json"},
-        )
+        self._timeout = timeout
 
     async def _call(self, method: str, params: dict[str, Any] | None = None) -> Any:
         """Make an HTTP POST call to the conformance server."""
@@ -218,17 +214,25 @@ class HTTPBridgeAdapter(BaseAdapter):
         if params:
             body = {k: _serialize(v) for k, v in params.items() if v is not None}
 
-        response = await self._client.post(f"/{method}", json=body)
+        async with httpx.AsyncClient(
+            base_url=self._base_url,
+            timeout=self._timeout,
+            headers={"Content-Type": "application/json"},
+        ) as client:
+            response = await client.post(f"/{method}", json=body)
 
-        if response.status_code >= 400:
-            error_body = response.json() if response.content else {}
-            error_msg = error_body.get("error", f"HTTP {response.status_code}")
-            raise RuntimeError(f"Bridge call {method} failed: {error_msg}")
+            if response.status_code >= 400:
+                try:
+                    error_body = response.json()
+                except Exception:
+                    error_body = {"error": response.text}
+                error_msg = error_body.get("error", f"HTTP {response.status_code}")
+                raise RuntimeError(f"Bridge call {method} failed: {error_msg}")
 
-        if response.status_code == 204 or not response.content:
-            return None
+            if response.status_code == 204 or not response.content:
+                return None
 
-        return response.json()
+            return response.json()
 
     # --- Lifecycle ---
 
@@ -239,7 +243,6 @@ class HTTPBridgeAdapter(BaseAdapter):
 
     async def teardown(self) -> None:
         await self._call("teardown")
-        await self._client.aclose()
 
     async def clear_all_data(self) -> None:
         await self._call("clear_all_data")

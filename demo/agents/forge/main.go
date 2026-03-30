@@ -45,9 +45,9 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", handleHealth)
-	mux.HandleFunc("POST /enrich", handleEnrich)
-	mux.HandleFunc("POST /pipeline", handlePipeline)
+	mux.HandleFunc("/health", handleHealth)
+	mux.HandleFunc("/enrich", handleEnrich)
+	mux.HandleFunc("/pipeline", handlePipeline)
 
 	addr := ":" + port
 	fmt.Printf("Forge agent running on http://localhost%s\n", addr)

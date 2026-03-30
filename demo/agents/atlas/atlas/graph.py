@@ -7,7 +7,7 @@ by reading their reasoning traces and synthesizing cross-agent knowledge.
 from __future__ import annotations
 
 import os
-from typing import Annotated, TypedDict
+from typing import TypedDict
 
 import httpx
 from langgraph.graph import StateGraph, END

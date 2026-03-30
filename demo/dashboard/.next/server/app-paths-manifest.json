@@ -1,0 +1,7 @@
+{
+  "/api/agents/route": "app/api/agents/route.js",
+  "/api/graph/route": "app/api/graph/route.js",
+  "/page": "app/page.js",
+  "/api/activity/route": "app/api/activity/route.js",
+  "/api/node-detail/route": "app/api/node-detail/route.js"
+}

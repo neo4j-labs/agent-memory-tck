@@ -36,7 +36,7 @@ async def research(request: ResearchRequest) -> ResearchResponse:
         session_id=session_id,
     )
 
-    prompt = f"Analyze this podcast transcript and extract all people, organizations, and key topics mentioned:\n\n"
+    prompt = "Analyze this podcast transcript and extract all people, organizations, and key topics mentioned:\n\n"
     if request.episode_title:
         prompt += f"Episode: {request.episode_title}\n\n"
     prompt += request.transcript

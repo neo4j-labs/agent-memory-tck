@@ -5,7 +5,40 @@
 // defined in tck/adapters/base_adapter.py.
 package memory
 
-import "time"
+import (
+	"strings"
+	"time"
+)
+
+// FlexTime is a time.Time that can parse ISO 8601 timestamps with or without timezone.
+type FlexTime struct {
+	time.Time
+}
+
+func (ft *FlexTime) UnmarshalJSON(data []byte) error {
+	s := strings.Trim(string(data), `"`)
+	if s == "null" || s == "" {
+		return nil
+	}
+	// Try RFC3339 first (with timezone)
+	t, err := time.Parse(time.RFC3339, s)
+	if err == nil {
+		ft.Time = t
+		return nil
+	}
+	// Try without timezone
+	t, err = time.Parse("2006-01-02T15:04:05.999999", s)
+	if err == nil {
+		ft.Time = t
+		return nil
+	}
+	t, err = time.Parse("2006-01-02T15:04:05", s)
+	if err == nil {
+		ft.Time = t
+		return nil
+	}
+	return err
+}
 
 // MessageRole represents the role of a message sender.
 type MessageRole string
@@ -33,7 +66,7 @@ type Message struct {
 	ID        string                 `json:"id"`
 	Role      MessageRole            `json:"role"`
 	Content   string                 `json:"content"`
-	Timestamp time.Time              `json:"timestamp"`
+	Timestamp FlexTime               `json:"timestamp"`
 	Embedding []float64              `json:"embedding,omitempty"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
@@ -44,16 +77,16 @@ type Conversation struct {
 	SessionID string    `json:"session_id"`
 	Messages  []Message `json:"messages"`
 	Title     string    `json:"title,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt FlexTime  `json:"created_at"`
 	UpdatedAt string    `json:"updated_at,omitempty"`
 }
 
 // SessionInfo provides summary information about a session.
 type SessionInfo struct {
-	SessionID    string    `json:"session_id"`
-	MessageCount int       `json:"message_count"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    string    `json:"updated_at,omitempty"`
+	SessionID    string   `json:"session_id"`
+	MessageCount int      `json:"message_count"`
+	CreatedAt    FlexTime `json:"created_at"`
+	UpdatedAt    string   `json:"updated_at,omitempty"`
 }
 
 // Entity represents a named entity in the knowledge graph.
@@ -66,7 +99,7 @@ type Entity[T any] struct {
 	Description   string    `json:"description,omitempty"`
 	Embedding     []float64 `json:"embedding,omitempty"`
 	CanonicalName string    `json:"canonical_name,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	CreatedAt     FlexTime  `json:"created_at"`
 	Extra         T         `json:"extra,omitempty"`
 }
 
@@ -108,8 +141,8 @@ type ReasoningTrace struct {
 	Steps       []ReasoningStep `json:"steps,omitempty"`
 	Outcome     string          `json:"outcome,omitempty"`
 	Success     *bool           `json:"success,omitempty"`
-	StartedAt   time.Time       `json:"started_at"`
-	CompletedAt *time.Time      `json:"completed_at,omitempty"`
+	StartedAt   FlexTime        `json:"started_at"`
+	CompletedAt *FlexTime       `json:"completed_at,omitempty"`
 }
 
 // ReasoningStep represents a step in the agent's reasoning process.

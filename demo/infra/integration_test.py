@@ -10,7 +10,6 @@ Requires all agents and Neo4j to be running (via docker compose up).
 """
 
 import asyncio
-import sys
 
 import httpx
 

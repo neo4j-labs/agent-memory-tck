@@ -31,16 +31,6 @@ from tck.fixtures.mocks import MockEmbedder
 _NO_ADAPTER = object()
 
 
-def pytest_addoption(parser):
-    """Add TCK-specific CLI options."""
-    parser.addoption(
-        "--bridge-url",
-        default=None,
-        help="URL of the HTTP bridge conformance server (e.g., http://localhost:3001). "
-        "When set, uses HTTPBridgeAdapter instead of requiring a Python adapter fixture.",
-    )
-
-
 def pytest_configure(config):
     """Register TCK markers."""
     config.addinivalue_line("markers", "bronze: Bronze tier - schema and short-term memory")
@@ -51,7 +41,7 @@ def pytest_configure(config):
 
 
 @pytest.fixture(scope="session")
-async def adapter(request):
+def adapter(request):
     """Provide a BaseAdapter implementation.
 
     If --bridge-url is set, uses HTTPBridgeAdapter. Otherwise, override
@@ -62,12 +52,8 @@ async def adapter(request):
     if bridge_url:
         from tck.adapters.http_bridge import HTTPBridgeAdapter
 
-        adapter = HTTPBridgeAdapter(bridge_url)
-        await adapter.setup()
-        yield adapter
-        await adapter.teardown()
-    else:
-        yield _NO_ADAPTER
+        return HTTPBridgeAdapter(bridge_url)
+    return _NO_ADAPTER
 
 
 @pytest.fixture(autouse=True)
