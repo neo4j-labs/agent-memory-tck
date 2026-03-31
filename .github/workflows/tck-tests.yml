@@ -194,7 +194,7 @@ jobs:
       - name: Start C# conformance server
         run: |
           cd clients/csharp/conformance/Neo4j.AgentMemory.Conformance
-          MEMORY_ENDPOINT=http://localhost:3001 dotnet run --urls "http://localhost:3002" &
+          MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 dotnet run &
           sleep 5
 
       - name: Run TCK Bronze via C# bridge

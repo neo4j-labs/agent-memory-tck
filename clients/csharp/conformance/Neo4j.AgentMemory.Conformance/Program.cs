@@ -25,7 +25,7 @@ var client = new MemoryClient(new MemoryClientOptions { Endpoint = endpoint });
 await client.ConnectAsync();
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.UseUrls($"http://localhost:{port}");
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 var app = builder.Build();
 
 var jsonOptions = new JsonSerializerOptions
