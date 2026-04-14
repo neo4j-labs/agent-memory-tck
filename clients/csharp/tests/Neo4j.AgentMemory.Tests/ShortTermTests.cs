@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Neo4j.AgentMemory.Models;
 using Neo4j.AgentMemory.Transport;
 using NSubstitute;
@@ -82,8 +83,9 @@ public class ShortTermTests
     [Fact]
     public async Task DeleteMessage_ReturnsBool()
     {
-        _transport.RequestAsync<Dictionary<string, bool>>("delete_message", Arg.Any<Dictionary<string, object?>?>(), Arg.Any<CancellationToken>())
-            .Returns(new Dictionary<string, bool> { ["deleted"] = true });
+        var jsonElement = JsonSerializer.Deserialize<JsonElement>("{\"deleted\":true}");
+        _transport.RequestAsync<JsonElement>("delete_message", Arg.Any<Dictionary<string, object?>?>(), Arg.Any<CancellationToken>())
+            .Returns(jsonElement);
 
         var result = await _client.ShortTerm.DeleteMessageAsync("msg-1");
         Assert.True(result);

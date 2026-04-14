@@ -34,6 +34,22 @@ var jsonOptions = new JsonSerializerOptions
     DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
 };
 
+// Global error handler so unhandled exceptions return JSON errors instead of empty 500 responses
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next(context);
+    }
+    catch (Exception ex)
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        var error = JsonSerializer.Serialize(new { error = ex.Message });
+        await context.Response.WriteAsync(error);
+    }
+});
+
 // Helper to read JSON body as a dictionary
 async Task<Dictionary<string, JsonElement>> ReadBody(HttpRequest req)
 {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Neo4j.AgentMemory.Models;
 using Neo4j.AgentMemory.Transport;
 
@@ -80,11 +81,13 @@ public class ShortTermMemory
         string messageId,
         CancellationToken ct = default)
     {
-        var result = await _transport.RequestAsync<Dictionary<string, bool>>("delete_message", new Dictionary<string, object?>
+        var result = await _transport.RequestAsync<JsonElement>("delete_message", new Dictionary<string, object?>
         {
             ["message_id"] = messageId
         }, ct);
-        return result?.GetValueOrDefault("deleted", false) ?? false;
+        if (result.ValueKind == JsonValueKind.Object && result.TryGetProperty("deleted", out var deleted))
+            return deleted.GetBoolean();
+        return false;
     }
 
     /// <summary>Delete all data for a specific session.</summary>
