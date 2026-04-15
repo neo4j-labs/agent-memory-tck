@@ -222,11 +222,19 @@ jobs:
             lib <- Sys.getenv('R_LIBS_USER', '/usr/local/lib/R/site-library')
             dir.create(lib, recursive = TRUE, showWarnings = FALSE)
             .libPaths(c(lib, .libPaths()))
-            cat('Installing to:', lib, '\n')
-            cat('Library paths:', paste(.libPaths(), collapse = ', '), '\n')
+            cat('R_LIBS_USER:', lib, '\n')
+            cat('All .libPaths():', paste(.libPaths(), collapse = '\n  '), '\n')
             install.packages(c('plumber', 'httr2', 'R6', 'jsonlite', 'testthat'), lib = lib, repos = 'https://cloud.r-project.org/')
-            cat('Installed packages:', paste(list.files(lib), collapse = ', '), '\n')
+            cat('Packages in lib:', paste(list.files(lib), collapse = ', '), '\n')
           "
+
+      - name: Verify R packages
+        run: |
+          echo "=== Checking R_LIBS_USER ==="
+          echo "R_LIBS_USER=$R_LIBS_USER"
+          ls -la "$R_LIBS_USER" | head -20 || echo "Directory does not exist or is empty"
+          echo "=== Checking if plumber is findable ==="
+          Rscript -e ".libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths())); cat(.libPaths(), sep='\n'); library(plumber); cat('plumber loaded OK\n')"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
