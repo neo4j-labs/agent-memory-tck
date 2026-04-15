@@ -1,6 +1,6 @@
 # neo4j-agent-memory TCK — Project Roadmap
 
-**Last updated:** March 29, 2026
+**Last updated:** April 14, 2026
 **TCK Version:** 1.0.0 (Release Candidate)
 
 This document summarizes the implementation progress across all five milestones, identifies gaps between the current state and the PRD requirements, and outlines the future roadmap for the project.
@@ -210,6 +210,9 @@ These items were specified in the PRD but were intentionally deferred or are bey
   - Port 8005, session prefix `sage-`
 - **Infrastructure updates**: Docker Compose, dashboard agent registry, integration test, seed data
 - **Documentation updates**: README, CLAUDE.md, ROADMAP.md, demo README, C# client README
+- **CI conformance pipeline**: GitHub Actions job running Bronze TCK tests against C# bridge with Neo4j service container, pre-build step, and health-check-based startup
+- **Reference adapter fix**: Custom `delete_message` Cypher query with proper chain repair and `DETACH DELETE` to work around upstream package bug
+- **Bridge error handling**: Error-handling middleware in reference bridge server (JSON error responses instead of aiohttp default 500 pages)
 
 ---
 

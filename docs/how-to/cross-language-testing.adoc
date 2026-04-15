@@ -3,7 +3,7 @@
 :toclevels: 2
 :source-highlighter: rouge
 
-This guide explains how to test TypeScript, Go, or any non-Python implementation against the Python TCK test suite using the HTTP bridge protocol.
+This guide explains how to test TypeScript, Go, C#, or any non-Python implementation against the Python TCK test suite using the HTTP bridge protocol.
 
 == How It Works
 
@@ -17,7 +17,7 @@ The HTTP bridge enables the Python TCK to validate implementations in any langua
  Python TCK Tests
        |
        v
- HTTPBridgeAdapter ──HTTP POST──> Conformance Server (TS/Go/etc.)
+ HTTPBridgeAdapter ──HTTP POST──> Conformance Server (TS/Go/C#/etc.)
                                         |
                                         v
                                   Your Native Client
@@ -66,6 +66,29 @@ Then:
 ----
 uv run pytest -m bronze --bridge-url http://localhost:3001 -v
 ----
+
+== Running the C# Conformance Server
+
+[source,bash]
+----
+cd clients/csharp
+
+# Build the solution first
+dotnet build Neo4j.AgentMemory.sln
+
+# Set the upstream memory service endpoint and start the conformance server
+cd conformance/Neo4j.AgentMemory.Conformance
+MEMORY_ENDPOINT=http://localhost:7474 dotnet run --no-build
+----
+
+Then:
+
+[source,bash]
+----
+uv run pytest -m bronze --bridge-url http://localhost:3001 -v
+----
+
+TIP: Use `TCK_BRIDGE_PORT` to change the default port: `TCK_BRIDGE_PORT=4000 dotnet run --no-build`
 
 == Building Your Own Conformance Server
 

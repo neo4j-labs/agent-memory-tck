@@ -115,7 +115,7 @@ uv run tck results.json --name "My Implementation" -o report.json --html report.
 
 ### Cross-Language Testing
 
-Test TypeScript or Go implementations via the HTTP bridge protocol:
+Test TypeScript, Go, or C# implementations via the HTTP bridge protocol:
 
 ```bash
 # Start a conformance server (TypeScript example)
@@ -184,7 +184,7 @@ See the [C# client README](clients/csharp/README.md).
 
 ## Multi-Agent Demo
 
-Five agents in four languages sharing one Neo4j graph:
+Five agents in five languages sharing one Neo4j graph:
 
 | Agent | Language | Framework | Role |
 |-------|----------|-----------|------|

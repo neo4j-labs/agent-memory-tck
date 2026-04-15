@@ -65,7 +65,7 @@ jobs:
             report.html
 ----
 
-== GitHub Actions: HTTP Bridge (TypeScript/Go)
+== GitHub Actions: HTTP Bridge (TypeScript/Go/C#)
 
 For non-Python implementations, start your conformance server first:
 
@@ -134,6 +134,34 @@ jobs:
           uv sync --extra bridge
           uv run pytest -m bronze --bridge-url http://localhost:3001 -v
 ----
+
+=== C#
+
+[source,yaml]
+----
+    steps:
+      # ... (Neo4j service same as above)
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0"
+
+      - name: Build C# conformance server
+        run: dotnet build clients/csharp/Neo4j.AgentMemory.sln
+
+      - name: Start C# conformance server
+        run: |
+          cd clients/csharp/conformance/Neo4j.AgentMemory.Conformance
+          MEMORY_ENDPOINT=bolt://localhost:7687 TCK_BRIDGE_PORT=3001 dotnet run --no-build &
+          for i in $(seq 1 30); do curl -s http://localhost:3001/setup > /dev/null 2>&1 && break || sleep 1; done
+
+      - name: Run TCK via bridge
+        run: |
+          uv sync --extra bridge
+          uv run pytest -m bronze --bridge-url http://localhost:3001 -v
+----
+
+TIP: Pre-building the C# project with `dotnet build` before `dotnet run --no-build` ensures fast startup. The health check loop replaces a fixed `sleep` and is more reliable in CI environments.
 
 == Adding a Compliance Badge
 

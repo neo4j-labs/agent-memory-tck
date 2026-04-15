@@ -348,3 +348,4 @@ Reference conformance servers are provided in the repository:
 * *Python*: `tck/bridge/reference_server.py` (aiohttp)
 * *TypeScript*: `clients/typescript/conformance/server.ts` (Node.js http)
 * *Go*: `clients/go/conformance/main.go` (net/http)
+* *C#*: `clients/csharp/conformance/Neo4j.AgentMemory.Conformance/Program.cs` (ASP.NET Minimal API)
