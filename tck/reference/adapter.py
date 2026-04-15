@@ -207,9 +207,7 @@ class ReferenceAdapter(BaseAdapter):
         DETACH DELETE m
         RETURN true AS deleted
         """
-        results = await self._client._client.execute_write(
-            query, {"id": str(message_id)}
-        )
+        results = await self._client._client.execute_write(query, {"id": str(message_id)})
         if results and results[0].get("deleted"):
             return True
         return False
