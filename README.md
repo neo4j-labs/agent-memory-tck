@@ -33,7 +33,7 @@ agent-memory-tck/
 
 | Component | Description |
 |-----------|-------------|
-| **TCK Specification** | 178 test scenarios across 3 compliance tiers, backed by `SPEC.md` with 98+ behavioral clauses |
+| **TCK Specification** | 178 test scenarios across 3 compliance tiers, backed by `SPEC.md` with 146 behavioral clauses |
 | **Scenario Registry** | 178 stable scenario IDs (`SCN-B-001` through `SCN-G-018`) with SPEC clause traceability |
 | **HTTP Bridge** | Cross-language conformance protocol enabling the Python test suite to validate TypeScript, Go, C#, R, or any implementation |
 | **TypeScript Client** | `@neo4j-labs/agent-memory` with `MemoryClient`, Vercel AI SDK middleware, and MCP tool definitions |
@@ -134,7 +134,7 @@ uv run pytest -m bronze --bridge-url http://localhost:3001 -v
 ```typescript
 import { MemoryClient } from "@neo4j-labs/agent-memory";
 
-const client = new MemoryClient({ endpoint: "https://nams.neo4jsandbox.com" });
+const client = new MemoryClient();
 await client.connect();
 
 // Short-term memory
@@ -152,7 +152,7 @@ Includes [Vercel AI SDK middleware](clients/typescript/src/middleware/vercel-ai.
 ## Go Client
 
 ```go
-client, _ := memory.New(memory.WithEndpoint("https://nams.neo4jsandbox.com"))
+client, _ := memory.New()
 defer client.Close(ctx)
 
 // Short-term memory
@@ -170,7 +170,7 @@ Includes [MCP handler](clients/go/memory/mcp_handler.go) (`http.Handler`). See t
 ## C# Client
 
 ```csharp
-await using var client = new MemoryClient(new MemoryClientOptions { Endpoint = "https://nams.neo4jsandbox.com" });
+await using var client = new MemoryClient();
 await client.ConnectAsync();
 
 // Short-term memory

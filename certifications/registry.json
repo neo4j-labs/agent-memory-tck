@@ -1,4 +1,14 @@
 {
-  "tck_version": "0.1.0",
-  "certifications": []
+  "tck_version": "1.0.0",
+  "certifications": [
+    {
+      "name": "neo4j-agent-memory",
+      "version": "0.0.5",
+      "language": "Python",
+      "tier": "bronze",
+      "tck_version": "1.0.0",
+      "certified_at": "2026-04-15T00:00:00Z",
+      "repository": "https://github.com/neo4j-labs/agent-memory"
+    }
+  ]
 }

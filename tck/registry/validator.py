@@ -24,6 +24,15 @@ def load_registry(registry_path: Path) -> dict:
         return yaml.safe_load(f) or {}
 
 
+def _extract_marker_tier(decorators: list[ast.expr]) -> str | None:
+    """Extract bronze/silver/gold tier from pytest.mark decorators."""
+    for dec in decorators:
+        if isinstance(dec, ast.Attribute) and dec.attr in ("bronze", "silver", "gold"):
+            if isinstance(dec.value, ast.Attribute) and dec.value.attr == "mark":
+                return dec.attr
+    return None
+
+
 def collect_test_ids(tests_dir: Path) -> set[str]:
     """Collect all test function IDs from the test files using AST parsing."""
     test_ids = set()
@@ -42,6 +51,27 @@ def collect_test_ids(tests_dir: Path) -> set[str]:
                             test_ids.add(test_id)
 
     return test_ids
+
+
+def collect_test_tiers(tests_dir: Path) -> dict[str, str]:
+    """Map test_id -> tier from pytest.mark decorators on test classes."""
+    tiers: dict[str, str] = {}
+
+    for py_file in tests_dir.rglob("test_*.py"):
+        module_name = py_file.stem
+        tree = ast.parse(py_file.read_text())
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+                class_tier = _extract_marker_tier(node.decorator_list)
+                if class_tier:
+                    for item in node.body:
+                        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            if item.name.startswith("test_"):
+                                test_id = f"{module_name}::{node.name}::{item.name}"
+                                tiers[test_id] = class_tier
+
+    return tiers
 
 
 def validate(registry_path: Path, tests_dir: Path) -> list[str]:
@@ -70,6 +100,15 @@ def validate(registry_path: Path, tests_dir: Path) -> list[str]:
     unregistered = test_ids - registry_test_ids
     for test_id in sorted(unregistered):
         errors.append(f"Test '{test_id}' has no scenario ID in registry")
+
+    # Check tier consistency between registry YAML and pytest.mark decorators
+    test_tiers = collect_test_tiers(tests_dir)
+    for scn_id, entry in registry.items():
+        test_id = entry.get("test_id", "")
+        yaml_tier = entry.get("tier", "")
+        code_tier = test_tiers.get(test_id, "")
+        if yaml_tier and code_tier and yaml_tier != code_tier:
+            errors.append(f"{scn_id}: registry tier '{yaml_tier}' != code marker '{code_tier}'")
 
     return errors
 

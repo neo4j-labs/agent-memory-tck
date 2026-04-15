@@ -96,7 +96,7 @@ Content-Type: application/json
 
 | Method | Parameters | Returns |
 |--------|-----------|---------|
-| `POST /setup` | (none) | `{"ok": true}` |
+| `POST /setup` | (none) | `{"ok": true, "protocol_version": "0.1.0"}` |
 | `POST /teardown` | (none) | 204 |
 | `POST /clear_all_data` | (none) | 204 |
 

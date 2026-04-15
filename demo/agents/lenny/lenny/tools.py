@@ -37,7 +37,7 @@ async def extract_entities_tool(
     endpoint = ctx.deps.memory_endpoint
     stored = []
 
-    for name, etype, desc in zip(names, entity_types, descriptions):
+    for name, etype, desc in zip(names, entity_types, descriptions, strict=True):
         await _memory_call(
             endpoint,
             "add_entity",

@@ -10,7 +10,7 @@ Install with: pip install neo4j-agent-memory-tck[reference]
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -34,13 +34,13 @@ from tck.adapters.base_adapter import (
 def _to_datetime(val) -> datetime:
     """Convert a value to Python datetime, handling Neo4j DateTime objects."""
     if val is None:
-        return datetime.utcnow()
+        return datetime.now(timezone.utc)
     if isinstance(val, datetime):
         return val
     try:
         return val.to_native()
     except AttributeError:
-        return datetime.utcnow()
+        return datetime.now(timezone.utc)
 
 
 class ReferenceAdapter(BaseAdapter):

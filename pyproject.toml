@@ -1,7 +1,7 @@
 [project]
 name = "neo4j-agent-memory-tck"
 version = "1.0.0"
-description = "Technology Compliance Kit for neo4j-agent-memory implementations"
+description = "Technology Compatibility Kit for neo4j-agent-memory implementations"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
@@ -38,7 +38,7 @@ tck = "tck.report.compliance_report:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
+asyncio_default_fixture_loop_scope = "session"
 testpaths = ["tck/tests"]
 markers = [
     "bronze: Bronze tier - schema and short-term memory",

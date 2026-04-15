@@ -74,7 +74,7 @@ pr$setSerializer(plumber::serializer_json(auto_unbox = TRUE, null = "null"))
 # --- Lifecycle ---
 
 pr$handle("POST", "/setup", function(req, res) {
-  list(ok = TRUE)
+  list(ok = TRUE, protocol_version = "0.1.0")
 })
 
 pr$handle("POST", "/teardown", function(req, res) {

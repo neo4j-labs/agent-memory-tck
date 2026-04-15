@@ -147,7 +147,7 @@ func f(m map[string]interface{}, key string, def float64) float64 {
 // --- Handlers ---
 
 func handleSetup(_ context.Context, _ map[string]interface{}) (interface{}, error) {
-	return map[string]bool{"ok": true}, nil
+	return map[string]interface{}{"ok": true, "protocol_version": "0.1.0"}, nil
 }
 
 func handleTeardown(_ context.Context, _ map[string]interface{}) (interface{}, error) {

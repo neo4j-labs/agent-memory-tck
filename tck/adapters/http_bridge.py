@@ -18,7 +18,7 @@ See tck/bridge/protocol.md for the full protocol specification.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -44,7 +44,7 @@ from tck.adapters.base_adapter import (
 def _parse_datetime(val: str | None) -> datetime:
     """Parse an ISO 8601 datetime string."""
     if val is None:
-        return datetime.utcnow()
+        return datetime.now(timezone.utc)
     return datetime.fromisoformat(val)
 
 
@@ -207,6 +207,7 @@ class HTTPBridgeAdapter(BaseAdapter):
     def __init__(self, base_url: str, timeout: float = 30.0):
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
+        self.protocol_version: str | None = None
 
     async def _call(self, method: str, params: dict[str, Any] | None = None) -> Any:
         """Make an HTTP POST call to the conformance server."""
@@ -240,6 +241,8 @@ class HTTPBridgeAdapter(BaseAdapter):
         result = await self._call("setup")
         if result and not result.get("ok", True):
             raise RuntimeError("Bridge setup failed")
+        if result:
+            self.protocol_version = result.get("protocol_version")
 
     async def teardown(self) -> None:
         await self._call("teardown")

@@ -50,7 +50,7 @@ type Handler = (body: Record<string, unknown>) => Promise<unknown>;
 
 const handlers: Record<string, Handler> = {
   // Lifecycle
-  setup: async () => ({ ok: true }),
+  setup: async () => ({ ok: true, protocol_version: "0.1.0" }),
   teardown: async () => undefined,
   clear_all_data: async () => {
     // The bridge server relies on the upstream to handle this

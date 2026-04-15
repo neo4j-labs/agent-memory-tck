@@ -1,9 +1,9 @@
 # neo4j-agent-memory TCK — Project Roadmap
 
-**Last updated:** April 14, 2026
+**Last updated:** April 15, 2026
 **TCK Version:** 1.0.0 (Release Candidate)
 
-This document summarizes the implementation progress across all five milestones, identifies gaps between the current state and the PRD requirements, and outlines the future roadmap for the project.
+This document summarizes the implementation progress across all six phases, identifies gaps between the current state and the PRD requirements, and outlines the future roadmap for the project.
 
 ---
 
@@ -23,13 +23,13 @@ The repository began with a single commit containing:
 
 | Metric | Before | After | Change |
 |--------|--------|-------|--------|
-| SPEC clauses | ~40 | 98+ | +145% |
+| SPEC clauses | ~40 | 146 | +265% |
 | Test scenarios | ~40 | 178 | +345% |
 | Bronze tests | ~27 | 93 | +244% |
 | Silver tests | ~26 | 67 | +158% |
 | Gold tests | ~6 | 18 | +200% |
 | Source files | ~15 | 107 | +613% |
-| Languages | 1 (Python) | 5 (Python, TypeScript, Go, C#, TSX) | +4 |
+| Languages | 1 (Python) | 6 (Python, TypeScript, Go, C#, R) | +5 |
 
 ---
 
@@ -134,7 +134,7 @@ The PRD specified Gherkin `.feature` files, but the plan adopted **pytest classe
 | Item | Status | Notes |
 |------|--------|-------|
 | Dashboard build configs (`next.config.ts`, `tsconfig.json`) | Missing | Dashboard cannot build without these |
-| NVL integration | Placeholder only | Graph-viz uses SVG placeholder; NVL import commented out |
+| NVL integration | Complete | Real `@neo4j-nvl/react` `InteractiveNvlWrapper` integration |
 | Agent integration testing | Not validated | Agents written but not run against a shared instance |
 | Cloud Run deployment (`cloudbuild.yaml`, `terraform/`) | Not implemented | Demo runs locally via Docker Compose only |
 | Gold test count | 18 of 20+ target | 2 tests short of plan target |
@@ -189,9 +189,9 @@ These items were specified in the PRD but were intentionally deferred or are bey
 
 ## Future Roadmap
 
-## Phase 6: C# Client + Sage Agent — Complete
+## Phase 6: C# Client, R Client + Sage/Rune Agents — Complete
 
-**Goal:** Add a C# client library and a 5th demo agent using Microsoft Semantic Kernel.
+**Goal:** Add C# and R client libraries and two more demo agents (Sage using Semantic Kernel, Rune using ellmer).
 
 ### Delivered
 
@@ -213,6 +213,13 @@ These items were specified in the PRD but were intentionally deferred or are bey
 - **CI conformance pipeline**: GitHub Actions job running Bronze TCK tests against C# bridge with Neo4j service container, pre-build step, and health-check-based startup
 - **Reference adapter fix**: Custom `delete_message` Cypher query with proper chain repair and `DETACH DELETE` to work around upstream package bug
 - **Bridge error handling**: Error-handling middleware in reference bridge server (JSON error responses instead of aiohttp default 500 pages)
+- **R client library** (`clients/rlang/neo4j.memory/`) — R package with R6 classes, httr2 transport, jsonlite serialization:
+  - `MemoryClient` composing `short_term`, `long_term`, and `reasoning` sub-clients
+  - 98 `testthat` assertions across 7 test files
+  - Conformance server (`conformance/server.R`) handling all 26 bridge endpoints via plumber
+- **Rune agent** (`demo/agents/rune/`) — R/ellmer statistical-analysis agent with regression tools, port 8006
+- **R conformance CI job** — GitHub Actions job running Bronze TCK tests against R bridge with Neo4j service container
+- **Dashboard NVL integration** — Real `@neo4j-nvl/react` `InteractiveNvlWrapper`, chat panel, and node-detail drawer
 
 ---
 
@@ -269,7 +276,7 @@ Long-term goals for ecosystem growth:
 2. **Automatic test generation** — Generate test scenarios from SPEC clauses (PRD v2 goal)
 3. **Public compatibility registry** — Web page at `neo4j.com/labs/agent-memory/compatibility`
 4. **Cloud Run deployment** — `cloudbuild.yaml` and Terraform configs for demo
-5. **NVL integration** — Replace SVG placeholder with full Neo4j Visualization Library in dashboard
+5. ~~**NVL integration**~~ — Complete: `@neo4j-nvl/react` `InteractiveNvlWrapper` integrated in dashboard
 6. **Third-party certification automation** — Run TCK against publicly accessible service endpoints
 
 ---
@@ -282,7 +289,7 @@ Long-term goals for ecosystem growth:
 | Silver scenarios | 180-240 cumulative | 67 | Partial (Silver standalone; PRD counted cumulative) |
 | Gold scenarios | 120-160 additional | 18 | In progress |
 | Total scenarios | 380-520 | 178 | Phase 1 of multi-phase expansion |
-| Python Bronze pass rate | 100% | Untested (no Neo4j in CI yet) | Pending |
+| Python Bronze pass rate | 100% | 93/93 (local run confirmed) | Met |
 | TypeScript Bronze pass rate | 100% | Tests scaffolded | Pending |
 | Go Bronze pass rate | 100% | Tests not written | Pending |
 | Multi-agent demo | Live URL | Docker Compose only | Pending deployment |

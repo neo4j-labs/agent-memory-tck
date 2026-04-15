@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from enum import Enum
 from typing import Any
 from uuid import UUID
 
@@ -29,7 +30,7 @@ def _json_serializer(obj: Any) -> Any:
         return str(obj)
     if hasattr(obj, "isoformat"):
         return obj.isoformat()
-    if hasattr(obj, "value"):
+    if isinstance(obj, Enum):
         return obj.value
     if hasattr(obj, "model_dump"):
         return obj.model_dump(mode="json")
@@ -120,7 +121,7 @@ class BridgeServer:
     # --- Lifecycle ---
 
     async def handle_setup(self, request: web.Request) -> web.Response:
-        return _json_response({"ok": True})
+        return _json_response({"ok": True, "protocol_version": "0.1.0"})
 
     async def handle_teardown(self, request: web.Request) -> web.Response:
         return web.Response(status=204)

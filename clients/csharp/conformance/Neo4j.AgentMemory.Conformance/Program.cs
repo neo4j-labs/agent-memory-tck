@@ -116,7 +116,7 @@ object? V(Dictionary<string, JsonElement> body, string key)
 
 // --- Lifecycle ---
 
-app.MapPost("/setup", () => Results.Ok(new { ok = true }));
+app.MapPost("/setup", () => Results.Ok(new { ok = true, protocol_version = "0.1.0" }));
 
 app.MapPost("/teardown", () => Results.NoContent());
 

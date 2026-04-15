@@ -41,7 +41,8 @@ TIERS = {
 
 def classify_test_tier(test: dict) -> str | None:
     """Determine which tier a test belongs to based on its markers."""
-    markers = {m.get("name", m) if isinstance(m, dict) else m for m in test.get("markers", [])}
+    raw = test.get("markers") or test.get("keywords") or []
+    markers = {m.get("name", m) if isinstance(m, dict) else m for m in raw}
     if "gold" in markers:
         return "gold"
     if "silver" in markers:
