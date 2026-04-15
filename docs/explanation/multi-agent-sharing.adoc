@@ -37,6 +37,7 @@ Lenny: session_id = "lenny-task-001"
 Scout: session_id = "scout-search-042"
 Forge: session_id = "forge-enrich-007"
 Atlas: session_id = "atlas-synth-003"
+Sage:  session_id = "sage-audit-012"
 ----
 
 **Conversations and reasoning traces are isolated by session.** Lenny's conversation history is not visible when querying Scout's session.
@@ -74,7 +75,7 @@ The Gold tier includes tests that verify this sharing model:
 
 == The Multi-Agent Demo
 
-The repository includes a four-agent demo proving this architecture:
+The repository includes a five-agent demo proving this architecture:
 
 [cols="1,1,1,2"]
 |===
@@ -99,6 +100,11 @@ The repository includes a four-agent demo proving this architecture:
 |Python
 |LangGraph
 |Orchestrator — reads all agents' reasoning traces, produces cross-agent synthesis
+
+|*Sage*
+|C#
+|Semantic Kernel
+|Knowledge validation — detects conflicts, audits graph integrity
 |===
 
 === Data Flow
@@ -113,7 +119,7 @@ Forge (Go) ──reads──────────────────┤�
 Atlas (Python) ──reads all traces───┴──synthesizes──> Summary of all agents' work
 ----
 
-Each agent runs as a separate service (Cloud Run or Docker container), all connecting to the same Neo4j instance. The TCK guarantees that Lenny's Python writes are readable by Scout's TypeScript reads and Forge's Go reads — because they all implement the same schema.
+Each agent runs as a separate service (Cloud Run or Docker container), all connecting to the same Neo4j instance. The TCK guarantees that Lenny's Python writes are readable by Scout's TypeScript reads, Forge's Go reads, and Sage's C# reads — because they all implement the same schema.
 
 == Why This Matters
 

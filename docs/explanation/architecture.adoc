@@ -6,7 +6,7 @@ This document explains the architectural choices behind the TCK and the rational
 
 == Why a TCK?
 
-The neo4j-agent-memory ecosystem is expanding beyond a single Python package. TypeScript, Go, and hosted service implementations need a shared definition of "compatible." Without a TCK:
+The neo4j-agent-memory ecosystem is expanding beyond a single Python package. TypeScript, Go, C#, and hosted service implementations need a shared definition of "compatible." Without a TCK:
 
 * Each language implementation will diverge in behavior, especially in edge cases.
 * Agents in different languages cannot safely share the same Neo4j graph.
@@ -58,7 +58,7 @@ BaseAdapter (abstract)    <-- The contract
 This design means:
 
 * Tests are implementation-agnostic — they test *behavior*, not *code*.
-* The same test suite validates Python, TypeScript, Go, or any other implementation.
+* The same test suite validates Python, TypeScript, Go, C#, or any other implementation.
 * TCK data models (`TCKMessage`, `TCKEntity`, etc.) are the common language.
 
 == The HTTP Bridge
@@ -74,7 +74,7 @@ The bridge protocol is the critical enabler for cross-language testing. It avoid
 
 === Why Not Native Tests in Each Language?
 
-Native test suites in TypeScript (Vitest) and Go (`testing`) are planned as *secondary validation*. The Python suite remains the single source of truth because:
+Native test suites in TypeScript (Vitest), Go (`testing`), and C# (xUnit) are planned as *secondary validation*. The Python suite remains the single source of truth because:
 
 * One test definition means one place to update when behavior changes.
 * Cross-language consistency is guaranteed — all languages pass the exact same assertions.
@@ -92,11 +92,11 @@ This is preferable to a binary pass/fail that would either force all implementat
 
 == Monorepo Structure
 
-The TCK, TypeScript client, Go client, and demo all live in one repository. This enables:
+The TCK, TypeScript client, Go client, C# client, and demo all live in one repository. This enables:
 
 * *Atomic updates*: A SPEC change, test update, and client fix can land in one PR.
 * *Shared CI*: One pipeline validates the spec, tests, and all implementations.
-* *Cross-references*: TypeScript and Go test data (`testdata.ts`, `testdata.go`) mirror the Python fixtures exactly.
+* *Cross-references*: TypeScript, Go, and C# test data mirror the Python fixtures exactly.
 
 The trade-off is a more complex repository. Go module paths are longer (`github.com/neo4j-labs/agent-memory-tck/clients/go/memory`) than they would be in a standalone repo.
 

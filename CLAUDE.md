@@ -104,6 +104,15 @@ go build -o /dev/null ./conformance/  # Build conformance server
 MEMORY_ENDPOINT=http://... go run ./conformance   # Bridge server on :3001
 ```
 
+### C# Client
+
+```bash
+cd clients/csharp
+dotnet build Neo4j.AgentMemory.sln              # Build all projects
+dotnet test tests/Neo4j.AgentMemory.Tests/      # Unit tests
+MEMORY_ENDPOINT=http://... dotnet run --project conformance/Neo4j.AgentMemory.Conformance  # Bridge server on :3001
+```
+
 ### Demo
 
 ```bash
@@ -153,7 +162,7 @@ All tests interact with implementations through `tck/adapters/base_adapter.py`:
 
 The bridge enables the Python test suite to validate non-Python implementations:
 
-1. TS/Go implements a thin HTTP server mapping `POST /{method_name}` → native client calls
+1. TS/Go/C# implements a thin HTTP server mapping `POST /{method_name}` → native client calls
 2. Python `HTTPBridgeAdapter` serializes each `BaseAdapter` method as an HTTP POST
 3. Run via `pytest --bridge-url http://localhost:3001`
 
@@ -193,6 +202,17 @@ IDs are permanent — once published, never reassigned. Format: `SCN-{B|S|G}-{NN
 - `Client.MCPHandler()` returns `http.Handler` for MCP endpoint exposure
 - Goroutine-safe (no shared mutable state, `http.Client` is thread-safe)
 
+### C# Client Architecture
+
+`clients/csharp/src/Neo4j.AgentMemory/` uses **async/await** pattern:
+
+- All methods are `async Task<T>` with optional `CancellationToken`
+- `MemoryClient` composes three sub-clients: `ShortTerm`, `LongTerm`, `Reasoning`
+- `ITransport` interface with `HttpTransport` implementation using `HttpClient`
+- Wire format uses `[JsonPropertyName]` attributes for snake_case serialization
+- Implements `IAsyncDisposable` for deterministic cleanup
+- .NET 8.0 LTS target
+
 ## Key Files
 
 | File | Purpose |
@@ -215,6 +235,7 @@ IDs are permanent — once published, never reassigned. Format: `SCN-{B|S|G}-{NN
 - **Python line length**: 100 (ruff default).
 - **TypeScript**: Strict mode, no `any` in public API, ESM only.
 - **Go**: Standard `gofmt`, context-first parameters, functional options for optional params.
+- **C#**: .NET 8.0, nullable reference types, async/await with CancellationToken, System.Text.Json.
 
 ## Environment Variables
 

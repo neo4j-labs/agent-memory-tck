@@ -26,6 +26,13 @@ package-lock.json
 *.exe
 *.test
 
+# C# / .NET
+bin/
+obj/
+*.user
+*.suo
+*.nupkg
+
 # IDE
 .idea/
 .vscode/

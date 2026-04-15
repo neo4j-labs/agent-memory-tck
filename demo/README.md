@@ -1,6 +1,6 @@
 # Multi-Agent Memory Demo
 
-This demo showcases four AI agents written in three languages sharing the same Neo4j knowledge graph. It proves the core TCK value proposition: if implementations pass the TCK, their memory writes are interoperable.
+This demo showcases five AI agents written in four languages sharing the same Neo4j knowledge graph. It proves the core TCK value proposition: if implementations pass the TCK, their memory writes are interoperable.
 
 ## Architecture
 
@@ -16,13 +16,13 @@ This demo showcases four AI agents written in three languages sharing the same N
                     │  (memory service)    │
                     └──────────┬──────────┘
                                │
-         ┌─────────┬───────────┼───────────┬──────────┐
-         │         │           │           │          │
-    ┌────┴────┐ ┌──┴───┐  ┌───┴────┐ ┌────┴───┐ ┌───┴──────┐
-    │ Lenny   │ │Scout │  │ Forge  │ │ Atlas  │ │Dashboard │
-    │ Python  │ │  TS  │  │   Go   │ │ Python │ │ Next.js  │
-    │ :8001   │ │:8002 │  │ :8003  │ │ :8004  │ │ :3000    │
-    └─────────┘ └──────┘  └────────┘ └────────┘ └──────────┘
+         ┌─────────┬───────────┼───────────┬──────────┬──────────┐
+         │         │           │           │          │          │
+    ┌────┴────┐ ┌──┴───┐  ┌───┴────┐ ┌────┴───┐ ┌───┴───┐ ┌───┴──────┐
+    │ Lenny   │ │Scout │  │ Forge  │ │ Atlas  │ │ Sage  │ │Dashboard │
+    │ Python  │ │  TS  │  │   Go   │ │ Python │ │  C#   │ │ Next.js  │
+    │ :8001   │ │:8002 │  │ :8003  │ │ :8004  │ │:8005  │ │ :3000    │
+    └─────────┘ └──────┘  └────────┘ └────────┘ └───────┘ └──────────┘
 ```
 
 ### Agents
@@ -33,11 +33,12 @@ This demo showcases four AI agents written in three languages sharing the same N
 | **Scout** | TypeScript | Vercel AI SDK | Web search — enriches graph with web findings | 8002 |
 | **Forge** | Go | Custom HTTP | Data pipeline — adds structured properties to entities | 8003 |
 | **Atlas** | Python | LangGraph | Orchestrator — synthesizes knowledge from all agents | 8004 |
+| **Sage** | C# | Semantic Kernel | Knowledge validation — detects contradictions and conflicts | 8005 |
 
 ### Shared Memory Model
 
 - **Entities are shared** — An entity created by Lenny (Python) is immediately readable by Forge (Go) and Scout (TypeScript).
-- **Conversations are isolated** — Each agent has its own session prefix (`lenny-*`, `scout-*`, `forge-*`, `atlas-*`).
+- **Conversations are isolated** — Each agent has its own session prefix (`lenny-*`, `scout-*`, `forge-*`, `atlas-*`, `sage-*`).
 - **Reasoning traces are per-agent** — Each agent records its own reasoning, but Atlas can read all agents' traces for synthesis.
 
 ## Quick Start
@@ -47,6 +48,7 @@ This demo showcases four AI agents written in three languages sharing the same N
 - Docker Desktop (for Neo4j)
 - Python 3.10+ with [uv](https://docs.astral.sh/uv/)
 - Go 1.21+
+- .NET 8.0+ SDK
 - Node.js 20+
 
 ### Step 1: Start Neo4j
@@ -82,9 +84,9 @@ uv run python demo/seed-data.py
 This creates:
 - **18 entities** — Sam Altman, Dario Amodei, Jensen Huang, OpenAI, Anthropic, NVIDIA, etc.
 - **36 facts** — CEO_OF, INVESTED_IN, CREATED, INTERVIEWED relationships
-- **4 conversations** — one per agent, showing their distinct workflows
-- **5 reasoning traces** — with steps and tool calls from each agent
-- **21 messages** — across all four agent sessions
+- **5 conversations** — one per agent, showing their distinct workflows
+- **6 reasoning traces** — with steps and tool calls from each agent
+- **24 messages** — across all five agent sessions
 
 ### Step 4: Start the Dashboard
 
@@ -122,7 +124,7 @@ Refresh the dashboard to see the new facts appear in the graph.
 
 ## Running All Agents
 
-Lenny, Scout, and Atlas require an `OPENAI_API_KEY` since they use LLM-powered reasoning. If you have a key:
+Lenny, Scout, and Atlas require an `OPENAI_API_KEY` since they use LLM-powered reasoning. Forge and Sage work without one. If you have a key:
 
 ```bash
 # Terminal 1 — Lenny (Python/PydanticAI)
@@ -140,7 +142,11 @@ MEMORY_ENDPOINT=http://localhost:3001 OPENAI_API_KEY=sk-... \
 cd demo/agents/forge
 MEMORY_ENDPOINT=http://localhost:3001 PORT=8003 go run .
 
-# Terminal 4 — Atlas (Python/LangGraph)
+# Terminal 4 — Sage (C#/Semantic Kernel)
+cd demo/agents/sage
+MEMORY_ENDPOINT=http://localhost:3001 PORT=8005 dotnet run
+
+# Terminal 5 — Atlas (Python/LangGraph)
 cd demo/agents/atlas
 MEMORY_ENDPOINT=http://localhost:3001 OPENAI_API_KEY=sk-... \
   uv run uvicorn atlas.main:app --port 8004
@@ -156,7 +162,9 @@ The seed data tells a coherent story:
 
 3. **Forge** (Go/Custom HTTP) ran a data pipeline that added structured properties to key entities — Sam Altman's education, NVIDIA's market cap, Anthropic's headquarters.
 
-4. **Atlas** (Python/LangGraph) orchestrated a synthesis across all agents. It gathered entities and reasoning traces from Lenny, Scout, and Forge, then produced a unified AI industry landscape report.
+4. **Sage** (C#/Semantic Kernel) validated the knowledge graph for contradictions. It checked entity types and relationships for consistency, confirming high confidence scores across all agent contributions.
+
+5. **Atlas** (Python/LangGraph) orchestrated a synthesis across all agents. It gathered entities and reasoning traces from Lenny, Scout, Forge, and Sage, then produced a unified AI industry landscape report.
 
 Each agent wrote to the same Neo4j graph using different languages and frameworks, but because they all use the TCK-compliant memory interface, their writes are fully interoperable.
 
@@ -181,6 +189,13 @@ demo/
 │   ├── forge/                # Go / Custom HTTP
 │   │   ├── main.go           # net/http server with enrich/pipeline
 │   │   ├── go.mod
+│   │   └── Dockerfile
+│   ├── sage/                 # C# / Semantic Kernel
+│   │   ├── Program.cs        # ASP.NET Minimal API with validate/audit
+│   │   ├── Services/
+│   │   │   ├── ConflictDetector.cs
+│   │   │   └── KnowledgeAuditor.cs
+│   │   ├── Sage.csproj
 │   │   └── Dockerfile
 │   └── atlas/                # Python / LangGraph
 │       ├── atlas/
@@ -226,6 +241,9 @@ demo/
 | Forge | `/health` | GET | Health check |
 | Atlas | `/synthesize` | POST | Cross-agent knowledge synthesis |
 | Atlas | `/health` | GET | Health check |
+| Sage | `/validate` | POST | Detect contradictions in entity facts |
+| Sage | `/audit` | POST | Audit knowledge graph integrity |
+| Sage | `/health` | GET | Health check |
 
 ### Dashboard API
 

@@ -189,7 +189,28 @@ class ReferenceAdapter(BaseAdapter):
         ]
 
     async def delete_message(self, message_id: UUID) -> bool:
-        return await self._client.short_term.delete_message(message_id)
+        # The upstream package's DELETE_MESSAGE query only removes MENTIONS
+        # relationships and uses plain DELETE, which fails when HAS_MESSAGE,
+        # NEXT_MESSAGE, or FIRST_MESSAGE relationships exist. Use a custom
+        # query that repairs the chain and uses DETACH DELETE.
+        query = """
+        MATCH (m:Message {id: $id})
+        OPTIONAL MATCH (prev)-[:NEXT_MESSAGE]->(m)
+        OPTIONAL MATCH (m)-[:NEXT_MESSAGE]->(next)
+        OPTIONAL MATCH (conv)-[:FIRST_MESSAGE]->(m)
+        FOREACH (_ IN CASE WHEN prev IS NOT NULL AND next IS NOT NULL THEN [1] ELSE [] END |
+            CREATE (prev)-[:NEXT_MESSAGE]->(next)
+        )
+        FOREACH (_ IN CASE WHEN conv IS NOT NULL AND next IS NOT NULL THEN [1] ELSE [] END |
+            CREATE (conv)-[:FIRST_MESSAGE]->(next)
+        )
+        DETACH DELETE m
+        RETURN true AS deleted
+        """
+        results = await self._client._client.execute_write(query, {"id": str(message_id)})
+        if results and results[0].get("deleted"):
+            return True
+        return False
 
     async def clear_session(self, session_id: str) -> None:
         await self._client.short_term.clear_session(session_id)

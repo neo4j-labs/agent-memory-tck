@@ -64,8 +64,21 @@ class BridgeServer:
 
     def __init__(self, adapter):
         self.adapter = adapter
-        self.app = web.Application()
+        self.app = web.Application(middlewares=[self._error_middleware])
         self._setup_routes()
+
+    @web.middleware
+    async def _error_middleware(self, request, handler):
+        try:
+            return await handler(request)
+        except web.HTTPException:
+            raise
+        except Exception as exc:
+            logger.exception(f"Error handling {request.path}")
+            return web.json_response(
+                {"error": f"{type(exc).__name__}: {exc}"},
+                status=500,
+            )
 
     def _setup_routes(self):
         routes = [

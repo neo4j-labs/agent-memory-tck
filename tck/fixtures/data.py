@@ -11,7 +11,7 @@ SESSION_C = "tck-session-gamma"
 
 # Edge-case test strings
 LONG_CONTENT = "x" * 10_000  # 10K character string
-UNICODE_CONTENT = "Hello \u4e16\u754c \ud83c\udf0d \u00e9\u00e8\u00ea \u00fc\u00f6\u00e4 \u2603\ufe0f \u2764\ufe0f\u200d\ud83d\udd25"
+UNICODE_CONTENT = "Hello \u4e16\u754c \U0001f30d \u00e9\u00e8\u00ea \u00fc\u00f6\u00e4 \u2603\ufe0f \u2764\ufe0f\u200d\U0001f525"
 SPECIAL_CHARS_CONTENT = "Line1\nLine2\tTabbed \"quoted\" 'single' back\\slash"
 EMPTY_CONTENT = ""
 

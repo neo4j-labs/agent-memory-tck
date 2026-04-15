@@ -17,6 +17,7 @@ LENNY_URL = "http://localhost:8001"
 SCOUT_URL = "http://localhost:8002"
 FORGE_URL = "http://localhost:8003"
 ATLAS_URL = "http://localhost:8004"
+SAGE_URL = "http://localhost:8005"
 
 
 async def check_health(name: str, url: str) -> bool:
@@ -44,6 +45,7 @@ async def test_cross_language_entity_sharing():
         ("Scout (TypeScript)", SCOUT_URL),
         ("Forge (Go)", FORGE_URL),
         ("Atlas (Python)", ATLAS_URL),
+        ("Sage (C#)", SAGE_URL),
     ]
 
     all_healthy = True
@@ -139,6 +141,25 @@ async def test_cross_language_entity_sharing():
                 print(f"  Atlas synthesis failed: HTTP {resp.status_code}")
     except Exception as e:
         print(f"  Atlas synthesis failed: {e}")
+
+    # Step 6: Sage validates entity
+    print("\n6. Sage validating entity knowledge...")
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{SAGE_URL}/validate",
+                json={"entity_name": "Alice Johnson"},
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                print(f"  Found: {data.get('found', False)}")
+                print(f"  Conflicts: {len(data.get('conflicts', []))}")
+                print(f"  Confidence: {data.get('confidence_score', 0)}")
+            else:
+                print(f"  Sage validation failed: HTTP {resp.status_code}")
+    except Exception as e:
+        print(f"  Sage validation failed: {e}")
 
     print("\n=== Integration Test Complete ===")
 

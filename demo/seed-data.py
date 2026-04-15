@@ -598,6 +598,91 @@ async def seed():
         print(f"  + Reasoning trace: {trace['id'][:8]}... (3 steps, 3 tool calls)")
 
         # ==================================================================
+        # SAGE CONVERSATION — Knowledge validation
+        # ==================================================================
+        print("\n--- Sage (C#/Semantic Kernel) conversation ---")
+        sid = "sage-validate-001"
+        for role, content in [
+            (
+                "assistant",
+                "Starting knowledge validation for AI industry entities.",
+            ),
+            (
+                "assistant",
+                "Validated Sam Altman: 0 type conflicts detected. Confidence score: 1.0. "
+                "Found consistent CEO_OF relationship with OpenAI across all agent sources.",
+            ),
+            (
+                "assistant",
+                "Audit complete: 18 entities (8 Person, 7 Organization, 3 Event), "
+                "4 sessions, 5 traces. No orphaned entities detected.",
+            ),
+        ]:
+            await call(c, "add_message", {"session_id": sid, "role": role, "content": content})
+        print(f"  + 3 messages in {sid}")
+
+        # Sage reasoning trace
+        trace = await call(
+            c,
+            "start_trace",
+            {"session_id": sid, "task": "Validate entity: Sam Altman"},
+        )
+        s1 = await call(
+            c,
+            "add_step",
+            {
+                "trace_id": trace["id"],
+                "thought": "Looking up entity 'Sam Altman' in knowledge graph",
+                "action": "get_entity_by_name",
+                "observation": "Found: Sam Altman (PERSON)",
+            },
+        )
+        await call(
+            c,
+            "record_tool_call",
+            {
+                "step_id": s1["id"],
+                "tool_name": "get_entity_by_name",
+                "arguments": {"name": "Sam Altman"},
+                "status": "success",
+                "duration_ms": 45,
+                "result": {"name": "Sam Altman", "type": "PERSON"},
+            },
+        )
+        s2 = await call(
+            c,
+            "add_step",
+            {
+                "trace_id": trace["id"],
+                "thought": "Searching for facts about entity to detect contradictions",
+                "action": "search_entities",
+                "observation": "Found 18 related entities, 0 type conflicts",
+            },
+        )
+        await call(
+            c,
+            "record_tool_call",
+            {
+                "step_id": s2["id"],
+                "tool_name": "search_entities",
+                "arguments": {"query": "Sam Altman", "limit": 20},
+                "status": "success",
+                "duration_ms": 120,
+                "result": {"count": 18, "conflicts": 0},
+            },
+        )
+        await call(
+            c,
+            "complete_trace",
+            {
+                "trace_id": trace["id"],
+                "outcome": "Validated Sam Altman: 0 conflicts, confidence 1.0",
+                "success": True,
+            },
+        )
+        print(f"  + Reasoning trace: {trace['id'][:8]}... (2 steps, 2 tool calls)")
+
+        # ==================================================================
         # Additional enrichment facts (from various agents)
         # ==================================================================
         print("\n--- Additional enrichment facts ---")
@@ -626,11 +711,11 @@ async def seed():
         print("=" * 50)
         print(f"  Entities:       {len(people) + len(orgs) + len(events)}")
         print(f"  Facts:          {len(facts) + len(extra_facts)}")
-        print("  Conversations:  4 (lenny, scout, forge, atlas)")
-        print("  Messages:       21")
-        print("  Traces:         5")
-        print("  Tool Calls:     14")
-        print("  Total nodes:    ~70+")
+        print("  Conversations:  5 (lenny, scout, forge, atlas, sage)")
+        print("  Messages:       24")
+        print("  Traces:         6")
+        print("  Tool Calls:     16")
+        print("  Total nodes:    ~80+")
         print("\nDashboard: http://localhost:3000")
 
 
