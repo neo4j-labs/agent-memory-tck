@@ -1,5 +1,5 @@
 /**
- * HTTP transport for the Cypherlite Cloud service.
+ * HTTP transport for the NAMS service.
  *
  * Uses only the standard fetch() API — compatible with Node.js 20+,
  * Bun, Deno, Cloudflare Workers, and Vercel Edge Runtime.

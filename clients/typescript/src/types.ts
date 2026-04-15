@@ -144,7 +144,7 @@ export interface ToolStats {
 // ---------------------------------------------------------------------------
 
 export interface MemoryClientOptions {
-  /** URL of the Cypherlite Cloud or compatible HTTP endpoint. */
+  /** URL of the NAMS or compatible HTTP endpoint. */
   endpoint?: string;
 
   /** API key for authentication with the hosted service. */

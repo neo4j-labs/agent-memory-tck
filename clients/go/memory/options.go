@@ -4,7 +4,7 @@ import "time"
 
 // Config holds the configuration for a memory Client.
 type Config struct {
-	// Endpoint is the URL of the Cypherlite Cloud or compatible HTTP service.
+	// Endpoint is the URL of the NAMS or compatible HTTP service.
 	Endpoint string
 
 	// APIKey for authentication with the hosted service.

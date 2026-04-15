@@ -6,7 +6,7 @@
  * import { MemoryClient } from "@neo4j-labs/agent-memory";
  *
  * const client = new MemoryClient({
- *   endpoint: "https://memory.cypherlite.cloud",
+ *   endpoint: "https://nams.neo4jsandbox.com",
  *   apiKey: "your-api-key",
  * });
  * await client.connect();

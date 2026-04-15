@@ -134,7 +134,7 @@ uv run pytest -m bronze --bridge-url http://localhost:3001 -v
 ```typescript
 import { MemoryClient } from "@neo4j-labs/agent-memory";
 
-const client = new MemoryClient({ endpoint: "https://memory.cypherlite.cloud" });
+const client = new MemoryClient({ endpoint: "https://nams.neo4jsandbox.com" });
 await client.connect();
 
 // Short-term memory
@@ -152,7 +152,7 @@ Includes [Vercel AI SDK middleware](clients/typescript/src/middleware/vercel-ai.
 ## Go Client
 
 ```go
-client, _ := memory.New(memory.WithEndpoint("https://memory.cypherlite.cloud"))
+client, _ := memory.New(memory.WithEndpoint("https://nams.neo4jsandbox.com"))
 defer client.Close(ctx)
 
 // Short-term memory
@@ -170,7 +170,7 @@ Includes [MCP handler](clients/go/memory/mcp_handler.go) (`http.Handler`). See t
 ## C# Client
 
 ```csharp
-await using var client = new MemoryClient(new MemoryClientOptions { Endpoint = "https://memory.cypherlite.cloud" });
+await using var client = new MemoryClient(new MemoryClientOptions { Endpoint = "https://nams.neo4jsandbox.com" });
 await client.ConnectAsync();
 
 // Short-term memory

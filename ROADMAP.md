@@ -176,7 +176,7 @@ These items were specified in the PRD but were intentionally deferred or are bey
 | PRD Feature | Status | Rationale |
 |-------------|--------|-----------|
 | Gherkin `.feature` files | Replaced by pytest + scenario registry | Same traceability, less overhead |
-| `tck/service/` (Service API scenarios) | Not started | Requires Cypherlite Cloud API to be available |
+| `tck/service/` (Service API scenarios) | Not started | Requires NAMS API to be available |
 | `tck/observational/` (Observer/Reflector) | Not started | Gold+ feature; requires observational memory in Python package |
 | `tck/error-handling/` (Error codes, retry) | Not started | Deferred to post-v1.0 |
 | `tck/idempotency/` (dedicated directory) | Merged into Bronze tests | `TestIdempotency` class in `test_short_term.py` |
@@ -230,7 +230,7 @@ Close the gaps identified above to achieve full milestone acceptance:
 
 ### v1.1.0 — Service API & Error Handling (Weeks 23-26)
 
-Extend the TCK to cover the hosted Cypherlite Cloud service:
+Extend the TCK to cover the hosted NAMS service:
 
 1. **Service API scenarios** (`tck/service/endpoints/`) — HTTP request/response contracts for all operations
 2. **Authentication scenarios** (`tck/service/auth/`) — API key validation, token scopes, rate limiting

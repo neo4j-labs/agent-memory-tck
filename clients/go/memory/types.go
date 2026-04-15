@@ -1,6 +1,6 @@
 // Package memory provides a Go client for neo4j-agent-memory.
 //
-// It supports connecting to the hosted Cypherlite Cloud service via HTTP
+// It supports connecting to the hosted NAMS service via HTTP
 // or directly to a Neo4j instance. All types mirror the TCK data models
 // defined in tck/adapters/base_adapter.py.
 package memory

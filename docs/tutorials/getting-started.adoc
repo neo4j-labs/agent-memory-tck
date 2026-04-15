@@ -9,7 +9,7 @@ This tutorial walks you through installing the TCK, writing a minimal adapter, a
 
 * Python 3.10 or later
 * https://docs.astral.sh/uv/[uv] package manager (recommended) or pip
-* A running Neo4j instance (local or Aura) _or_ access to the hosted Cypherlite Cloud service
+* A running Neo4j instance (local or Aura) _or_ access to the hosted NAMS service
 
 == Step 1: Install the TCK
 

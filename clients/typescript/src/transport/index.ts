@@ -3,7 +3,7 @@
  *
  * The Transport interface decouples the memory client from the underlying
  * communication mechanism. This enables the same client API to work with:
- *   - Cypherlite Cloud HTTP API (primary)
+ *   - NAMS HTTP API (primary)
  *   - Direct Neo4j connection (for local development)
  *   - MCP protocol
  */
