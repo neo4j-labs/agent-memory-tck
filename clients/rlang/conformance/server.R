@@ -1,8 +1,5 @@
 r_libs_user <- Sys.getenv("R_LIBS_USER", "")
 if (nchar(r_libs_user) > 0) .libPaths(c(r_libs_user, .libPaths()))
-cat("R_LIBS_USER:", r_libs_user, "\n")
-cat("Library paths:", paste(.libPaths(), collapse = "\n  "), "\n")
-cat("plumber available:", requireNamespace("plumber", quietly = TRUE), "\n")
 
 library(plumber)
 library(jsonlite)
