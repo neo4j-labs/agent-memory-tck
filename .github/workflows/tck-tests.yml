@@ -164,16 +164,19 @@ jobs:
 
       - name: Install R packages
         run: |
-          mkdir -p "$R_LIBS_USER"
-          Rscript -e "install.packages(c('testthat', 'httr2', 'R6', 'jsonlite'), repos = 'https://cloud.r-project.org/')"
+          Rscript -e "
+            lib <- Sys.getenv('R_LIBS_USER', '/usr/local/lib/R/site-library')
+            dir.create(lib, recursive = TRUE, showWarnings = FALSE)
+            .libPaths(c(lib, .libPaths()))
+            install.packages(c('testthat', 'httr2', 'R6', 'jsonlite'), lib = lib, repos = 'https://cloud.r-project.org/')
+          "
 
       - name: Run R unit tests
         run: |
           cd clients/rlang/neo4j.memory
           Rscript -e "
-            library(R6)
-            library(httr2)
-            library(jsonlite)
+            .libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths()))
+            library(R6); library(httr2); library(jsonlite)
             for (f in list.files('R', full.names = TRUE)) source(f)
             testthat::test_dir('tests/testthat', reporter = 'summary', stop_on_failure = TRUE)
           "
@@ -215,8 +218,15 @@ jobs:
 
       - name: Install R packages
         run: |
-          mkdir -p "$R_LIBS_USER"
-          Rscript -e "install.packages(c('plumber', 'httr2', 'R6', 'jsonlite', 'testthat'), repos = 'https://cloud.r-project.org/')"
+          Rscript -e "
+            lib <- Sys.getenv('R_LIBS_USER', '/usr/local/lib/R/site-library')
+            dir.create(lib, recursive = TRUE, showWarnings = FALSE)
+            .libPaths(c(lib, .libPaths()))
+            cat('Installing to:', lib, '\n')
+            cat('Library paths:', paste(.libPaths(), collapse = ', '), '\n')
+            install.packages(c('plumber', 'httr2', 'R6', 'jsonlite', 'testthat'), lib = lib, repos = 'https://cloud.r-project.org/')
+            cat('Installed packages:', paste(list.files(lib), collapse = ', '), '\n')
+          "
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -235,7 +245,7 @@ jobs:
       - name: Start R conformance server
         run: |
           cd clients/rlang/conformance
-          MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 Rscript server.R > /tmp/r-conformance.log 2>&1 &
+          MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 Rscript -e "lib <- Sys.getenv('R_LIBS_USER'); .libPaths(c(lib, .libPaths())); source('server.R')" > /tmp/r-conformance.log 2>&1 &
           R_PID=$!
           echo "R conformance server PID: $R_PID"
           READY=false
@@ -262,9 +272,8 @@ jobs:
         run: |
           cd clients/rlang/neo4j.memory
           MEMORY_ENDPOINT=http://localhost:3001 Rscript -e "
-            library(R6)
-            library(httr2)
-            library(jsonlite)
+            .libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths()))
+            library(R6); library(httr2); library(jsonlite)
             for (f in list.files('R', full.names = TRUE)) source(f)
             testthat::test_dir('tests/testthat', reporter = 'summary', stop_on_failure = TRUE, filter = 'integration')
           "
