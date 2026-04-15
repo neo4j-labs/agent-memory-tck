@@ -149,8 +149,6 @@ jobs:
 
   rlang-unit-tests:
     runs-on: ubuntu-latest
-    env:
-      R_LIBS_USER: /home/runner/r-libs
     steps:
       - uses: actions/checkout@v4
 
@@ -166,14 +164,13 @@ jobs:
 
       - name: Install R packages
         run: |
-          mkdir -p $R_LIBS_USER
-          Rscript -e "install.packages(c('testthat', 'httr2', 'R6', 'jsonlite'), lib = '${{ env.R_LIBS_USER }}', repos = 'https://cloud.r-project.org/')"
+          mkdir -p "$R_LIBS_USER"
+          Rscript -e "install.packages(c('testthat', 'httr2', 'R6', 'jsonlite'), repos = 'https://cloud.r-project.org/')"
 
       - name: Run R unit tests
         run: |
           cd clients/rlang/neo4j.memory
           Rscript -e "
-            .libPaths(c('${{ env.R_LIBS_USER }}', .libPaths()))
             library(R6)
             library(httr2)
             library(jsonlite)
@@ -187,7 +184,6 @@ jobs:
       NEO4J_URI: bolt://localhost:7687
       NEO4J_USERNAME: neo4j
       NEO4J_PASSWORD: testpassword
-      R_LIBS_USER: /home/runner/r-libs
 
     services:
       neo4j:
@@ -219,8 +215,8 @@ jobs:
 
       - name: Install R packages
         run: |
-          mkdir -p $R_LIBS_USER
-          Rscript -e "install.packages(c('plumber', 'httr2', 'R6', 'jsonlite', 'testthat'), lib = '${{ env.R_LIBS_USER }}', repos = 'https://cloud.r-project.org/')"
+          mkdir -p "$R_LIBS_USER"
+          Rscript -e "install.packages(c('plumber', 'httr2', 'R6', 'jsonlite', 'testthat'), repos = 'https://cloud.r-project.org/')"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -239,7 +235,7 @@ jobs:
       - name: Start R conformance server
         run: |
           cd clients/rlang/conformance
-          MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 Rscript -e ".libPaths(c('${{ env.R_LIBS_USER }}', .libPaths())); source('server.R')" > /tmp/r-conformance.log 2>&1 &
+          MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 Rscript server.R > /tmp/r-conformance.log 2>&1 &
           R_PID=$!
           echo "R conformance server PID: $R_PID"
           READY=false
@@ -266,7 +262,6 @@ jobs:
         run: |
           cd clients/rlang/neo4j.memory
           MEMORY_ENDPOINT=http://localhost:3001 Rscript -e "
-            .libPaths(c('${{ env.R_LIBS_USER }}', .libPaths()))
             library(R6)
             library(httr2)
             library(jsonlite)
