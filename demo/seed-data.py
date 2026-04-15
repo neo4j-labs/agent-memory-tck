@@ -753,7 +753,11 @@ async def seed():
             {
                 "step_id": s2["id"],
                 "tool_name": "run_correlation",
-                "arguments": {"property1": "founding_year", "property2": "fact_count", "method": "pearson"},
+                "arguments": {
+                    "property1": "founding_year",
+                    "property2": "fact_count",
+                    "method": "pearson",
+                },
                 "status": "success",
                 "duration_ms": 42,
                 "result": {"correlation": 0.72, "p_value": 0.028, "method": "pearson"},
