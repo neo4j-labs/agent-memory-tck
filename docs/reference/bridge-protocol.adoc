@@ -349,3 +349,4 @@ Reference conformance servers are provided in the repository:
 * *TypeScript*: `clients/typescript/conformance/server.ts` (Node.js http)
 * *Go*: `clients/go/conformance/main.go` (net/http)
 * *C#*: `clients/csharp/conformance/Neo4j.AgentMemory.Conformance/Program.cs` (ASP.NET Minimal API)
+* *R*: `clients/rlang/conformance/server.R` (plumber)

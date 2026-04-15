@@ -30,7 +30,7 @@ func main() {
     ctx := context.Background()
 
     client, err := memory.New(
-        memory.WithEndpoint("https://memory.cypherlite.cloud"),
+        memory.WithEndpoint("https://nams.neo4jsandbox.com"),
         memory.WithAPIKey("your-api-key"),
     )
     if err != nil {

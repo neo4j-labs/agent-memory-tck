@@ -683,6 +683,120 @@ async def seed():
         print(f"  + Reasoning trace: {trace['id'][:8]}... (2 steps, 2 tool calls)")
 
         # ==================================================================
+        # RUNE CONVERSATION — Statistical analysis (R/ellmer)
+        # ==================================================================
+        print("\n--- Rune (R/ellmer) conversation ---")
+        sid = "rune-analysis-001"
+        for role, content in [
+            (
+                "user",
+                "Analyze the relationship between AI company funding and entity count in the graph.",
+            ),
+            (
+                "assistant",
+                "Running summary statistics on entity properties. Found 18 entities across "
+                "8 Person, 7 Organization, 3 Event types. Running correlation analysis between "
+                "company founding year and number of associated facts.",
+            ),
+            (
+                "assistant",
+                "Analysis complete: Pearson correlation r=0.72 (p=0.028) between organization "
+                "age and fact count, suggesting established companies have richer graph "
+                "representations. K-means clustering (k=3) reveals distinct entity groups: "
+                "tech leaders, AI startups, and research events.",
+            ),
+        ]:
+            await call(c, "add_message", {"session_id": sid, "role": role, "content": content})
+        print(f"  + 3 messages in {sid}")
+
+        # Rune reasoning trace
+        trace = await call(
+            c,
+            "start_trace",
+            {"session_id": sid, "task": "Statistical analysis of AI entity landscape"},
+        )
+        s1 = await call(
+            c,
+            "add_step",
+            {
+                "trace_id": trace["id"],
+                "thought": "Need to gather entity data for statistical analysis",
+                "action": "run_summary",
+                "observation": "Computed descriptive stats: n=18, types={Person:8, Org:7, Event:3}",
+            },
+        )
+        await call(
+            c,
+            "record_tool_call",
+            {
+                "step_id": s1["id"],
+                "tool_name": "run_summary",
+                "arguments": {"property": "type", "entity_count": 18},
+                "status": "success",
+                "duration_ms": 85,
+                "result": {"n": 18, "types": {"Person": 8, "Organization": 7, "Event": 3}},
+            },
+        )
+        s2 = await call(
+            c,
+            "add_step",
+            {
+                "trace_id": trace["id"],
+                "thought": "Testing correlation between org age and fact density",
+                "action": "run_correlation",
+                "observation": "r=0.72, p=0.028 — significant positive correlation",
+            },
+        )
+        await call(
+            c,
+            "record_tool_call",
+            {
+                "step_id": s2["id"],
+                "tool_name": "run_correlation",
+                "arguments": {
+                    "property1": "founding_year",
+                    "property2": "fact_count",
+                    "method": "pearson",
+                },
+                "status": "success",
+                "duration_ms": 42,
+                "result": {"correlation": 0.72, "p_value": 0.028, "method": "pearson"},
+            },
+        )
+        s3 = await call(
+            c,
+            "add_step",
+            {
+                "trace_id": trace["id"],
+                "thought": "Clustering entities to identify structural groups",
+                "action": "run_clustering",
+                "observation": "3 clusters identified: tech leaders, AI startups, research events",
+            },
+        )
+        await call(
+            c,
+            "record_tool_call",
+            {
+                "step_id": s3["id"],
+                "tool_name": "run_clustering",
+                "arguments": {"k": 3, "properties": ["fact_count", "relationship_count"]},
+                "status": "success",
+                "duration_ms": 120,
+                "result": {"k": 3, "cluster_sizes": [5, 7, 6], "within_ss": 12.4},
+            },
+        )
+        await call(
+            c,
+            "complete_trace",
+            {
+                "trace_id": trace["id"],
+                "outcome": "Statistical analysis complete: significant correlation (r=0.72) and 3 entity clusters identified",
+                "success": True,
+            },
+        )
+        print(f"  + Reasoning trace: {trace['id'][:8]}... (3 steps, 3 tool calls)")
+
+        # ==================================================================
         # Additional enrichment facts (from various agents)
         # ==================================================================
         print("\n--- Additional enrichment facts ---")
@@ -711,10 +825,10 @@ async def seed():
         print("=" * 50)
         print(f"  Entities:       {len(people) + len(orgs) + len(events)}")
         print(f"  Facts:          {len(facts) + len(extra_facts)}")
-        print("  Conversations:  5 (lenny, scout, forge, atlas, sage)")
-        print("  Messages:       24")
-        print("  Traces:         6")
-        print("  Tool Calls:     16")
+        print("  Conversations:  6 (lenny, scout, forge, atlas, sage, rune)")
+        print("  Messages:       27")
+        print("  Traces:         7")
+        print("  Tool Calls:     19")
         print("  Total nodes:    ~80+")
         print("\nDashboard: http://localhost:3000")
 

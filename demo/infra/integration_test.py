@@ -18,6 +18,7 @@ SCOUT_URL = "http://localhost:8002"
 FORGE_URL = "http://localhost:8003"
 ATLAS_URL = "http://localhost:8004"
 SAGE_URL = "http://localhost:8005"
+RUNE_URL = "http://localhost:8006"
 
 
 async def check_health(name: str, url: str) -> bool:
@@ -46,6 +47,7 @@ async def test_cross_language_entity_sharing():
         ("Forge (Go)", FORGE_URL),
         ("Atlas (Python)", ATLAS_URL),
         ("Sage (C#)", SAGE_URL),
+        ("Rune (R)", RUNE_URL),
     ]
 
     all_healthy = True
@@ -160,6 +162,29 @@ async def test_cross_language_entity_sharing():
                 print(f"  Sage validation failed: HTTP {resp.status_code}")
     except Exception as e:
         print(f"  Sage validation failed: {e}")
+
+    # Step 7: Rune (R) runs statistical analysis
+    print("\n7. Rune (R) analyzing entity statistics...")
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{RUNE_URL}/analyze",
+                json={
+                    "entity_names": ["Alice Johnson"],
+                    "analysis_type": "summary",
+                    "property": "ROLE",
+                },
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                print(f"  Session: {data.get('session_id')}")
+                print(f"  Analysis: {data.get('analysis_type')}")
+                print(f"  Entities: {data.get('entity_count', 0)}")
+            else:
+                print(f"  Rune analysis failed: HTTP {resp.status_code}")
+    except Exception as e:
+        print(f"  Rune analysis failed: {e}")
 
     print("\n=== Integration Test Complete ===")
 

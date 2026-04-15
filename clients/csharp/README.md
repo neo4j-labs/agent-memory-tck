@@ -13,7 +13,7 @@ using Neo4j.AgentMemory.Models;
 
 await using var client = new MemoryClient(new MemoryClientOptions
 {
-    Endpoint = "https://memory.cypherlite.cloud"
+    Endpoint = "https://nams.neo4jsandbox.com"
 });
 await client.ConnectAsync();
 

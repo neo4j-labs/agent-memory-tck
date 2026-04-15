@@ -6,10 +6,11 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5+-blue.svg?logo=typescript)](https://www.typescriptlang.org/)
 [![Go 1.21+](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?logo=go)](https://go.dev/)
 [![.NET 8](https://img.shields.io/badge/.NET-8.0+-512bd4.svg?logo=dotnet)](https://dotnet.microsoft.com/)
+[![R 4.1+](https://img.shields.io/badge/R-4.1+-276DC3.svg?logo=r)](https://www.r-project.org/)
 
 Technology Compatibility Kit for [neo4j-agent-memory](https://github.com/neo4j-labs/agent-memory) implementations.
 
-The TCK provides a formal behavioral specification, 178 executable test scenarios, and a compliance framework that enables any implementation — in any language — to verify conformance with the neo4j-agent-memory data model. It also includes TypeScript, Go, and C# client libraries and a multi-agent reference demo.
+The TCK provides a formal behavioral specification, 178 executable test scenarios, and a compliance framework that enables any implementation — in any language — to verify conformance with the neo4j-agent-memory data model. It also includes TypeScript, Go, C#, and R client libraries and a multi-agent reference demo.
 
 > **Neo4j Labs Project** — This project is maintained by Neo4j Labs as an experimental, community-supported project. It is not officially supported by Neo4j. For community support, use [GitHub Issues](https://github.com/neo4j-labs/agent-memory-tck/issues).
 
@@ -24,7 +25,8 @@ agent-memory-tck/
   clients/typescript/   @neo4j-labs/agent-memory npm package
   clients/go/           agent-memory-go module
   clients/csharp/       Neo4j.AgentMemory .NET package
-  demo/                 5-agent polyglot demo (Python, TypeScript, Go, C#)
+  clients/rlang/        neo4j.memory R package (httr2 + R6)
+  demo/                 6-agent polyglot demo (Python, TypeScript, Go, C#, R)
   docs/                 AsciiDoc documentation (Diataxis framework)
   SPEC.md               Normative specification v1.0.0
 ```
@@ -33,11 +35,12 @@ agent-memory-tck/
 |-----------|-------------|
 | **TCK Specification** | 178 test scenarios across 3 compliance tiers, backed by `SPEC.md` with 98+ behavioral clauses |
 | **Scenario Registry** | 178 stable scenario IDs (`SCN-B-001` through `SCN-G-018`) with SPEC clause traceability |
-| **HTTP Bridge** | Cross-language conformance protocol enabling the Python test suite to validate TypeScript, Go, or any implementation |
+| **HTTP Bridge** | Cross-language conformance protocol enabling the Python test suite to validate TypeScript, Go, C#, R, or any implementation |
 | **TypeScript Client** | `@neo4j-labs/agent-memory` with `MemoryClient`, Vercel AI SDK middleware, and MCP tool definitions |
 | **Go Client** | `memory` package with context-aware API, functional options, generic `Entity[T]`, and MCP handler |
 | **C# Client** | `Neo4j.AgentMemory` .NET 8 package with async/await API and `IAsyncDisposable` lifecycle |
-| **Multi-Agent Demo** | Lenny (Python/PydanticAI), Scout (TypeScript/Vercel AI SDK), Forge (Go), Atlas (Python/LangGraph), Sage (C#/Semantic Kernel) |
+| **R Client** | `neo4j.memory` R package with R6 classes, httr2 transport, and plumber conformance server |
+| **Multi-Agent Demo** | Lenny (Python/PydanticAI), Scout (TypeScript/Vercel AI SDK), Forge (Go), Atlas (Python/LangGraph), Sage (C#/Semantic Kernel), Rune (R/ellmer) |
 | **Documentation** | AsciiDoc docs following the Diataxis framework: tutorials, how-to guides, reference, explanation |
 
 ## Compliance Tiers
@@ -115,7 +118,7 @@ uv run tck results.json --name "My Implementation" -o report.json --html report.
 
 ### Cross-Language Testing
 
-Test TypeScript, Go, or C# implementations via the HTTP bridge protocol:
+Test TypeScript, Go, C#, or R implementations via the HTTP bridge protocol:
 
 ```bash
 # Start a conformance server (TypeScript example)
@@ -131,7 +134,7 @@ uv run pytest -m bronze --bridge-url http://localhost:3001 -v
 ```typescript
 import { MemoryClient } from "@neo4j-labs/agent-memory";
 
-const client = new MemoryClient({ endpoint: "https://memory.cypherlite.cloud" });
+const client = new MemoryClient({ endpoint: "https://nams.neo4jsandbox.com" });
 await client.connect();
 
 // Short-term memory
@@ -149,7 +152,7 @@ Includes [Vercel AI SDK middleware](clients/typescript/src/middleware/vercel-ai.
 ## Go Client
 
 ```go
-client, _ := memory.New(memory.WithEndpoint("https://memory.cypherlite.cloud"))
+client, _ := memory.New(memory.WithEndpoint("https://nams.neo4jsandbox.com"))
 defer client.Close(ctx)
 
 // Short-term memory
@@ -167,7 +170,7 @@ Includes [MCP handler](clients/go/memory/mcp_handler.go) (`http.Handler`). See t
 ## C# Client
 
 ```csharp
-await using var client = new MemoryClient(new MemoryClientOptions { Endpoint = "https://memory.cypherlite.cloud" });
+await using var client = new MemoryClient(new MemoryClientOptions { Endpoint = "https://nams.neo4jsandbox.com" });
 await client.ConnectAsync();
 
 // Short-term memory
@@ -182,9 +185,29 @@ var trace = await client.Reasoning.StartTraceAsync("session-1", "Research task")
 
 See the [C# client README](clients/csharp/README.md).
 
+## R Client
+
+```r
+library(neo4j.memory)
+
+client <- MemoryClient$new(endpoint = "http://localhost:3001")
+client$connect()
+
+# Short-term memory
+client$short_term$add_message("session-1", "user", "Hello!")
+
+# Long-term memory
+client$long_term$add_entity("Alice", "PERSON", description = "Engineer")
+
+# Reasoning memory
+trace <- client$reasoning$start_trace("session-1", "Research task")
+```
+
+See the [R client README](clients/rlang/README.md).
+
 ## Multi-Agent Demo
 
-Five agents in five languages sharing one Neo4j graph:
+Six agents in five languages sharing one Neo4j graph:
 
 | Agent | Language | Framework | Role |
 |-------|----------|-----------|------|
@@ -193,6 +216,7 @@ Five agents in five languages sharing one Neo4j graph:
 | **Forge** | Go | Custom HTTP | Data pipeline, property enrichment |
 | **Atlas** | Python | LangGraph | Orchestrator, cross-agent synthesis |
 | **Sage** | C# | Semantic Kernel | Knowledge validation, conflict detection |
+| **Rune** | R | ellmer | Statistical analysis, analytical reasoning |
 
 ```bash
 cd demo/infra
