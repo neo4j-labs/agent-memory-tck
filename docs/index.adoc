@@ -45,7 +45,7 @@ Learning-oriented guides that walk you through a complete task from start to fin
 Task-oriented guides for accomplishing specific goals.
 
 * link:how-to/writing-an-adapter.html[Writing a TCK Adapter] — Implement `BaseAdapter` for your memory system
-* link:how-to/cross-language-testing.html[Cross-Language Conformance Testing] — Test TypeScript, Go, or C# implementations via the HTTP bridge
+* link:how-to/cross-language-testing.html[Cross-Language Conformance Testing] — Test TypeScript, Go, C#, or R implementations via the HTTP bridge
 * link:how-to/ci-integration.html[Adding TCK to Your CI Pipeline] — Run conformance tests in GitHub Actions
 * link:how-to/certification.html[Obtaining TCK Certification] — Generate compliance reports and submit to the registry
 

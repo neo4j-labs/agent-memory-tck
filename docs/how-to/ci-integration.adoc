@@ -65,7 +65,7 @@ jobs:
             report.html
 ----
 
-== GitHub Actions: HTTP Bridge (TypeScript/Go/C#)
+== GitHub Actions: HTTP Bridge (TypeScript/Go/C#/R)
 
 For non-Python implementations, start your conformance server first:
 
@@ -162,6 +162,33 @@ jobs:
 ----
 
 TIP: Pre-building the C# project with `dotnet build` before `dotnet run --no-build` ensures fast startup. The health check loop replaces a fixed `sleep` and is more reliable in CI environments.
+
+=== R
+
+[source,yaml]
+----
+    steps:
+      # ... (Neo4j service same as above)
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.4.0"
+
+      - name: Install R packages
+        run: |
+          Rscript -e "install.packages(c('plumber', 'httr2', 'R6', 'jsonlite'), repos = 'https://cloud.r-project.org/')"
+
+      - name: Start R conformance server
+        run: |
+          cd clients/rlang/conformance
+          MEMORY_ENDPOINT=bolt://localhost:7687 TCK_BRIDGE_PORT=3001 Rscript server.R &
+          for i in $(seq 1 30); do curl -s http://localhost:3001/setup > /dev/null 2>&1 && break || sleep 1; done
+
+      - name: Run TCK via bridge
+        run: |
+          uv sync --extra bridge
+          uv run pytest -m bronze --bridge-url http://localhost:3001 -v
+----
 
 == Adding a Compliance Badge
 

@@ -165,6 +165,9 @@ jobs:
         run: |
           cd clients/rlang/neo4j.memory
           Rscript -e "
+            library(R6)
+            library(httr2)
+            library(jsonlite)
             for (f in list.files('R', full.names = TRUE)) source(f)
             testthat::test_dir('tests/testthat', reporter = 'summary', stop_on_failure = TRUE)
           "
@@ -227,6 +230,9 @@ jobs:
         run: |
           cd clients/rlang/neo4j.memory
           MEMORY_ENDPOINT=http://localhost:3001 Rscript -e "
+            library(R6)
+            library(httr2)
+            library(jsonlite)
             for (f in list.files('R', full.names = TRUE)) source(f)
             testthat::test_dir('tests/testthat', reporter = 'summary', stop_on_failure = TRUE, filter = 'integration')
           "

@@ -11,6 +11,7 @@ Without a shared specification:
 * A Python agent using PydanticAI writes entities with one property naming convention.
 * A TypeScript agent using Vercel AI SDK writes entities with a different convention.
 * A Go agent writes reasoning traces with an incompatible structure.
+* An R agent writes statistical traces with yet another format.
 
 When all three connect to the same Neo4j Aura instance, their writes are *silently incompatible*. The Python agent can't read what the TypeScript agent wrote.
 
@@ -38,6 +39,7 @@ Scout: session_id = "scout-search-042"
 Forge: session_id = "forge-enrich-007"
 Atlas: session_id = "atlas-synth-003"
 Sage:  session_id = "sage-audit-012"
+Rune:  session_id = "rune-analysis-001"
 ----
 
 **Conversations and reasoning traces are isolated by session.** Lenny's conversation history is not visible when querying Scout's session.
@@ -75,7 +77,7 @@ The Gold tier includes tests that verify this sharing model:
 
 == The Multi-Agent Demo
 
-The repository includes a five-agent demo proving this architecture:
+The repository includes a six-agent demo proving this architecture:
 
 [cols="1,1,1,2"]
 |===
@@ -105,6 +107,11 @@ The repository includes a five-agent demo proving this architecture:
 |C#
 |Semantic Kernel
 |Knowledge validation — detects conflicts, audits graph integrity
+
+|*Rune*
+|R
+|ellmer
+|Statistical analysis — runs regressions, correlations, clustering on graph entities
 |===
 
 === Data Flow
@@ -116,10 +123,12 @@ Scout (TypeScript) ──reads──────────┤──enriches─
                                     │
 Forge (Go) ──reads──────────────────┤──enriches──> Fact("Alice Johnson", ROLE, "CTO")
                                     │
+Rune (R) ──reads────────────────────┤──analyzes───> ReasoningTrace(correlation r=0.72, p=0.028)
+                                    │
 Atlas (Python) ──reads all traces───┴──synthesizes──> Summary of all agents' work
 ----
 
-Each agent runs as a separate service (Cloud Run or Docker container), all connecting to the same Neo4j instance. The TCK guarantees that Lenny's Python writes are readable by Scout's TypeScript reads, Forge's Go reads, and Sage's C# reads — because they all implement the same schema.
+Each agent runs as a separate service (Cloud Run or Docker container), all connecting to the same Neo4j instance. The TCK guarantees that Lenny's Python writes are readable by Scout's TypeScript reads, Forge's Go reads, Sage's C# reads, and Rune's R reads — because they all implement the same schema.
 
 == Why This Matters
 
