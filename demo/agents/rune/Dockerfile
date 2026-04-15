@@ -3,10 +3,11 @@ FROM rocker/r-ver:4.4.0
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-openssl-dev \
     libssl-dev \
+    libsodium-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN R -e "install.packages(c('plumber', 'jsonlite', 'httr2'), \
-    repos='https://packagemanager.posit.co/cran/__linux__/jammy/latest')"
+    repos='https://cloud.r-project.org/')"
 
 WORKDIR /app
 COPY demo/agents/rune/ /app/
