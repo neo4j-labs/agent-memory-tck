@@ -239,8 +239,28 @@ jobs:
       - name: Start R conformance server
         run: |
           cd clients/rlang/conformance
-          MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 Rscript -e ".libPaths(c('${{ env.R_LIBS_USER }}', .libPaths())); source('server.R')" &
-          for i in $(seq 1 30); do curl -s http://localhost:3002/setup > /dev/null 2>&1 && break || sleep 1; done
+          MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 Rscript -e ".libPaths(c('${{ env.R_LIBS_USER }}', .libPaths())); source('server.R')" > /tmp/r-conformance.log 2>&1 &
+          R_PID=$!
+          echo "R conformance server PID: $R_PID"
+          READY=false
+          for i in $(seq 1 60); do
+            if ! kill -0 $R_PID 2>/dev/null; then
+              echo "R conformance server crashed! Logs:"
+              cat /tmp/r-conformance.log
+              exit 1
+            fi
+            if curl -s -X POST http://localhost:3002/setup > /dev/null 2>&1; then
+              echo "R conformance server ready on port 3002"
+              READY=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$READY" != "true" ]; then
+            echo "R conformance server failed to start within 60s. Logs:"
+            cat /tmp/r-conformance.log
+            exit 1
+          fi
 
       - name: Run R integration tests
         run: |
