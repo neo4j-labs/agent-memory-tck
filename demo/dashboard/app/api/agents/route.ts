@@ -18,6 +18,7 @@ const AGENTS = [
   { name: "Forge", prefix: "forge", url: process.env.FORGE_URL ?? "http://localhost:8003", framework: "Custom HTTP", language: "Go", color: "#f97316" },
   { name: "Atlas", prefix: "atlas", url: process.env.ATLAS_URL ?? "http://localhost:8004", framework: "LangGraph", language: "Python", color: "#8b5cf6" },
   { name: "Sage", prefix: "sage", url: process.env.SAGE_URL ?? "http://localhost:8005", framework: "Semantic Kernel", language: "C#", color: "#ec4899" },
+  { name: "Rune", prefix: "rune", url: process.env.RUNE_URL ?? "http://localhost:8006", framework: "ellmer", language: "R", color: "#2F9E44" },
 ];
 
 export const dynamic = "force-dynamic";

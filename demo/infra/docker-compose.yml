@@ -60,5 +60,20 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  rune:
+    build:
+      context: ../../
+      dockerfile: demo/agents/rune/Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      MEMORY_ENDPOINT: ${MEMORY_ENDPOINT:-http://host.docker.internal:3001}
+      PORT: "8006"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   neo4j_data:

@@ -1,6 +1,6 @@
 # Multi-Agent Memory Demo
 
-This demo showcases five AI agents written in four languages sharing the same Neo4j knowledge graph. It proves the core TCK value proposition: if implementations pass the TCK, their memory writes are interoperable.
+This demo showcases six AI agents written in five languages sharing the same Neo4j knowledge graph. It proves the core TCK value proposition: if implementations pass the TCK, their memory writes are interoperable.
 
 ## Architecture
 
@@ -16,13 +16,13 @@ This demo showcases five AI agents written in four languages sharing the same Ne
                     │  (memory service)    │
                     └──────────┬──────────┘
                                │
-         ┌─────────┬───────────┼───────────┬──────────┬──────────┐
-         │         │           │           │          │          │
-    ┌────┴────┐ ┌──┴───┐  ┌───┴────┐ ┌────┴───┐ ┌───┴───┐ ┌───┴──────┐
-    │ Lenny   │ │Scout │  │ Forge  │ │ Atlas  │ │ Sage  │ │Dashboard │
-    │ Python  │ │  TS  │  │   Go   │ │ Python │ │  C#   │ │ Next.js  │
-    │ :8001   │ │:8002 │  │ :8003  │ │ :8004  │ │:8005  │ │ :3000    │
-    └─────────┘ └──────┘  └────────┘ └────────┘ └───────┘ └──────────┘
+         ┌─────────┬───────────┼───────────┬──────────┬──────────┬──────────┐
+         │         │           │           │          │          │          │
+    ┌────┴────┐ ┌──┴───┐  ┌───┴────┐ ┌────┴───┐ ┌───┴───┐ ┌───┴───┐ ┌───┴──────┐
+    │ Lenny   │ │Scout │  │ Forge  │ │ Atlas  │ │ Sage  │ │ Rune  │ │Dashboard │
+    │ Python  │ │  TS  │  │   Go   │ │ Python │ │  C#   │ │   R   │ │ Next.js  │
+    │ :8001   │ │:8002 │  │ :8003  │ │ :8004  │ │:8005  │ │:8006  │ │ :3000    │
+    └─────────┘ └──────┘  └────────┘ └────────┘ └───────┘ └───────┘ └──────────┘
 ```
 
 ### Agents
@@ -34,11 +34,12 @@ This demo showcases five AI agents written in four languages sharing the same Ne
 | **Forge** | Go | Custom HTTP | Data pipeline — adds structured properties to entities | 8003 |
 | **Atlas** | Python | LangGraph | Orchestrator — synthesizes knowledge from all agents | 8004 |
 | **Sage** | C# | Semantic Kernel | Knowledge validation — detects contradictions and conflicts | 8005 |
+| **Rune** | R | ellmer | Statistical analysis — runs regressions, correlations, clustering | 8006 |
 
 ### Shared Memory Model
 
 - **Entities are shared** — An entity created by Lenny (Python) is immediately readable by Forge (Go) and Scout (TypeScript).
-- **Conversations are isolated** — Each agent has its own session prefix (`lenny-*`, `scout-*`, `forge-*`, `atlas-*`, `sage-*`).
+- **Conversations are isolated** — Each agent has its own session prefix (`lenny-*`, `scout-*`, `forge-*`, `atlas-*`, `sage-*`, `rune-*`).
 - **Reasoning traces are per-agent** — Each agent records its own reasoning, but Atlas can read all agents' traces for synthesis.
 
 ## Quick Start
@@ -49,6 +50,7 @@ This demo showcases five AI agents written in four languages sharing the same Ne
 - Python 3.10+ with [uv](https://docs.astral.sh/uv/)
 - Go 1.21+
 - .NET 8.0+ SDK
+- R >= 4.1 with plumber, httr2, jsonlite packages
 - Node.js 20+
 
 ### Step 1: Start Neo4j
@@ -84,9 +86,9 @@ uv run python demo/seed-data.py
 This creates:
 - **18 entities** — Sam Altman, Dario Amodei, Jensen Huang, OpenAI, Anthropic, NVIDIA, etc.
 - **36 facts** — CEO_OF, INVESTED_IN, CREATED, INTERVIEWED relationships
-- **5 conversations** — one per agent, showing their distinct workflows
-- **6 reasoning traces** — with steps and tool calls from each agent
-- **24 messages** — across all five agent sessions
+- **6 conversations** — one per agent, showing their distinct workflows
+- **7 reasoning traces** — with steps and tool calls from each agent
+- **27 messages** — across all six agent sessions
 
 ### Step 4: Start the Dashboard
 
@@ -124,7 +126,7 @@ Refresh the dashboard to see the new facts appear in the graph.
 
 ## Running All Agents
 
-Lenny, Scout, and Atlas require an `OPENAI_API_KEY` since they use LLM-powered reasoning. Forge and Sage work without one. If you have a key:
+Lenny, Scout, and Atlas require an `OPENAI_API_KEY` since they use LLM-powered reasoning. Forge, Sage, and Rune work without one. If you have a key:
 
 ```bash
 # Terminal 1 — Lenny (Python/PydanticAI)
@@ -146,7 +148,12 @@ MEMORY_ENDPOINT=http://localhost:3001 PORT=8003 go run .
 cd demo/agents/sage
 MEMORY_ENDPOINT=http://localhost:3001 PORT=8005 dotnet run
 
-# Terminal 5 — Atlas (Python/LangGraph)
+# Terminal 5 — Rune (R/ellmer)
+cd demo/agents/rune
+MEMORY_ENDPOINT=http://localhost:3001 PORT=8006 \
+  Rscript -e "pr <- plumber::plumb('plumber.R'); pr\$run(host='0.0.0.0', port=8006)"
+
+# Terminal 6 — Atlas (Python/LangGraph)
 cd demo/agents/atlas
 MEMORY_ENDPOINT=http://localhost:3001 OPENAI_API_KEY=sk-... \
   uv run uvicorn atlas.main:app --port 8004
@@ -164,7 +171,9 @@ The seed data tells a coherent story:
 
 4. **Sage** (C#/Semantic Kernel) validated the knowledge graph for contradictions. It checked entity types and relationships for consistency, confirming high confidence scores across all agent contributions.
 
-5. **Atlas** (Python/LangGraph) orchestrated a synthesis across all agents. It gathered entities and reasoning traces from Lenny, Scout, Forge, and Sage, then produced a unified AI industry landscape report.
+5. **Rune** (R/ellmer) performed statistical analysis on the entities in the graph. It ran correlation tests between organization age and fact density (r=0.72, p=0.028), computed descriptive statistics, and used k-means clustering to identify three distinct entity groups — recording all R function calls as reasoning trace provenance.
+
+6. **Atlas** (Python/LangGraph) orchestrated a synthesis across all agents. It gathered entities and reasoning traces from Lenny, Scout, Forge, Sage, and Rune, then produced a unified AI industry landscape report.
 
 Each agent wrote to the same Neo4j graph using different languages and frameworks, but because they all use the TCK-compliant memory interface, their writes are fully interoperable.
 
@@ -196,6 +205,11 @@ demo/
 │   │   │   ├── ConflictDetector.cs
 │   │   │   └── KnowledgeAuditor.cs
 │   │   ├── Sage.csproj
+│   │   └── Dockerfile
+│   ├── rune/                 # R / ellmer
+│   │   ├── plumber.R         # Plumber API with analyze/query
+│   │   ├── tools.R           # Statistical analysis functions
+│   │   ├── memory_helpers.R  # HTTP wrapper for bridge server
 │   │   └── Dockerfile
 │   └── atlas/                # Python / LangGraph
 │       ├── atlas/
@@ -244,6 +258,9 @@ demo/
 | Sage | `/validate` | POST | Detect contradictions in entity facts |
 | Sage | `/audit` | POST | Audit knowledge graph integrity |
 | Sage | `/health` | GET | Health check |
+| Rune | `/analyze` | POST | Run statistical analysis on entities |
+| Rune | `/query` | POST | Search entities from the graph |
+| Rune | `/health` | GET | Health check |
 
 ### Dashboard API
 
@@ -288,5 +305,5 @@ ORDER BY agent
 | Bridge server won't start | Check Neo4j is running: `curl http://localhost:7474` |
 | Dashboard shows 0 nodes | Run `uv run python demo/seed-data.py` to populate the graph |
 | Forge can't connect | Ensure bridge is running on port 3001 |
-| Agent panels show red dots | Only Forge runs without `OPENAI_API_KEY`; others need it |
+| Agent panels show red dots | Forge, Sage, and Rune run without `OPENAI_API_KEY`; Lenny, Scout, and Atlas need it |
 | Port already in use | Kill existing process: `lsof -ti:3001 \| xargs kill -9` |

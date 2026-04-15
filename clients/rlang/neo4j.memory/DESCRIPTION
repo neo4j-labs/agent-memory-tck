@@ -1,0 +1,20 @@
+Package: neo4j.memory
+Title: Neo4j Agent Memory Client for R
+Version: 0.1.0
+Authors@R: person("Neo4j Labs", email = "labs@neo4j.com", role = c("aut", "cre"))
+Description: R client for neo4j-agent-memory, providing short-term, long-term,
+    and reasoning memory operations via an HTTP transport layer. Built on R6
+    classes with httr2 for HTTP and jsonlite for serialization.
+License: Apache License (>= 2)
+URL: https://github.com/neo4j-labs/agent-memory-tck
+Imports:
+    httr2 (>= 1.0.0),
+    R6 (>= 2.5.0),
+    jsonlite (>= 1.8.0)
+Suggests:
+    testthat (>= 3.0.0),
+    plumber
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.0
+Config/testthat/edition: 3

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is the **neo4j-agent-memory Technology Compatibility Kit (TCK)** — a monorepo containing a behavioral specification, executable test suite, TypeScript client, Go client, and multi-agent demo for the neo4j-agent-memory ecosystem.
+This is the **neo4j-agent-memory Technology Compatibility Kit (TCK)** — a monorepo containing a behavioral specification, executable test suite, TypeScript client, Go client, C# client, R client, and multi-agent demo for the neo4j-agent-memory ecosystem.
 
 The TCK defines what it means to be a compliant implementation of neo4j-agent-memory across any language. Implementations pass the TCK by implementing a `BaseAdapter` and running the test suite against it.
 
@@ -20,9 +20,11 @@ agent-memory-tck/
 │   └── tests/v1/                 # 178 test scenarios across Bronze/Silver/Gold tiers
 ├── clients/
 │   ├── typescript/               # @neo4j-labs/agent-memory npm package
-│   └── go/                       # agent-memory-go Go module
+│   ├── go/                       # agent-memory-go Go module
+│   ├── csharp/                   # Neo4j.AgentMemory NuGet package
+│   └── rlang/                    # neo4j.memory R package (httr2 + R6)
 ├── demo/
-│   ├── agents/{lenny,scout,forge,atlas}/  # 4 demo agents (Python, TS, Go)
+│   ├── agents/{lenny,scout,forge,atlas,sage,rune}/  # 6 demo agents (Python, TS, Go, C#, R)
 │   ├── dashboard/                # Next.js + NVL real-time visualization
 │   └── infra/                    # Docker Compose + integration tests
 ├── docs/                         # Adapter guide, certification, CI integration
@@ -113,11 +115,21 @@ dotnet test tests/Neo4j.AgentMemory.Tests/      # Unit tests
 MEMORY_ENDPOINT=http://... dotnet run --project conformance/Neo4j.AgentMemory.Conformance  # Bridge server on :3001
 ```
 
+### R Client
+
+```bash
+cd clients/rlang
+R CMD INSTALL neo4j.memory/                           # Install package
+R CMD check neo4j.memory/                             # Check package
+cd conformance
+MEMORY_ENDPOINT=http://... Rscript server.R           # Bridge server on :3001
+```
+
 ### Demo
 
 ```bash
 cd demo/infra
-docker compose up                     # All 4 agents + dashboard + Neo4j
+docker compose up                     # All agents + dashboard + Neo4j
 python integration_test.py            # Cross-language entity sharing test
 ```
 
@@ -213,6 +225,16 @@ IDs are permanent — once published, never reassigned. Format: `SCN-{B|S|G}-{NN
 - Implements `IAsyncDisposable` for deterministic cleanup
 - .NET 8.0 LTS target
 
+### R Client Architecture
+
+`clients/rlang/neo4j.memory/R/` uses **R6 classes** with Tidyverse conventions:
+
+- `HttpTransport` R6 class wraps `httr2::request()` for HTTP POST to memory service
+- `MemoryClient` composes three sub-clients: `short_term`, `long_term`, `reasoning`
+- Wire format uses snake_case (matching bridge protocol); R naturally uses snake_case
+- Parse helpers (`parse_message()`, `parse_entity()`, etc.) convert JSON lists to consistent R structures
+- Dependencies: httr2, R6, jsonlite (all CRAN packages from Posit/Tidyverse ecosystem)
+
 ## Key Files
 
 | File | Purpose |
@@ -236,6 +258,7 @@ IDs are permanent — once published, never reassigned. Format: `SCN-{B|S|G}-{NN
 - **TypeScript**: Strict mode, no `any` in public API, ESM only.
 - **Go**: Standard `gofmt`, context-first parameters, functional options for optional params.
 - **C#**: .NET 8.0, nullable reference types, async/await with CancellationToken, System.Text.Json.
+- **R**: R6 classes, snake_case methods, httr2 for HTTP, jsonlite for serialization, Tidyverse conventions.
 
 ## Environment Variables
 

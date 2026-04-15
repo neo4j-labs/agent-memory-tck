@@ -38,6 +38,8 @@ const DEFAULT_AGENTS: AgentStatus[] = [
   { name: "Scout", framework: "Vercel AI SDK", language: "TypeScript", color: "#22c55e", healthy: false, entityCount: 0, traceCount: 0, messageCount: 0 },
   { name: "Forge", framework: "Custom HTTP", language: "Go", color: "#f97316", healthy: false, entityCount: 0, traceCount: 0, messageCount: 0 },
   { name: "Atlas", framework: "LangGraph", language: "Python", color: "#8b5cf6", healthy: false, entityCount: 0, traceCount: 0, messageCount: 0 },
+  { name: "Sage", framework: "Semantic Kernel", language: "C#", color: "#ec4899", healthy: false, entityCount: 0, traceCount: 0, messageCount: 0 },
+  { name: "Rune", framework: "ellmer", language: "R", color: "#2F9E44", healthy: false, entityCount: 0, traceCount: 0, messageCount: 0 },
 ];
 
 export default function DashboardPage() {

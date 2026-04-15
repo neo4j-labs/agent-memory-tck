@@ -49,6 +49,8 @@ const AGENT_COLORS: Record<string, string> = {
   scout: "#22c55e",
   forge: "#f97316",
   atlas: "#8b5cf6",
+  sage: "#ec4899",
+  rune: "#2F9E44",
   shared: "#64748b",
   unknown: "#475569",
 };
