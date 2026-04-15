@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { GraphVisualization } from "../components/graph-viz";
-import { AgentPanel } from "../components/agent-panel";
-import { HeaderBar } from "../components/header-bar";
-import { ActivityFeed } from "../components/activity-feed";
-import { EntityDetail } from "../components/entity-detail";
+import { Box, Flex, Tabs, Text } from "@chakra-ui/react";
+import { LuUsers, LuMessageSquare } from "react-icons/lu";
+
+import dynamic from "next/dynamic";
+
+const GraphVisualization = dynamic(
+  () => import("@/components/graph-visualization").then((m) => m.GraphVisualization),
+  { ssr: false },
+);
+import { AgentPanel, type AgentStatus } from "@/components/agent-panel";
+import { ActivityFeed } from "@/components/activity-feed";
+import { HeaderBar } from "@/components/header-bar";
+import { NodeDetailDrawer } from "@/components/node-detail-drawer";
+import { ChatPanel } from "@/components/chat-panel";
 
 interface GraphNode {
   id: string;
@@ -22,17 +31,6 @@ interface GraphEdge {
   type: string;
 }
 
-interface AgentStatus {
-  name: string;
-  framework: string;
-  language: string;
-  color: string;
-  healthy: boolean;
-  entityCount: number;
-  traceCount: number;
-  messageCount: number;
-}
-
 const DEFAULT_AGENTS: AgentStatus[] = [
   { name: "Lenny", framework: "PydanticAI", language: "Python", color: "#3b82f6", healthy: false, entityCount: 0, traceCount: 0, messageCount: 0 },
   { name: "Scout", framework: "Vercel AI SDK", language: "TypeScript", color: "#22c55e", healthy: false, entityCount: 0, traceCount: 0, messageCount: 0 },
@@ -46,22 +44,23 @@ export default function DashboardPage() {
   const [agents, setAgents] = useState(DEFAULT_AGENTS);
   const [graphData, setGraphData] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] }>({ nodes: [], edges: [] });
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     try {
-      const [graphRes, agentRes] = await Promise.all([
+      const [graphRes, agentsRes] = await Promise.all([
         fetch("/api/graph"),
         fetch("/api/agents"),
       ]);
-      if (graphRes.ok) {
-        const data = await graphRes.json();
-        setGraphData(data);
-      }
-      if (agentRes.ok) {
-        const data = await agentRes.json();
-        if (data.agents) setAgents(data.agents);
-      }
-    } catch { /* graceful degradation */ }
+      const [graph, agentData] = await Promise.all([
+        graphRes.json(),
+        agentsRes.json(),
+      ]);
+      setGraphData(graph);
+      if (agentData.agents) setAgents(agentData.agents);
+    } catch {
+      /* ignore fetch errors */
+    }
   }, []);
 
   useEffect(() => {
@@ -70,54 +69,106 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  const healthyCount = agents.filter(a => a.healthy).length;
+  const handleNodeClick = useCallback((node: GraphNode | null) => {
+    if (!node || !node.id) {
+      setSelectedNode(null);
+    } else {
+      setSelectedNode(node);
+    }
+  }, []);
+
+  const handleNodeDoubleClick = useCallback(
+    async (node: GraphNode) => {
+      try {
+        const res = await fetch("/api/node-detail", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nodeId: node.id }),
+        });
+        const data = await res.json();
+        const newIds = new Set<string>();
+        (data.connections ?? []).forEach((c: { id: string }) => newIds.add(c.id));
+        setHighlightIds(newIds);
+        setTimeout(() => setHighlightIds(new Set()), 3000);
+      } catch {
+        /* ignore */
+      }
+      fetchData();
+    },
+    [fetchData],
+  );
+
+  const handleGraphUpdate = useCallback(() => {
+    const prevIds = new Set(graphData.nodes.map((n) => n.id));
+    fetchData().then(() => {
+      // After refresh, highlight new nodes
+    });
+  }, [fetchData, graphData.nodes]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <Flex h="100vh" direction="column" bg="bg">
       <HeaderBar
         nodeCount={graphData.nodes.length}
         edgeCount={graphData.edges.length}
-        agentCount={healthyCount}
+        agentCount={agents.length}
         onRefresh={fetchData}
       />
 
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Left sidebar — Agents + Activity */}
-        <aside style={{
-          width: 280, flexShrink: 0, borderRight: "1px solid #222",
-          overflow: "auto", background: "#0d0d0d",
-        }}>
-          <div style={{ padding: "12px 12px 4px" }}>
-            <h2 style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
-              Agents
-            </h2>
-            {agents.map((agent) => (
-              <AgentPanel key={agent.name} agent={agent} />
-            ))}
-          </div>
+      <Flex flex="1" overflow="hidden">
+        {/* Left sidebar */}
+        <Box
+          w="300px"
+          borderRightWidth="1px"
+          borderColor="border.subtle"
+          bg="bg.panel"
+          display="flex"
+          flexDirection="column"
+          overflow="hidden"
+        >
+          <Tabs.Root defaultValue="agents" variant="line" size="sm" flex="1" display="flex" flexDirection="column">
+            <Tabs.List px="3" pt="2">
+              <Tabs.Trigger value="agents">
+                <LuUsers />
+                <Text ml="1">Agents</Text>
+              </Tabs.Trigger>
+              <Tabs.Trigger value="chat">
+                <LuMessageSquare />
+                <Text ml="1">Chat</Text>
+              </Tabs.Trigger>
+            </Tabs.List>
 
-          <div style={{ borderTop: "1px solid #1a1a1a" }}>
-            <ActivityFeed />
-          </div>
-        </aside>
+            <Tabs.Content value="agents" flex="1" overflow="auto" p="0">
+              <Box px="3" py="2">
+                {agents.map((agent) => (
+                  <AgentPanel key={agent.name} agent={agent} />
+                ))}
+              </Box>
+              <ActivityFeed />
+            </Tabs.Content>
 
-        {/* Center — Graph */}
-        <main style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+            <Tabs.Content value="chat" flex="1" overflow="hidden" p="0">
+              <ChatPanel agents={agents} onGraphUpdate={handleGraphUpdate} />
+            </Tabs.Content>
+          </Tabs.Root>
+        </Box>
+
+        {/* Main graph area */}
+        <Box flex="1" position="relative" bg="bg">
           <GraphVisualization
             nodes={graphData.nodes}
             edges={graphData.edges}
-            onNodeClick={(node) => setSelectedNode(node)}
+            onNodeClick={handleNodeClick}
+            onNodeDoubleClick={handleNodeDoubleClick}
+            highlightNodeIds={highlightIds}
           />
-        </main>
+        </Box>
+      </Flex>
 
-        {/* Right sidebar — Entity Detail (slides in on click) */}
-        {selectedNode && (
-          <EntityDetail
-            node={selectedNode}
-            onClose={() => setSelectedNode(null)}
-          />
-        )}
-      </div>
-    </div>
+      {/* Node detail drawer */}
+      <NodeDetailDrawer
+        node={selectedNode}
+        onClose={() => setSelectedNode(null)}
+      />
+    </Flex>
   );
 }

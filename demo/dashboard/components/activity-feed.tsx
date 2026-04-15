@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Box, HStack, Heading, Text, Timeline, VStack } from "@chakra-ui/react";
 
 interface ActivityItem {
   id: string;
@@ -15,18 +16,22 @@ const AGENT_COLORS: Record<string, string> = {
   scout: "#22c55e",
   forge: "#f97316",
   atlas: "#8b5cf6",
+  sage: "#ec4899",
+  rune: "#2F9E44",
   shared: "#64748b",
 };
 
 const TYPE_VERBS: Record<string, string> = {
   Person: "discovered",
   Organization: "identified",
+  Location: "mapped",
+  Event: "recorded",
   Entity: "created entity",
   Fact: "recorded fact",
+  Preference: "noted preference",
   Message: "sent message",
-  Conversation: "started conversation",
   ReasoningTrace: "started reasoning",
-  ReasoningStep: "reasoned",
+  ReasoningStep: "reasoning step",
   ToolCall: "called tool",
 };
 
@@ -37,51 +42,56 @@ export function ActivityFeed() {
     const fetchActivity = async () => {
       try {
         const res = await fetch("/api/activity");
-        if (res.ok) {
-          const data = await res.json();
-          setItems(data.items ?? []);
-        }
-      } catch { /* ignore */ }
+        const data = await res.json();
+        setItems(data.items ?? []);
+      } catch {
+        /* ignore */
+      }
     };
     fetchActivity();
     const interval = setInterval(fetchActivity, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  if (items.length === 0) return null;
+
   return (
-    <div style={{ padding: "0 12px" }}>
-      <h3 style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.05em", margin: "12px 0 8px" }}>
+    <Box px="3" py="2">
+      <Heading size="xs" color="fg.muted" mb="2" textTransform="uppercase" letterSpacing="wide">
         Activity Feed
-      </h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 300, overflowY: "auto" }}>
-        {items.length === 0 && (
-          <div style={{ color: "#444", fontSize: 11, padding: 8 }}>No activity yet</div>
-        )}
-        {items.map((item) => (
-          <div key={item.id} style={{
-            display: "flex", alignItems: "flex-start", gap: 8, padding: "5px 0",
-            borderBottom: "1px solid #1a1a1a", fontSize: 11,
-          }}>
-            <span style={{
-              width: 6, height: 6, borderRadius: "50%", marginTop: 4, flexShrink: 0,
-              background: AGENT_COLORS[item.agent] ?? AGENT_COLORS["shared"],
-            }} />
-            <div style={{ minWidth: 0 }}>
-              <span style={{ color: AGENT_COLORS[item.agent] ?? "#666", fontWeight: 600 }}>
-                {item.agent}
-              </span>
-              {" "}
-              <span style={{ color: "#888" }}>
-                {TYPE_VERBS[item.type] ?? "created"}
-              </span>
-              {" "}
-              <span style={{ color: "#ccc" }}>
-                {item.label.length > 30 ? item.label.slice(0, 28) + "..." : item.label}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+      </Heading>
+      <Box maxH="300px" overflowY="auto">
+        <Timeline.Root size="sm">
+          {items.slice(0, 20).map((item) => {
+            const color = AGENT_COLORS[item.agent] ?? AGENT_COLORS.shared;
+            const verb = TYPE_VERBS[item.type] ?? "created";
+            const label =
+              item.label.length > 30
+                ? item.label.slice(0, 30) + "…"
+                : item.label;
+
+            return (
+              <Timeline.Item key={item.id}>
+                <Timeline.Connector>
+                  <Timeline.Separator />
+                  <Timeline.Indicator bg={color} />
+                </Timeline.Connector>
+                <Timeline.Content pb="2">
+                  <Text textStyle="xs" lineClamp={1}>
+                    <Text as="span" color={color} fontWeight="bold">
+                      {item.agent}
+                    </Text>{" "}
+                    <Text as="span" color="fg.muted">
+                      {verb}
+                    </Text>{" "}
+                    {label}
+                  </Text>
+                </Timeline.Content>
+              </Timeline.Item>
+            );
+          })}
+        </Timeline.Root>
+      </Box>
+    </Box>
   );
 }

@@ -1,5 +1,15 @@
 "use client";
 
+import {
+  Badge,
+  Flex,
+  HStack,
+  Heading,
+  IconButton,
+  Stat,
+} from "@chakra-ui/react";
+import { LuRefreshCw } from "react-icons/lu";
+
 interface HeaderBarProps {
   nodeCount: number;
   edgeCount: number;
@@ -7,45 +17,73 @@ interface HeaderBarProps {
   onRefresh: () => void;
 }
 
-export function HeaderBar({ nodeCount, edgeCount, agentCount, onRefresh }: HeaderBarProps) {
+export function HeaderBar({
+  nodeCount,
+  edgeCount,
+  agentCount,
+  onRefresh,
+}: HeaderBarProps) {
   return (
-    <header style={{
-      height: 48, background: "#111", borderBottom: "1px solid #222",
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "0 16px", flexShrink: 0,
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em" }}>
+    <Flex
+      h="48px"
+      align="center"
+      px="4"
+      borderBottomWidth="1px"
+      borderColor="border.subtle"
+      bg="bg.panel"
+      justify="space-between"
+      flexShrink={0}
+    >
+      <HStack gap="3">
+        <Heading size="md" fontWeight="bold">
           Agent Memory
-        </span>
-        <span style={{ fontSize: 11, color: "#666", background: "#1a1a1a", padding: "2px 8px", borderRadius: 4 }}>
+        </Heading>
+        <Badge colorPalette="purple" variant="subtle" size="sm">
           Polyglot Demo
-        </span>
-      </div>
+        </Badge>
+      </HStack>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12 }}>
-        <Stat label="Nodes" value={nodeCount} color="#3b82f6" />
-        <Stat label="Edges" value={edgeCount} color="#22c55e" />
-        <Stat label="Agents" value={agentCount} color="#f97316" />
-        <button
+      <HStack gap="6">
+        <HStack gap="4">
+          <Stat.Root size="sm">
+            <HStack gap="1">
+              <Stat.Label color="fg.muted">Nodes</Stat.Label>
+              <Stat.ValueText color="blue.fg" fontWeight="bold" textStyle="sm">
+                {nodeCount}
+              </Stat.ValueText>
+            </HStack>
+          </Stat.Root>
+          <Stat.Root size="sm">
+            <HStack gap="1">
+              <Stat.Label color="fg.muted">Edges</Stat.Label>
+              <Stat.ValueText color="green.fg" fontWeight="bold" textStyle="sm">
+                {edgeCount}
+              </Stat.ValueText>
+            </HStack>
+          </Stat.Root>
+          <Stat.Root size="sm">
+            <HStack gap="1">
+              <Stat.Label color="fg.muted">Agents</Stat.Label>
+              <Stat.ValueText
+                color="orange.fg"
+                fontWeight="bold"
+                textStyle="sm"
+              >
+                {agentCount}
+              </Stat.ValueText>
+            </HStack>
+          </Stat.Root>
+        </HStack>
+
+        <IconButton
+          aria-label="Refresh"
+          size="sm"
+          variant="ghost"
           onClick={onRefresh}
-          style={{
-            background: "#222", border: "1px solid #333", color: "#999",
-            padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11,
-          }}
         >
-          Refresh
-        </button>
-      </div>
-    </header>
-  );
-}
-
-function Stat({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <span style={{ color: "#666" }}>{label}</span>
-      <span style={{ color, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{value}</span>
-    </div>
+          <LuRefreshCw />
+        </IconButton>
+      </HStack>
+    </Flex>
   );
 }
