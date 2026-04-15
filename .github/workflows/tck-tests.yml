@@ -159,7 +159,10 @@ jobs:
 
       - name: Install R packages
         run: |
-          Rscript -e "install.packages(c('testthat', 'httr2', 'R6', 'jsonlite'), repos = 'https://cloud.r-project.org/')"
+          Rscript -e "
+            dir.create(Sys.getenv('R_LIBS_USER'), recursive = TRUE, showWarnings = FALSE)
+            install.packages(c('testthat', 'httr2', 'R6', 'jsonlite'), lib = Sys.getenv('R_LIBS_USER'), repos = 'https://cloud.r-project.org/')
+          "
 
       - name: Run R unit tests
         run: |
@@ -204,7 +207,10 @@ jobs:
 
       - name: Install R packages
         run: |
-          Rscript -e "install.packages(c('plumber', 'httr2', 'R6', 'jsonlite', 'testthat'), repos = 'https://cloud.r-project.org/')"
+          Rscript -e "
+            dir.create(Sys.getenv('R_LIBS_USER'), recursive = TRUE, showWarnings = FALSE)
+            install.packages(c('plumber', 'httr2', 'R6', 'jsonlite', 'testthat'), lib = Sys.getenv('R_LIBS_USER'), repos = 'https://cloud.r-project.org/')
+          "
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
