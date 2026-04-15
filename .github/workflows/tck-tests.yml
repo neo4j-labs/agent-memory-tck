@@ -245,7 +245,7 @@ jobs:
       - name: Start R conformance server
         run: |
           cd clients/rlang/conformance
-          MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 Rscript -e "lib <- Sys.getenv('R_LIBS_USER'); .libPaths(c(lib, .libPaths())); source('server.R')" > /tmp/r-conformance.log 2>&1 &
+          MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 Rscript server.R > /tmp/r-conformance.log 2>&1 &
           R_PID=$!
           echo "R conformance server PID: $R_PID"
           READY=false

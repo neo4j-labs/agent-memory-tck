@@ -1,3 +1,6 @@
+r_libs_user <- Sys.getenv("R_LIBS_USER", "")
+if (nchar(r_libs_user) > 0) .libPaths(c(r_libs_user, .libPaths()))
+
 library(plumber)
 library(jsonlite)
 
