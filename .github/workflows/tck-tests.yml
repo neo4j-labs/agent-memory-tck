@@ -147,6 +147,94 @@ jobs:
       - name: Run C# unit tests
         run: dotnet test clients/csharp/tests/Neo4j.AgentMemory.Tests/
 
+  rlang-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.4.0'
+
+      - name: Install R packages
+        run: |
+          Rscript -e "install.packages(c('testthat', 'httr2', 'R6', 'jsonlite'), repos = 'https://cloud.r-project.org/')"
+
+      - name: Run R unit tests
+        run: |
+          cd clients/rlang/neo4j.memory
+          Rscript -e "
+            for (f in list.files('R', full.names = TRUE)) source(f)
+            testthat::test_dir('tests/testthat', reporter = 'summary', stop_on_failure = TRUE)
+          "
+
+  rlang-conformance:
+    runs-on: ubuntu-latest
+    services:
+      neo4j:
+        image: neo4j:5-community
+        env:
+          NEO4J_AUTH: neo4j/testpassword
+          NEO4J_PLUGINS: '["apoc"]'
+        ports:
+          - 7687:7687
+          - 7474:7474
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p testpassword 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: testpassword
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.4.0'
+
+      - name: Install R packages
+        run: |
+          Rscript -e "install.packages(c('plumber', 'httr2', 'R6', 'jsonlite', 'testthat'), repos = 'https://cloud.r-project.org/')"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install TCK dependencies
+        run: uv sync --extra reference --extra bridge
+
+      - name: Start reference bridge server
+        run: |
+          uv run python -m tck.bridge.reference_server &
+          sleep 5
+
+      - name: Start R conformance server
+        run: |
+          cd clients/rlang/conformance
+          MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 Rscript server.R &
+          for i in $(seq 1 30); do curl -s http://localhost:3002/setup > /dev/null 2>&1 && break || sleep 1; done
+
+      - name: Run R integration tests
+        run: |
+          cd clients/rlang/neo4j.memory
+          MEMORY_ENDPOINT=http://localhost:3001 Rscript -e "
+            for (f in list.files('R', full.names = TRUE)) source(f)
+            testthat::test_dir('tests/testthat', reporter = 'summary', stop_on_failure = TRUE, filter = 'integration')
+          "
+
+      - name: Run TCK Bronze via R bridge
+        run: |
+          uv run pytest -m bronze --bridge-url http://localhost:3002 -v
+
   csharp-conformance:
     runs-on: ubuntu-latest
     services:
