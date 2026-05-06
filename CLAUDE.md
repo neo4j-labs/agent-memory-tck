@@ -17,12 +17,13 @@ agent-memory-tck/
 │   ├── reference/                # Reference adapter wrapping neo4j-agent-memory Python package
 │   ├── registry/                 # Scenario ID registry (YAML) + validator
 │   ├── report/                   # Compliance report generator (JSON + HTML)
-│   └── tests/v1/                 # 178 test scenarios across Bronze/Silver/Gold tiers
+│   └── tests/v1/                 # 189 test scenarios across Bronze/Silver/Gold/Platinum tiers
 ├── clients/
 │   ├── typescript/               # @neo4j-labs/agent-memory npm package
 │   ├── go/                       # agent-memory-go Go module
 │   ├── csharp/                   # Neo4j.AgentMemory NuGet package
-│   └── rlang/                    # neo4j.memory R package (httr2 + R6)
+│   ├── rlang/                    # neo4j.memory R package (httr2 + R6)
+│   └── python/                   # neo4j-agent-memory-client Python package (httpx + asyncio)
 ├── demo/
 │   ├── agents/{lenny,scout,forge,atlas,sage,rune}/  # 6 demo agents (Python, TS, Go, C#, R)
 │   ├── dashboard/                # Next.js + NVL real-time visualization
@@ -192,7 +193,30 @@ SCN-B-001:
   description: First message creates conversation node
 ```
 
-IDs are permanent — once published, never reassigned. Format: `SCN-{B|S|G}-{NNN}`.
+IDs are permanent — once published, never reassigned. Format: `SCN-{B|S|G|P}-{NNN}`.
+
+### Dual-Transport Architecture
+
+Every language client (TS, Go, C#, R, Python) ships **two transports** behind
+a single `Transport` interface:
+
+- **BridgeTransport** — TCK bridge protocol (`POST {endpoint}/{snake_case}`,
+  snake_case JSON). Used by conformance servers and the local reference adapter.
+- **RestTransport** — Hosted REST API at `https://memory.neo4jlabs.com/v1`
+  (camelCase JSON, REST topology). Used for production deployments.
+
+Transport selection is automatic: endpoints containing a `/v1` segment route
+through REST; otherwise BridgeTransport. Override per-language via
+`transport: "rest" | "bridge"` (TS), `WithTransportMode(...)` (Go),
+`Transport = TransportMode.Rest` (C#), or `transport_mode = "rest"`
+(R / Python).
+
+The hosted service exposes 25+ operations beyond Bronze/Silver/Gold —
+three-tier context, observations, reflections, entity feedback, history,
+graph view, reasoning provenance, Cypher console, and API-key management.
+These are the **Volume 5 / Platinum tier** in SPEC.md and are exposed via
+the same client API. Implementations targeting only the bridge can leave
+Platinum methods unimplemented; the Platinum tests will skip.
 
 ### TypeScript Client Architecture
 
@@ -267,7 +291,9 @@ IDs are permanent — once published, never reassigned. Format: `SCN-{B|S|G}-{NN
 | `NEO4J_URI` | Reference adapter, CI | Neo4j connection string |
 | `NEO4J_USERNAME` | Reference adapter, CI | Neo4j username (default: `neo4j`) |
 | `NEO4J_PASSWORD` | Reference adapter, CI | Neo4j password |
-| `MEMORY_ENDPOINT` | Conformance servers, demo agents | HTTP endpoint for memory service |
+| `MEMORY_ENDPOINT` | Conformance servers, demo agents | HTTP endpoint for memory service. Set to `https://memory.neo4jlabs.com/v1` for the hosted service. |
+| `MEMORY_API_KEY` | Conformance servers, demo agents | `nams_*` Bearer token for the hosted Neo4j Agent Memory Service |
+| `MEMORY_MODE` | Demo agents | `bridge` (default) or `hosted` — picks which endpoint family the demo points at |
 | `TCK_BRIDGE_PORT` | Bridge servers | Port for conformance server (default: `3001`) |
 | `OPENAI_API_KEY` | Demo agents (Lenny, Scout, Atlas) | Required for LLM-powered agents |
 

@@ -52,14 +52,76 @@ ShortTermMemory <- R6::R6Class("ShortTermMemory",
     },
 
     clear_session = function(session_id) {
-      private$transport$request("clear_session", list(
-        session_id = session_id
+      private$transport$request("clear_session", list(session_id = session_id))
+      invisible(NULL)
+    },
+
+    # ---- Volume 5 / hosted-native ----------------------------------------
+
+    create_conversation = function(user_id, metadata = NULL) {
+      result <- private$transport$request("create_conversation", list(
+        user_id = user_id,
+        metadata = metadata
+      ))
+      parse_conversation(result)
+    },
+
+    list_conversations = function(limit = NULL) {
+      result <- private$transport$request("list_conversations", list(
+        limit = if (!is.null(limit)) as.integer(limit) else NULL
+      ))
+      if (is.null(result)) return(list())
+      lapply(result, parse_conversation)
+    },
+
+    get_conversation_metadata = function(conversation_id) {
+      result <- private$transport$request("get_conversation_metadata", list(
+        conversation_id = as.character(conversation_id)
+      ))
+      parse_conversation(result)
+    },
+
+    delete_conversation = function(conversation_id) {
+      private$transport$request("delete_conversation", list(
+        conversation_id = as.character(conversation_id)
       ))
       invisible(NULL)
+    },
+
+    get_context = function(conversation_id) {
+      result <- private$transport$request("get_context", list(
+        conversation_id = as.character(conversation_id)
+      ))
+      parse_context(result)
+    },
+
+    bulk_add_messages = function(conversation_id, messages) {
+      if (length(messages) > 100) stop("bulk_add_messages: max 100 messages")
+      result <- private$transport$request("bulk_add_messages", list(
+        conversation_id = as.character(conversation_id),
+        messages = messages
+      ))
+      if (is.null(result)) return(list())
+      lapply(result, parse_message)
+    },
+
+    get_observations = function(conversation_id, limit = NULL) {
+      result <- private$transport$request("get_observations", list(
+        conversation_id = as.character(conversation_id),
+        limit = if (!is.null(limit)) as.integer(limit) else NULL
+      ))
+      if (is.null(result)) return(list())
+      lapply(result, parse_observation)
+    },
+
+    get_reflections = function(conversation_id) {
+      result <- private$transport$request("get_reflections", list(
+        conversation_id = as.character(conversation_id)
+      ))
+      if (is.null(result)) return(list())
+      lapply(result, parse_reflection)
     }
   ),
 
-  private = list(
-    transport = NULL
-  )
+  private = list(transport = NULL)
 )

@@ -1,5 +1,6 @@
 #' @title Reasoning Memory Client
-#' @description Manages reasoning traces, steps, and tool calls.
+#' @description Manages reasoning traces, steps, tool calls, and hosted
+#'   provenance/explain views.
 #' @export
 ReasoningMemory <- R6::R6Class("ReasoningMemory",
   public = list(
@@ -82,10 +83,56 @@ ReasoningMemory <- R6::R6Class("ReasoningMemory",
       ))
       if (is.null(result)) return(list())
       lapply(result, parse_trace)
+    },
+
+    # ---- Volume 5 / hosted-native ----------------------------------------
+
+    record_step = function(conversation_id, reasoning, action_taken, result = NULL) {
+      resp <- private$transport$request("record_step", list(
+        conversation_id = as.character(conversation_id),
+        reasoning = reasoning,
+        action_taken = action_taken,
+        result = result
+      ))
+      parse_agent_step(resp)
+    },
+
+    list_steps = function(conversation_id) {
+      result <- private$transport$request("list_steps", list(
+        conversation_id = as.character(conversation_id)
+      ))
+      if (is.null(result)) return(list())
+      lapply(result, parse_agent_step)
+    },
+
+    explain_step = function(step_id) {
+      result <- private$transport$request("explain_step", list(
+        step_id = as.character(step_id)
+      ))
+      parse_agent_step_explanation(result)
+    },
+
+    get_trace_by_conversation = function(conversation_id) {
+      result <- private$transport$request("get_trace_by_conversation", list(
+        conversation_id = as.character(conversation_id)
+      ))
+      list(
+        conversation_id = result$conversation_id,
+        steps = if (is.null(result$steps)) list() else lapply(result$steps, parse_agent_step),
+        tool_calls = if (is.null(result$tool_calls)) list() else lapply(result$tool_calls, parse_tool_call)
+      )
+    },
+
+    get_entity_provenance = function(entity_id) {
+      result <- private$transport$request("get_entity_provenance", list(
+        entity_id = as.character(entity_id)
+      ))
+      list(
+        entity_id = result$entity_id,
+        steps = if (is.null(result$steps)) list() else lapply(result$steps, parse_agent_step)
+      )
     }
   ),
 
-  private = list(
-    transport = NULL
-  )
+  private = list(transport = NULL)
 )

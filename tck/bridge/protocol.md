@@ -1,6 +1,6 @@
 # HTTP Bridge Protocol
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 The HTTP bridge protocol enables the Python TCK test suite to validate
 implementations in any language by proxying `BaseAdapter` method calls
@@ -143,6 +143,55 @@ Content-Type: application/json
 | `POST /merge_duplicate_entities` | `source_id`, `target_id`, `canonical_name?` | `Entity` |
 | `POST /get_similar_traces` | `task`, `limit?`, `success_only?` | `ReasoningTrace[]` |
 
+### Platinum Tier (Volume 5 — hosted-service operations)
+
+These mirror the hosted REST API at `https://memory.neo4jlabs.com/v1`. All
+optional — implementations that don't expose these features may return HTTP
+501 Not Implemented or omit the routes entirely; the TCK Platinum tests will
+skip them.
+
+#### Conversation lifecycle
+
+| Method | Parameters | Returns |
+|--------|-----------|---------|
+| `POST /create_conversation` | `user_id`, `metadata?` | `Conversation` |
+| `POST /list_conversations` | `limit?` | `Conversation[]` |
+| `POST /get_conversation_metadata` | `conversation_id` | `Conversation` |
+| `POST /delete_conversation` | `conversation_id` | 204 |
+| `POST /get_context` | `conversation_id` | `ConversationContext` |
+| `POST /bulk_add_messages` | `conversation_id`, `messages` | `Message[]` |
+| `POST /get_observations` | `conversation_id`, `limit?` | `Observation[]` |
+| `POST /get_reflections` | `conversation_id` | `Reflection[]` |
+
+#### Entity graph
+
+| Method | Parameters | Returns |
+|--------|-----------|---------|
+| `POST /list_entities` | `type?`, `limit?` | `Entity[]` |
+| `POST /get_entity` | `entity_id` | `Entity` |
+| `POST /update_entity` | `entity_id`, `name?`, `description?` | `Entity` |
+| `POST /delete_entity` | `entity_id` | 204 |
+| `POST /set_entity_feedback` | `entity_id`, `user_score`, `confirmed` | `{id, updated}` |
+| `POST /get_entity_history` | `entity_id` | `EntityHistory` |
+| `POST /merge_entities` | `source_id`, `target_id` | `EntityMergeResult` |
+| `POST /get_entity_graph` | (none) | `EntityGraph` |
+
+#### Reasoning provenance
+
+| Method | Parameters | Returns |
+|--------|-----------|---------|
+| `POST /record_step` | `conversation_id`, `reasoning`, `action_taken`, `result?` | `AgentStep` |
+| `POST /list_steps` | `conversation_id` | `AgentStep[]` |
+| `POST /explain_step` | `step_id` | `AgentStepExplanation` |
+| `POST /get_trace_by_conversation` | `conversation_id` | `ConversationTrace` |
+| `POST /get_entity_provenance` | `entity_id` | `EntityProvenance` |
+
+#### Cypher console
+
+| Method | Parameters | Returns |
+|--------|-----------|---------|
+| `POST /cypher_query` | `cypher`, `params?` | `CypherResult` |
+
 ## Data Types
 
 All response objects use the same field names as the TCK Pydantic models:
@@ -277,6 +326,116 @@ All response objects use the same field names as the TCK Pydantic models:
   "target_id": "uuid-string",
   "relationship_type": "string",
   "properties": {}
+}
+```
+
+### Observation (Platinum)
+```json
+{
+  "id": "uuid-string",
+  "conversation_id": "uuid-string",
+  "content": "string",
+  "window_start": "ISO-8601" | null,
+  "window_end": "ISO-8601" | null,
+  "created_at": "ISO-8601"
+}
+```
+
+### Reflection (Platinum)
+```json
+{
+  "id": "uuid-string",
+  "conversation_id": "uuid-string",
+  "content": "string",
+  "created_at": "ISO-8601"
+}
+```
+
+### ConversationContext (Platinum)
+```json
+{
+  "reflections": [Reflection, ...],
+  "observations": [Observation, ...],
+  "recent_messages": [Message, ...]
+}
+```
+
+### AgentStep (Platinum)
+```json
+{
+  "id": "uuid-string",
+  "conversation_id": "uuid-string",
+  "reasoning": "string",
+  "action_taken": "string",
+  "result": "string" | null,
+  "created_at": "ISO-8601"
+}
+```
+
+### AgentStepExplanation (Platinum)
+```json
+{
+  "id": "uuid-string",
+  "conversation_id": "uuid-string",
+  "reasoning": "string",
+  "action_taken": "string",
+  "result": "string" | null,
+  "created_at": "ISO-8601",
+  "tool_calls": [ToolCall, ...],
+  "influenced_entities": [Entity, ...]
+}
+```
+
+### ConversationTrace (Platinum)
+```json
+{
+  "conversation_id": "uuid-string",
+  "steps": [AgentStep, ...],
+  "tool_calls": [ToolCall, ...]
+}
+```
+
+### EntityHistory (Platinum)
+```json
+{
+  "entity_id": "uuid-string",
+  "mentions": [
+    {
+      "conversation_id": "uuid-string",
+      "message_id": "uuid-string" | null,
+      "content": "string",
+      "timestamp": "ISO-8601"
+    }
+  ]
+}
+```
+
+### EntityProvenance (Platinum)
+```json
+{
+  "entity_id": "uuid-string",
+  "steps": [AgentStep, ...]
+}
+```
+
+### EntityGraph (Platinum)
+```json
+{
+  "nodes": [
+    { "id": "uuid", "name": "string", "type": "string" }
+  ],
+  "edges": [
+    { "id": "uuid", "source": "uuid", "target": "uuid", "type": "string" }
+  ]
+}
+```
+
+### CypherResult (Platinum)
+```json
+{
+  "columns": ["string", ...],
+  "rows": [[any, ...], ...],
+  "stats": {} | null
 }
 ```
 

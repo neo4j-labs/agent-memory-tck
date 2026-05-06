@@ -1,6 +1,6 @@
 {
   "name": "@neo4j-labs/agent-memory",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TypeScript client for neo4j-agent-memory — shared memory layer for AI agents backed by Neo4j",
   "type": "module",
   "license": "Apache-2.0",
@@ -22,6 +22,14 @@
     "./mcp": {
       "import": "./dist/mcp/index.js",
       "types": "./dist/mcp/index.d.ts"
+    },
+    "./integrations/langchain": {
+      "import": "./dist/integrations/langchain.js",
+      "types": "./dist/integrations/langchain.d.ts"
+    },
+    "./integrations/mastra": {
+      "import": "./dist/integrations/mastra.js",
+      "types": "./dist/integrations/mastra.d.ts"
     }
   },
   "main": "./dist/index.js",

@@ -1,0 +1,124 @@
+= How To Authenticate
+:description: API keys, OAuth refresh, scopes, and token rotation against the hosted service.
+
+The hosted Neo4j Agent Memory Service supports two authentication flows:
+
+* **Static `nams_*` API keys** — issued via the dashboard, expire in 90 days.
+* **OAuth 2.0 PKCE** — short-lived JWT access tokens with refresh.
+
+Every client SDK accepts either through the same `apiKey` / `tokenProvider`
+configuration knobs.
+
+== Static API keys
+
+Set the `Authorization: Bearer nams_*` header on every request.
+
+[source,bash]
+----
+curl -H "Authorization: Bearer $MEMORY_API_KEY" \
+  https://memory.neo4jlabs.com/v1/entities
+----
+
+In the SDKs:
+
+[tabs]
+======
+TypeScript::
++
+[source,ts]
+----
+new MemoryClient({
+  endpoint: "https://memory.neo4jlabs.com/v1",
+  apiKey: process.env.MEMORY_API_KEY,
+})
+----
+
+Python::
++
+[source,python]
+----
+MemoryClient(
+    endpoint="https://memory.neo4jlabs.com/v1",
+    api_key=os.environ["MEMORY_API_KEY"],
+)
+----
+
+Go::
++
+[source,go]
+----
+memory.New(
+    memory.WithEndpoint("https://memory.neo4jlabs.com/v1"),
+    memory.WithAPIKey(os.Getenv("MEMORY_API_KEY")),
+)
+----
+======
+
+== Managing keys via the SDK
+
+All five clients expose an `auth` (or `Auth`) sub-client mirroring
+`/v1/auth/api-keys`:
+
+[source,ts]
+----
+// List keys for a workspace.
+const keys = await client.auth.listApiKeys(workspaceId);
+
+// Create a new key. Plaintext is returned ONCE — store it now.
+const fresh = await client.auth.createApiKey({
+  label: "ci-runner",
+  scopes: ["read", "write"],
+  workspaceId,
+});
+console.log(fresh.key);  // nams_...
+
+// Revoke immediately.
+await client.auth.revokeApiKey(fresh.id);
+----
+
+== OAuth refresh-token rotation
+
+Static keys are convenient but coarse. For long-running services, prefer the
+OAuth flow:
+
+. Exchange your IdP token at `POST /v1/auth/exchange` to receive
+  `{access_token, refresh_token, expires_in}`.
+. Use the access token like a static key.
+. Before it expires, call `auth.refreshAccessToken(refresh_token)` to rotate.
+
+The clients support a `tokenProvider` callback so you can plug your refresh
+logic in once and forget it:
+
+[source,ts]
+----
+new MemoryClient({
+  endpoint: "https://memory.neo4jlabs.com/v1",
+  tokenProvider: async () => myTokenStore.getFreshAccessToken(),
+})
+----
+
+[source,python]
+----
+async def get_token() -> str:
+    return await my_token_store.get_fresh_access_token()
+
+MemoryClient(
+    endpoint="https://memory.neo4jlabs.com/v1",
+    token_provider=get_token,
+)
+----
+
+== Discovery endpoints
+
+The service implements the standard MCP / OAuth discovery endpoints:
+
+* `GET /.well-known/oauth-protected-resource` — RFC 9728
+* `GET /.well-known/oauth-authorization-server` — RFC 8414
+* `GET /.well-known/jwks.json` — JWT signing keys
+
+== Rotation policy
+
+Static keys expire after 90 days. Set a calendar reminder, or automate
+rotation with the `auth` API and a CI cron job. The plaintext is returned
+only at creation time — the SDK's `revealApiKey()` works only for keys you
+already created in the same workspace.

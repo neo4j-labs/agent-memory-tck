@@ -1,5 +1,6 @@
 #' @title Long-Term Memory Client
-#' @description Manages entities, preferences, facts, and relationships.
+#' @description Manages entities, preferences, facts, relationships, and the
+#'   hosted graph operations.
 #' @export
 LongTermMemory <- R6::R6Class("LongTermMemory",
   public = list(
@@ -11,6 +12,7 @@ LongTermMemory <- R6::R6Class("LongTermMemory",
       result <- private$transport$request("add_entity", list(
         name = name,
         entity_type = entity_type,
+        type = entity_type,
         description = description
       ))
       parse_entity(result)
@@ -34,10 +36,11 @@ LongTermMemory <- R6::R6Class("LongTermMemory",
       parse_fact(result)
     },
 
-    search_entities = function(query, limit = 10L) {
+    search_entities = function(query, limit = 10L, type = NULL) {
       result <- private$transport$request("search_entities", list(
         query = query,
-        limit = as.integer(limit)
+        limit = as.integer(limit),
+        type = type
       ))
       if (is.null(result)) return(list())
       lapply(result, parse_entity)
@@ -54,9 +57,7 @@ LongTermMemory <- R6::R6Class("LongTermMemory",
     },
 
     get_entity_by_name = function(name) {
-      result <- private$transport$request("get_entity_by_name", list(
-        name = name
-      ))
+      result <- private$transport$request("get_entity_by_name", list(name = name))
       if (is.null(result)) return(NULL)
       parse_entity(result)
     },
@@ -88,10 +89,78 @@ LongTermMemory <- R6::R6Class("LongTermMemory",
         canonical_name = canonical_name
       ))
       parse_entity(result)
+    },
+
+    # ---- Volume 5 / hosted-native ----------------------------------------
+
+    list_entities = function(type = NULL, limit = NULL) {
+      result <- private$transport$request("list_entities", list(
+        type = type,
+        limit = if (!is.null(limit)) as.integer(limit) else NULL
+      ))
+      if (is.null(result)) return(list())
+      lapply(result, parse_entity)
+    },
+
+    get_entity = function(entity_id) {
+      result <- private$transport$request("get_entity", list(
+        entity_id = as.character(entity_id)
+      ))
+      parse_entity(result)
+    },
+
+    update_entity = function(entity_id, name = NULL, description = NULL) {
+      result <- private$transport$request("update_entity", list(
+        entity_id = as.character(entity_id),
+        name = name,
+        description = description
+      ))
+      parse_entity(result)
+    },
+
+    delete_entity = function(entity_id) {
+      private$transport$request("delete_entity", list(
+        entity_id = as.character(entity_id)
+      ))
+      invisible(NULL)
+    },
+
+    set_entity_feedback = function(entity_id, user_score, confirmed) {
+      result <- private$transport$request("set_entity_feedback", list(
+        entity_id = as.character(entity_id),
+        user_score = as.numeric(user_score),
+        confirmed = isTRUE(confirmed)
+      ))
+      list(id = result$id, updated = isTRUE(result$updated))
+    },
+
+    get_entity_history = function(entity_id) {
+      result <- private$transport$request("get_entity_history", list(
+        entity_id = as.character(entity_id)
+      ))
+      parse_entity_history(result)
+    },
+
+    merge_entities = function(source_id, target_id) {
+      result <- private$transport$request("merge_entities", list(
+        source_id = as.character(source_id),
+        target_id = as.character(target_id)
+      ))
+      list(
+        source_id = result$source_id,
+        target_id = result$target_id,
+        status = result$status
+      )
+    },
+
+    get_entity_graph = function() {
+      result <- private$transport$request("get_entity_graph")
+      list(
+        nodes = if (is.null(result$nodes)) list() else result$nodes,
+        edges = if (is.null(result$edges)) list() else result$edges
+      )
     }
   ),
 
-  private = list(
-    transport = NULL
-  )
+  private = list(transport = NULL)
 )

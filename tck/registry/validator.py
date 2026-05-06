@@ -25,9 +25,14 @@ def load_registry(registry_path: Path) -> dict:
 
 
 def _extract_marker_tier(decorators: list[ast.expr]) -> str | None:
-    """Extract bronze/silver/gold tier from pytest.mark decorators."""
+    """Extract bronze/silver/gold/platinum tier from pytest.mark decorators."""
     for dec in decorators:
-        if isinstance(dec, ast.Attribute) and dec.attr in ("bronze", "silver", "gold"):
+        if isinstance(dec, ast.Attribute) and dec.attr in (
+            "bronze",
+            "silver",
+            "gold",
+            "platinum",
+        ):
             if isinstance(dec.value, ast.Attribute) and dec.value.attr == "mark":
                 return dec.attr
     return None
@@ -136,8 +141,9 @@ def main():
         bronze = sum(1 for v in registry.values() if v.get("tier") == "bronze")
         silver = sum(1 for v in registry.values() if v.get("tier") == "silver")
         gold = sum(1 for v in registry.values() if v.get("tier") == "gold")
+        platinum = sum(1 for v in registry.values() if v.get("tier") == "platinum")
         print(f"Registry validation PASSED: {len(registry)} scenarios")
-        print(f"  Bronze: {bronze}  Silver: {silver}  Gold: {gold}")
+        print(f"  Bronze: {bronze}  Silver: {silver}  Gold: {gold}  Platinum: {platinum}")
         sys.exit(0)
 
 

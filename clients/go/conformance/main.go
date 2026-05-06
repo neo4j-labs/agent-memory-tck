@@ -1,11 +1,13 @@
 // Package main implements the HTTP bridge conformance server for the Go client.
 //
-// This server enables the Python TCK test suite to validate the Go client
-// by proxying BaseAdapter method calls through the Go MemoryClient.
+// Routes are POST /{snake_case_method} matching the TCK bridge protocol. The
+// server proxies BaseAdapter method calls through the Go MemoryClient.
 //
 // Usage:
 //
-//	MEMORY_ENDPOINT=https://... go run ./conformance
+//	MEMORY_ENDPOINT=http://localhost:7687 go run ./conformance
+//	MEMORY_ENDPOINT=https://memory.neo4jlabs.com/v1 \
+//	    MEMORY_API_KEY=nams_... go run ./conformance
 //	# Then from the TCK repo:
 //	pytest -m bronze --bridge-url http://localhost:3001
 package main
@@ -34,14 +36,20 @@ func main() {
 		port = "3001"
 	}
 
+	apiKey := os.Getenv("MEMORY_API_KEY")
+	opts := []memory.Option{memory.WithEndpoint(endpoint)}
+	if apiKey != "" {
+		opts = append(opts, memory.WithAPIKey(apiKey))
+	}
+
 	var err error
-	client, err = memory.New(memory.WithEndpoint(endpoint))
+	client, err = memory.New(opts...)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 
 	if err := client.Connect(context.Background()); err != nil {
-		log.Fatalf("Failed to connect: %v", err)
+		log.Printf("warn: Connect failed: %v", err)
 	}
 
 	mux := http.NewServeMux()
@@ -79,6 +87,32 @@ func main() {
 
 	// Gold
 	mux.HandleFunc("POST /add_relationship", handle(handleAddRelationship))
+	mux.HandleFunc("POST /merge_duplicate_entities", handle(handleMergeDuplicateEntities))
+	mux.HandleFunc("POST /get_similar_traces", handle(handleGetSimilarTraces))
+
+	// Volume 5 / Platinum
+	mux.HandleFunc("POST /create_conversation", handle(handleCreateConversation))
+	mux.HandleFunc("POST /list_conversations", handle(handleListConversations))
+	mux.HandleFunc("POST /get_conversation_metadata", handle(handleGetConversationMetadata))
+	mux.HandleFunc("POST /delete_conversation", handle(handleDeleteConversation))
+	mux.HandleFunc("POST /get_context", handle(handleGetContext))
+	mux.HandleFunc("POST /bulk_add_messages", handle(handleBulkAddMessages))
+	mux.HandleFunc("POST /get_observations", handle(handleGetObservations))
+	mux.HandleFunc("POST /get_reflections", handle(handleGetReflections))
+	mux.HandleFunc("POST /list_entities", handle(handleListEntities))
+	mux.HandleFunc("POST /get_entity", handle(handleGetEntity))
+	mux.HandleFunc("POST /update_entity", handle(handleUpdateEntity))
+	mux.HandleFunc("POST /delete_entity", handle(handleDeleteEntity))
+	mux.HandleFunc("POST /set_entity_feedback", handle(handleSetEntityFeedback))
+	mux.HandleFunc("POST /get_entity_history", handle(handleGetEntityHistory))
+	mux.HandleFunc("POST /merge_entities", handle(handleMergeEntities))
+	mux.HandleFunc("POST /get_entity_graph", handle(handleGetEntityGraph))
+	mux.HandleFunc("POST /record_step", handle(handleRecordStep))
+	mux.HandleFunc("POST /list_steps", handle(handleListSteps))
+	mux.HandleFunc("POST /explain_step", handle(handleExplainStep))
+	mux.HandleFunc("POST /get_trace_by_conversation", handle(handleGetTraceByConversation))
+	mux.HandleFunc("POST /get_entity_provenance", handle(handleGetEntityProvenance))
+	mux.HandleFunc("POST /cypher_query", handle(handleCypherQuery))
 
 	addr := ":" + port
 	fmt.Printf("Go conformance server running on http://localhost%s\n", addr)
@@ -113,14 +147,14 @@ func handle(fn handlerFunc) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		_ = json.NewEncoder(w).Encode(result)
 	}
 }
 
 func httpError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
 func s(m map[string]interface{}, key string) string {
@@ -144,10 +178,15 @@ func f(m map[string]interface{}, key string, def float64) float64 {
 	return v
 }
 
+func anyMap(m map[string]interface{}, key string) map[string]interface{} {
+	v, _ := m[key].(map[string]interface{})
+	return v
+}
+
 // --- Handlers ---
 
 func handleSetup(_ context.Context, _ map[string]interface{}) (interface{}, error) {
-	return map[string]interface{}{"ok": true, "protocol_version": "0.1.0"}, nil
+	return map[string]interface{}{"ok": true, "protocol_version": "0.2.0"}, nil
 }
 
 func handleTeardown(_ context.Context, _ map[string]interface{}) (interface{}, error) {
@@ -203,7 +242,11 @@ func handleAddEntity(ctx context.Context, body map[string]interface{}) (interfac
 	if d := s(body, "description"); d != "" {
 		opts = append(opts, memory.WithDescription(d))
 	}
-	return client.LongTerm.AddEntity(ctx, s(body, "name"), s(body, "entity_type"), opts...)
+	entityType := s(body, "entity_type")
+	if entityType == "" {
+		entityType = s(body, "type")
+	}
+	return client.LongTerm.AddEntity(ctx, s(body, "name"), entityType, opts...)
 }
 
 func handleAddPreference(ctx context.Context, body map[string]interface{}) (interface{}, error) {
@@ -317,4 +360,134 @@ func handleGetToolStats(ctx context.Context, body map[string]interface{}) (inter
 
 func handleAddRelationship(ctx context.Context, body map[string]interface{}) (interface{}, error) {
 	return client.LongTerm.AddRelationship(ctx, s(body, "source_id"), s(body, "target_id"), s(body, "relationship_type"))
+}
+
+func handleMergeDuplicateEntities(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.LongTerm.MergeDuplicateEntities(ctx, s(body, "source_id"), s(body, "target_id"))
+}
+
+func handleGetSimilarTraces(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	successOnly := true
+	if v, ok := body["success_only"].(bool); ok {
+		successOnly = v
+	}
+	return client.Reasoning.GetSimilarTraces(ctx, s(body, "task"), i(body, "limit", 5), successOnly)
+}
+
+// ---- Volume 5 / Platinum -----------------------------------------------
+
+func handleCreateConversation(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.ShortTerm.CreateConversation(ctx, memory.CreateConversationParams{
+		UserID:   s(body, "user_id"),
+		Metadata: anyMap(body, "metadata"),
+	})
+}
+
+func handleListConversations(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.ShortTerm.ListConversations(ctx, i(body, "limit", 0))
+}
+
+func handleGetConversationMetadata(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.ShortTerm.GetConversationMetadata(ctx, s(body, "conversation_id"))
+}
+
+func handleDeleteConversation(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return nil, client.ShortTerm.DeleteConversation(ctx, s(body, "conversation_id"))
+}
+
+func handleGetContext(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.ShortTerm.GetContext(ctx, s(body, "conversation_id"))
+}
+
+func handleBulkAddMessages(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	raw, _ := body["messages"].([]interface{})
+	msgs := make([]memory.BulkMessageInput, 0, len(raw))
+	for _, item := range raw {
+		m, _ := item.(map[string]interface{})
+		if m == nil {
+			continue
+		}
+		msgs = append(msgs, memory.BulkMessageInput{
+			Role:     memory.MessageRole(s(m, "role")),
+			Content:  s(m, "content"),
+			Metadata: anyMap(m, "metadata"),
+		})
+	}
+	return client.ShortTerm.BulkAddMessages(ctx, s(body, "conversation_id"), msgs)
+}
+
+func handleGetObservations(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.ShortTerm.GetObservations(ctx, s(body, "conversation_id"), i(body, "limit", 0))
+}
+
+func handleGetReflections(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.ShortTerm.GetReflections(ctx, s(body, "conversation_id"))
+}
+
+func handleListEntities(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.LongTerm.ListEntities(ctx, s(body, "type"), i(body, "limit", 0))
+}
+
+func handleGetEntity(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.LongTerm.GetEntity(ctx, s(body, "entity_id"))
+}
+
+func handleUpdateEntity(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.LongTerm.UpdateEntity(ctx, s(body, "entity_id"), memory.UpdateEntityParams{
+		Name:        s(body, "name"),
+		Description: s(body, "description"),
+	})
+}
+
+func handleDeleteEntity(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return nil, client.LongTerm.DeleteEntity(ctx, s(body, "entity_id"))
+}
+
+func handleSetEntityFeedback(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	confirmed, _ := body["confirmed"].(bool)
+	return client.LongTerm.SetEntityFeedback(ctx, s(body, "entity_id"), f(body, "user_score", 0.0), confirmed)
+}
+
+func handleGetEntityHistory(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.LongTerm.GetEntityHistory(ctx, s(body, "entity_id"))
+}
+
+func handleMergeEntities(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.LongTerm.MergeEntities(ctx, s(body, "source_id"), s(body, "target_id"))
+}
+
+func handleGetEntityGraph(ctx context.Context, _ map[string]interface{}) (interface{}, error) {
+	return client.LongTerm.GetEntityGraph(ctx)
+}
+
+func handleRecordStep(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.Reasoning.RecordStep(ctx, memory.RecordStepInput{
+		ConversationID: s(body, "conversation_id"),
+		Reasoning:      s(body, "reasoning"),
+		ActionTaken:    s(body, "action_taken"),
+		Result:         s(body, "result"),
+	})
+}
+
+func handleListSteps(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.Reasoning.ListSteps(ctx, s(body, "conversation_id"))
+}
+
+func handleExplainStep(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.Reasoning.ExplainStep(ctx, s(body, "step_id"))
+}
+
+func handleGetTraceByConversation(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.Reasoning.GetTraceByConversation(ctx, s(body, "conversation_id"))
+}
+
+func handleGetEntityProvenance(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.Reasoning.GetEntityProvenance(ctx, s(body, "entity_id"))
+}
+
+func handleCypherQuery(ctx context.Context, body map[string]interface{}) (interface{}, error) {
+	return client.Query.Cypher(ctx, memory.CypherInput{
+		Cypher: s(body, "cypher"),
+		Params: anyMap(body, "params"),
+	})
 }

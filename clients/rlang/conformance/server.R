@@ -23,7 +23,11 @@ if (nchar(endpoint) == 0) stop("MEMORY_ENDPOINT environment variable is required
 
 port <- as.integer(Sys.getenv("TCK_BRIDGE_PORT", "3001"))
 
-client <- MemoryClient$new(endpoint = endpoint)
+api_key <- Sys.getenv("MEMORY_API_KEY", "")
+client <- MemoryClient$new(
+  endpoint = endpoint,
+  api_key = if (nchar(api_key) > 0) api_key else NULL
+)
 
 s <- function(body, key, default = "") {
   val <- body[[key]]
@@ -74,7 +78,7 @@ pr$setSerializer(plumber::serializer_json(auto_unbox = TRUE, null = "null"))
 # --- Lifecycle ---
 
 pr$handle("POST", "/setup", function(req, res) {
-  list(ok = TRUE, protocol_version = "0.1.0")
+  list(ok = TRUE, protocol_version = "0.2.0")
 })
 
 pr$handle("POST", "/teardown", function(req, res) {
@@ -287,6 +291,142 @@ pr$handle("POST", "/get_similar_traces", function(req, res) {
     limit = i(body, "limit", 5L),
     success_only = b(body, "success_only") %||% TRUE
   )
+})
+
+# --- Volume 5 / Platinum (hosted-native) ---
+
+pr$handle("POST", "/create_conversation", function(req, res) {
+  body <- req$body
+  client$short_term$create_conversation(
+    s(body, "user_id"),
+    metadata = m(body, "metadata")
+  )
+})
+
+pr$handle("POST", "/list_conversations", function(req, res) {
+  body <- req$body
+  client$short_term$list_conversations(limit = i(body, "limit"))
+})
+
+pr$handle("POST", "/get_conversation_metadata", function(req, res) {
+  body <- req$body
+  client$short_term$get_conversation_metadata(s(body, "conversation_id"))
+})
+
+pr$handle("POST", "/delete_conversation", function(req, res) {
+  body <- req$body
+  client$short_term$delete_conversation(s(body, "conversation_id"))
+  no_content(res)
+})
+
+pr$handle("POST", "/get_context", function(req, res) {
+  body <- req$body
+  client$short_term$get_context(s(body, "conversation_id"))
+})
+
+pr$handle("POST", "/bulk_add_messages", function(req, res) {
+  body <- req$body
+  msgs <- if (is.null(body$messages)) list() else body$messages
+  client$short_term$bulk_add_messages(s(body, "conversation_id"), msgs)
+})
+
+pr$handle("POST", "/get_observations", function(req, res) {
+  body <- req$body
+  client$short_term$get_observations(
+    s(body, "conversation_id"),
+    limit = i(body, "limit")
+  )
+})
+
+pr$handle("POST", "/get_reflections", function(req, res) {
+  body <- req$body
+  client$short_term$get_reflections(s(body, "conversation_id"))
+})
+
+pr$handle("POST", "/list_entities", function(req, res) {
+  body <- req$body
+  client$long_term$list_entities(
+    type = opt_str(body, "type"),
+    limit = i(body, "limit")
+  )
+})
+
+pr$handle("POST", "/get_entity", function(req, res) {
+  body <- req$body
+  client$long_term$get_entity(s(body, "entity_id"))
+})
+
+pr$handle("POST", "/update_entity", function(req, res) {
+  body <- req$body
+  client$long_term$update_entity(
+    s(body, "entity_id"),
+    name = opt_str(body, "name"),
+    description = opt_str(body, "description")
+  )
+})
+
+pr$handle("POST", "/delete_entity", function(req, res) {
+  body <- req$body
+  client$long_term$delete_entity(s(body, "entity_id"))
+  no_content(res)
+})
+
+pr$handle("POST", "/set_entity_feedback", function(req, res) {
+  body <- req$body
+  client$long_term$set_entity_feedback(
+    s(body, "entity_id"),
+    user_score = d(body, "user_score", 0),
+    confirmed = b(body, "confirmed") %||% FALSE
+  )
+})
+
+pr$handle("POST", "/get_entity_history", function(req, res) {
+  body <- req$body
+  client$long_term$get_entity_history(s(body, "entity_id"))
+})
+
+pr$handle("POST", "/merge_entities", function(req, res) {
+  body <- req$body
+  client$long_term$merge_entities(s(body, "source_id"), s(body, "target_id"))
+})
+
+pr$handle("POST", "/get_entity_graph", function(req, res) {
+  client$long_term$get_entity_graph()
+})
+
+pr$handle("POST", "/record_step", function(req, res) {
+  body <- req$body
+  client$reasoning$record_step(
+    s(body, "conversation_id"),
+    s(body, "reasoning"),
+    s(body, "action_taken"),
+    result = opt_str(body, "result")
+  )
+})
+
+pr$handle("POST", "/list_steps", function(req, res) {
+  body <- req$body
+  client$reasoning$list_steps(s(body, "conversation_id"))
+})
+
+pr$handle("POST", "/explain_step", function(req, res) {
+  body <- req$body
+  client$reasoning$explain_step(s(body, "step_id"))
+})
+
+pr$handle("POST", "/get_trace_by_conversation", function(req, res) {
+  body <- req$body
+  client$reasoning$get_trace_by_conversation(s(body, "conversation_id"))
+})
+
+pr$handle("POST", "/get_entity_provenance", function(req, res) {
+  body <- req$body
+  client$reasoning$get_entity_provenance(s(body, "entity_id"))
+})
+
+pr$handle("POST", "/cypher_query", function(req, res) {
+  body <- req$body
+  client$query$cypher(s(body, "cypher"), params = m(body, "params"))
 })
 
 cat(sprintf("R conformance server starting on port %d\n", port))

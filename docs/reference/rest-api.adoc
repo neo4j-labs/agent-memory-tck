@@ -1,0 +1,83 @@
+= REST API Reference
+:description: Hosted-service REST endpoints mapped to client SDK methods in each language.
+
+The hosted service at `https://memory.neo4jlabs.com/v1` exposes a REST API.
+This page maps every endpoint to its bridge-protocol equivalent and the
+corresponding method on each language client.
+
+Bridge-method names are what the TCK conformance tests use. SDK methods take
+language-idiomatic casing.
+
+== Conversations
+
+[cols="2,3,1,1,1,1,1"]
+|===
+| HTTP | Path | Bridge | TS | Go | Py | C#
+
+| `GET` | `/conversations` | `list_conversations` | `listConversations` | `ListConversations` | `list_conversations` | `ListConversationsAsync`
+| `POST` | `/conversations` | `create_conversation` | `createConversation` | `CreateConversation` | `create_conversation` | `CreateConversationAsync`
+| `GET` | `/conversations/{id}` | `get_conversation_metadata` | `getConversationMetadata` | `GetConversationMetadata` | `get_conversation_metadata` | `GetConversationMetadataAsync`
+| `DELETE` | `/conversations/{id}` | `delete_conversation` | `deleteConversation` | `DeleteConversation` | `delete_conversation` | `DeleteConversationAsync`
+| `GET` | `/conversations/{id}/messages` | `get_conversation` | `getConversation` | `GetConversation` | `get_conversation` | `GetConversationAsync`
+| `POST` | `/conversations/{id}/messages` | `add_message` | `addMessage` | `AddMessage` | `add_message` | `AddMessageAsync`
+| `POST` | `/conversations/{id}/messages/bulk` | `bulk_add_messages` | `bulkAddMessages` | `BulkAddMessages` | `bulk_add_messages` | `BulkAddMessagesAsync`
+| `POST` | `/conversations/{id}/search` | `search_messages` | `searchMessages` | `SearchMessages` | `search_messages` | `SearchMessagesAsync`
+| `GET` | `/conversations/{id}/context` | `get_context` | `getContext` | `GetContext` | `get_context` | `GetContextAsync`
+| `GET` | `/conversations/{id}/observations` | `get_observations` | `getObservations` | `GetObservations` | `get_observations` | `GetObservationsAsync`
+| `GET` | `/conversations/{id}/reflections` | `get_reflections` | `getReflections` | `GetReflections` | `get_reflections` | `GetReflectionsAsync`
+|===
+
+== Entities
+
+[cols="2,3,1,1,1,1,1"]
+|===
+| HTTP | Path | Bridge | TS | Go | Py | C#
+
+| `GET` | `/entities` | `list_entities` | `listEntities` | `ListEntities` | `list_entities` | `ListEntitiesAsync`
+| `POST` | `/entities` | `add_entity` | `addEntity` | `AddEntity` | `add_entity` | `AddEntityAsync`
+| `GET` | `/entities/{id}` | `get_entity` | `getEntity` | `GetEntity` | `get_entity` | `GetEntityAsync`
+| `PUT` | `/entities/{id}` | `update_entity` | `updateEntity` | `UpdateEntity` | `update_entity` | `UpdateEntityAsync`
+| `DELETE` | `/entities/{id}` | `delete_entity` | `deleteEntity` | `DeleteEntity` | `delete_entity` | `DeleteEntityAsync`
+| `PUT` | `/entities/{id}/feedback` | `set_entity_feedback` | `setEntityFeedback` | `SetEntityFeedback` | `set_entity_feedback` | `SetEntityFeedbackAsync`
+| `GET` | `/entities/{id}/history` | `get_entity_history` | `getEntityHistory` | `GetEntityHistory` | `get_entity_history` | `GetEntityHistoryAsync`
+| `POST` | `/entities/{id}/merge` | `merge_entities` | `mergeEntities` | `MergeEntities` | `merge_entities` | `MergeEntitiesAsync`
+| `GET` | `/entities/graph` | `get_entity_graph` | `getEntityGraph` | `GetEntityGraph` | `get_entity_graph` | `GetEntityGraphAsync`
+| `POST` | `/entities/search` | `search_entities` | `searchEntities` | `SearchEntities` | `search_entities` | `SearchEntitiesAsync`
+|===
+
+== Reasoning
+
+[cols="2,3,1,1,1,1,1"]
+|===
+| HTTP | Path | Bridge | TS | Go | Py | C#
+
+| `POST` | `/reasoning/steps` | `record_step` | `recordStep` | `RecordStep` | `record_step` | `RecordStepAsync`
+| `GET` | `/reasoning/steps` | `list_steps` | `listSteps` | `ListSteps` | `list_steps` | `ListStepsAsync`
+| `GET` | `/reasoning/explain/{step}` | `explain_step` | `explainStep` | `ExplainStep` | `explain_step` | `ExplainStepAsync`
+| `POST` | `/reasoning/tool-calls` | `record_tool_call` | `recordToolCall` | `RecordToolCall` | `record_tool_call` | `RecordToolCallAsync`
+| `GET` | `/reasoning/trace/{conv}` | `get_trace_by_conversation` | `getTraceByConversation` | `GetTraceByConversation` | `get_trace_by_conversation` | `GetTraceByConversationAsync`
+| `GET` | `/reasoning/provenance/{entity}` | `get_entity_provenance` | `getEntityProvenance` | `GetEntityProvenance` | `get_entity_provenance` | `GetEntityProvenanceAsync`
+|===
+
+== Cypher and Auth
+
+[cols="2,3,1,1,1,1,1"]
+|===
+| HTTP | Path | Bridge | TS | Go | Py | C#
+
+| `POST` | `/query` | `cypher_query` | `query.cypher` | `Query.Cypher` | `query.cypher` | `Query.CypherAsync`
+| `GET` | `/auth/api-keys` | `list_api_keys` | `auth.listApiKeys` | `Auth.ListAPIKeys` | `auth.list_api_keys` | `Auth.ListApiKeysAsync`
+| `POST` | `/auth/api-keys` | `create_api_key` | `auth.createApiKey` | `Auth.CreateAPIKey` | `auth.create_api_key` | `Auth.CreateApiKeyAsync`
+| `DELETE` | `/auth/api-keys/{id}` | `revoke_api_key` | `auth.revokeApiKey` | `Auth.RevokeAPIKey` | `auth.revoke_api_key` | `Auth.RevokeApiKeyAsync`
+| `GET` | `/auth/api-keys/{id}/reveal` | `reveal_api_key` | `auth.revealApiKey` | `Auth.RevealAPIKey` | `auth.reveal_api_key` | `Auth.RevealApiKeyAsync`
+| `POST` | `/auth/refresh` | `refresh_access_token` | `auth.refreshAccessToken` | `Auth.RefreshAccessToken` | `auth.refresh_access_token` | `Auth.RefreshAccessTokenAsync`
+|===
+
+== Wire format differences
+
+* Hosted REST: camelCase fields (`userId`, `conversationId`, `createdAt`).
+* Bridge protocol: snake_case fields (`user_id`, `conversation_id`,
+  `created_at`).
+
+The clients translate transparently. If you're writing a custom transport,
+see `tck/bridge/protocol.md` and the language-specific `casing` modules.

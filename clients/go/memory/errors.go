@@ -28,3 +28,7 @@ type ConnectionError struct{ MemoryError }
 
 // AuthenticationError indicates invalid credentials.
 type AuthenticationError struct{ MemoryError }
+
+// NotSupportedError indicates the transport cannot fulfil the requested
+// method (e.g. the hosted REST API has no equivalent).
+type NotSupportedError struct{ MemoryError }

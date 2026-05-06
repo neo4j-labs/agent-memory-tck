@@ -53,3 +53,11 @@ export class TransportError extends MemoryError {
     this.responseBody = responseBody;
   }
 }
+
+/** Raised when a transport cannot fulfil a method (e.g. REST has no equivalent). */
+export class NotSupportedError extends MemoryError {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "NotSupportedError";
+  }
+}

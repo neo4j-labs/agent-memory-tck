@@ -5,6 +5,8 @@ export default defineConfig({
     index: "src/index.ts",
     "middleware/vercel-ai": "src/middleware/vercel-ai.ts",
     "mcp/index": "src/mcp/index.ts",
+    "integrations/langchain": "src/integrations/langchain.ts",
+    "integrations/mastra": "src/integrations/mastra.ts",
   },
   format: ["esm"],
   dts: true,

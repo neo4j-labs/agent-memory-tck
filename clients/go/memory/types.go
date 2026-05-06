@@ -1,8 +1,14 @@
 // Package memory provides a Go client for neo4j-agent-memory.
 //
-// It supports connecting to the hosted NAMS service via HTTP
-// or directly to a Neo4j instance. All types mirror the TCK data models
-// defined in tck/adapters/base_adapter.py.
+// Two transports ship in-box:
+//
+//   - Bridge — the TCK bridge protocol used by conformance servers
+//     (POST {endpoint}/{snake_case_method}).
+//   - REST — the hosted service at https://memory.neo4jlabs.com/v1.
+//
+// All types use snake_case JSON tags so they round-trip through both
+// transports unchanged (the REST transport translates camelCase ↔ snake_case
+// at the wire layer).
 package memory
 
 import (
@@ -10,7 +16,8 @@ import (
 	"time"
 )
 
-// FlexTime is a time.Time that can parse ISO 8601 timestamps with or without timezone.
+// FlexTime is a time.Time that parses ISO 8601 timestamps with or without
+// timezone, and tolerates JSON null.
 type FlexTime struct {
 	time.Time
 }
@@ -20,13 +27,11 @@ func (ft *FlexTime) UnmarshalJSON(data []byte) error {
 	if s == "null" || s == "" {
 		return nil
 	}
-	// Try RFC3339 first (with timezone)
 	t, err := time.Parse(time.RFC3339, s)
 	if err == nil {
 		ft.Time = t
 		return nil
 	}
-	// Try without timezone
 	t, err = time.Parse("2006-01-02T15:04:05.999999", s)
 	if err == nil {
 		ft.Time = t
@@ -63,22 +68,26 @@ const (
 
 // Message represents a single message in a conversation.
 type Message struct {
-	ID        string                 `json:"id"`
-	Role      MessageRole            `json:"role"`
-	Content   string                 `json:"content"`
-	Timestamp FlexTime               `json:"timestamp"`
-	Embedding []float64              `json:"embedding,omitempty"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	ID             string                 `json:"id"`
+	Role           MessageRole            `json:"role"`
+	Content        string                 `json:"content"`
+	Timestamp      FlexTime               `json:"timestamp"`
+	Embedding      []float64              `json:"embedding,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	ConversationID string                 `json:"conversation_id,omitempty"`
 }
 
 // Conversation represents a conversation session containing messages.
 type Conversation struct {
-	ID        string    `json:"id"`
-	SessionID string    `json:"session_id"`
-	Messages  []Message `json:"messages"`
-	Title     string    `json:"title,omitempty"`
-	CreatedAt FlexTime  `json:"created_at"`
-	UpdatedAt string    `json:"updated_at,omitempty"`
+	ID          string                 `json:"id"`
+	SessionID   string                 `json:"session_id"`
+	Messages    []Message              `json:"messages"`
+	Title       string                 `json:"title,omitempty"`
+	CreatedAt   FlexTime               `json:"created_at"`
+	UpdatedAt   string                 `json:"updated_at,omitempty"`
+	WorkspaceID string                 `json:"workspace_id,omitempty"`
+	UserID      string                 `json:"user_id,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // SessionInfo provides summary information about a session.
@@ -89,22 +98,106 @@ type SessionInfo struct {
 	UpdatedAt    string   `json:"updated_at,omitempty"`
 }
 
+// Observation is an auto-generated message-window summary.
+type Observation struct {
+	ID             string   `json:"id"`
+	ConversationID string   `json:"conversation_id"`
+	Content        string   `json:"content"`
+	WindowStart    string   `json:"window_start,omitempty"`
+	WindowEnd      string   `json:"window_end,omitempty"`
+	CreatedAt      FlexTime `json:"created_at"`
+}
+
+// Reflection is a higher-level insight derived from observations.
+type Reflection struct {
+	ID             string   `json:"id"`
+	ConversationID string   `json:"conversation_id"`
+	Content        string   `json:"content"`
+	CreatedAt      FlexTime `json:"created_at"`
+}
+
+// ConversationContext is the three-tier context window the hosted service
+// returns from GET /v1/conversations/{id}/context.
+type ConversationContext struct {
+	Reflections    []Reflection  `json:"reflections"`
+	Observations   []Observation `json:"observations"`
+	RecentMessages []Message     `json:"recent_messages"`
+}
+
+// EntityRelationshipRef is a relationship returned alongside an entity.
+type EntityRelationshipRef struct {
+	ID         string                 `json:"id"`
+	Type       string                 `json:"type"`
+	TargetID   string                 `json:"target_id"`
+	TargetName string                 `json:"target_name,omitempty"`
+	Properties map[string]interface{} `json:"properties,omitempty"`
+}
+
 // Entity represents a named entity in the knowledge graph.
-// The type parameter T allows attaching custom metadata.
 type Entity[T any] struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Type          string    `json:"type"`
-	Subtype       string    `json:"subtype,omitempty"`
-	Description   string    `json:"description,omitempty"`
-	Embedding     []float64 `json:"embedding,omitempty"`
-	CanonicalName string    `json:"canonical_name,omitempty"`
-	CreatedAt     FlexTime  `json:"created_at"`
-	Extra         T         `json:"extra,omitempty"`
+	ID            string                  `json:"id"`
+	Name          string                  `json:"name"`
+	Type          string                  `json:"type"`
+	Subtype       string                  `json:"subtype,omitempty"`
+	Description   string                  `json:"description,omitempty"`
+	Embedding     []float64               `json:"embedding,omitempty"`
+	CanonicalName string                  `json:"canonical_name,omitempty"`
+	CreatedAt     FlexTime                `json:"created_at"`
+	UpdatedAt     string                  `json:"updated_at,omitempty"`
+	Confidence    *float64                `json:"confidence,omitempty"`
+	SourceStage   string                  `json:"source_stage,omitempty"`
+	Relationships []EntityRelationshipRef `json:"relationships,omitempty"`
+	Extra         T                       `json:"extra,omitempty"`
 }
 
 // BaseEntity is the common entity type without extra metadata.
 type BaseEntity = Entity[struct{}]
+
+// EntityHistory groups all conversation mentions of one entity.
+type EntityHistory struct {
+	EntityID string          `json:"entity_id"`
+	Mentions []EntityMention `json:"mentions"`
+}
+
+// EntityMention links a conversation/message to an entity.
+type EntityMention struct {
+	ConversationID string `json:"conversation_id"`
+	MessageID      string `json:"message_id,omitempty"`
+	Content        string `json:"content"`
+	Timestamp      string `json:"timestamp"`
+}
+
+// EntityGraphNode / EntityGraphEdge / EntityGraph represent the full graph view.
+type EntityGraphNode struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type EntityGraphEdge struct {
+	ID     string `json:"id"`
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Type   string `json:"type"`
+}
+
+type EntityGraph struct {
+	Nodes []EntityGraphNode `json:"nodes"`
+	Edges []EntityGraphEdge `json:"edges"`
+}
+
+// EntityFeedbackResult is returned by SetEntityFeedback.
+type EntityFeedbackResult struct {
+	ID      string `json:"id"`
+	Updated bool   `json:"updated"`
+}
+
+// EntityMergeResult is returned by MergeEntities.
+type EntityMergeResult struct {
+	SourceID string `json:"source_id"`
+	TargetID string `json:"target_id"`
+	Status   string `json:"status"`
+}
 
 // Preference represents a user preference.
 type Preference struct {
@@ -175,4 +268,60 @@ type ToolStats struct {
 	FailedCalls     int      `json:"failed_calls"`
 	SuccessRate     float64  `json:"success_rate"`
 	AvgDurationMs   *float64 `json:"avg_duration_ms,omitempty"`
+}
+
+// AgentStep is the hosted-service flat reasoning step (per conversation, no
+// trace wrapper).
+type AgentStep struct {
+	ID             string   `json:"id"`
+	ConversationID string   `json:"conversation_id"`
+	Reasoning      string   `json:"reasoning"`
+	ActionTaken    string   `json:"action_taken"`
+	Result         string   `json:"result,omitempty"`
+	CreatedAt      FlexTime `json:"created_at"`
+}
+
+// AgentStepExplanation is a detailed step view: tool calls + influenced entities.
+type AgentStepExplanation struct {
+	AgentStep
+	ToolCalls          []ToolCall   `json:"tool_calls"`
+	InfluencedEntities []BaseEntity `json:"influenced_entities"`
+}
+
+// ConversationTrace is the hosted flat trace for one conversation.
+type ConversationTrace struct {
+	ConversationID string      `json:"conversation_id"`
+	Steps          []AgentStep `json:"steps"`
+	ToolCalls      []ToolCall  `json:"tool_calls"`
+}
+
+// EntityProvenance is the reasoning chain that influenced an entity.
+type EntityProvenance struct {
+	EntityID string      `json:"entity_id"`
+	Steps    []AgentStep `json:"steps"`
+}
+
+// CypherResult is the response from POST /v1/query.
+type CypherResult struct {
+	Columns []string                 `json:"columns"`
+	Rows    [][]interface{}          `json:"rows"`
+	Stats   map[string]interface{}   `json:"stats,omitempty"`
+}
+
+// APIKey represents an API key (with optional plaintext at creation time).
+type APIKey struct {
+	ID          string   `json:"id"`
+	Label       string   `json:"label"`
+	Scopes      []string `json:"scopes,omitempty"`
+	WorkspaceID string   `json:"workspace_id"`
+	CreatedAt   string   `json:"created_at"`
+	ExpiresAt   string   `json:"expires_at,omitempty"`
+	Key         string   `json:"key,omitempty"`
+}
+
+// AccessTokenPair is returned by RefreshAccessToken.
+type AccessTokenPair struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
 }

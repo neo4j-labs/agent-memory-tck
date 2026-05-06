@@ -15,9 +15,13 @@ import { agentMemoryMiddleware } from "@neo4j-labs/agent-memory/middleware/verce
 const app = new Hono();
 
 const MEMORY_ENDPOINT = process.env["MEMORY_ENDPOINT"] ?? "http://localhost:3001";
+const MEMORY_API_KEY = process.env["MEMORY_API_KEY"];
 const PORT = parseInt(process.env["PORT"] ?? "8002", 10);
 
-const memoryClient = new MemoryClient({ endpoint: MEMORY_ENDPOINT });
+const memoryClient = new MemoryClient({
+  endpoint: MEMORY_ENDPOINT,
+  apiKey: MEMORY_API_KEY,
+});
 
 // Health check
 app.get("/health", (c) =>

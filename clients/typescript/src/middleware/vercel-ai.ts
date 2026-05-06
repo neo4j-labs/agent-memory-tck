@@ -1,133 +1,203 @@
 /**
  * Vercel AI SDK middleware for automatic memory integration.
  *
- * Wraps the Vercel AI SDK's useChat/streamText to automatically:
- *   - Inject relevant conversation history into every prompt
- *   - Persist assistant responses after generation
- *   - Capture tool calls as reasoning traces
+ * The middleware automatically:
+ *   - Injects three-tier conversational context (reflections + observations +
+ *     recent messages) ahead of every model call when a `conversationId` is
+ *     supplied — falls back to flat history for bridge transports.
+ *   - Persists the user's input message before generation.
+ *   - Persists the assistant's response (and tool calls) after generation.
+ *   - Lazily creates a conversation on first call when the caller didn't
+ *     pre-create one (only available with RestTransport).
  *
  * @example
  * ```ts
- * import { streamText } from "ai";
+ * import { generateText } from "ai";
  * import { MemoryClient } from "@neo4j-labs/agent-memory";
  * import { agentMemoryMiddleware } from "@neo4j-labs/agent-memory/middleware/vercel-ai";
  *
- * const client = new MemoryClient({ endpoint: "..." });
- * await client.connect();
- *
- * const middleware = agentMemoryMiddleware(client, {
- *   sessionId: "user-123-session",
+ * const client = new MemoryClient({
+ *   endpoint: "https://memory.neo4jlabs.com/v1",
+ *   apiKey: process.env.MEMORY_API_KEY!,
  * });
  *
- * const result = await streamText({
+ * const middleware = agentMemoryMiddleware(client, {
+ *   conversationId: "conv-uuid",      // or sessionId for bridge transport
+ *   userId: "alice@example.com",      // used if a conversation is created
+ *   includeContext: true,
+ * });
+ *
+ * const result = await generateText({
  *   model: yourModel,
  *   experimental_middleware: middleware,
  *   messages: [{ role: "user", content: "Hello!" }],
  * });
  * ```
+ *
+ * Compatible with the Vercel AI SDK v4+ `LanguageModelV1Middleware` shape.
  */
 
 import type { MemoryClient } from "../client.js";
-import type { Message } from "../types.js";
+import { NotSupportedError } from "../errors.js";
+import type { Message, MessageRole } from "../types.js";
 
 export interface AgentMemoryMiddlewareOptions {
-  /** Session ID for conversation tracking. Can be a string or a function that returns one. */
+  /**
+   * Conversation id (REST transport) or session id (bridge transport).
+   * Can be a string or a function that returns one.
+   */
+  conversationId?: string | (() => string);
+
+  /** @deprecated Use `conversationId`. Kept for backwards compatibility. */
   sessionId?: string | (() => string);
 
-  /** Whether to include conversation history in prompts. Default: true. */
-  includeHistory?: boolean | number;
+  /**
+   * User id used when lazily creating a conversation. Only consulted if
+   * `conversationId` is not supplied and the transport is REST.
+   */
+  userId?: string;
 
-  /** Whether to persist assistant responses. Default: true. */
+  /**
+   * Include three-tier context (reflections + observations + recent messages).
+   * If false, falls back to flat history. Default: true on REST, false on
+   * bridge (where context endpoints aren't implemented).
+   */
+  includeContext?: boolean;
+
+  /** Maximum messages to include from flat history (bridge fallback). */
+  historyLimit?: number;
+
+  /** Persist user input before generation. Default: true. */
+  persistInput?: boolean;
+
+  /** Persist assistant response after generation. Default: true. */
   persistResponses?: boolean;
 }
 
-/**
- * Resolve the session ID from the options.
- */
-function resolveSessionId(
-  sessionId?: string | (() => string),
-): string {
-  if (typeof sessionId === "function") return sessionId();
-  return sessionId ?? `session-${crypto.randomUUID()}`;
+export interface AgentMemoryLanguageModelMiddleware {
+  transformParams?: (options: { params: Record<string, unknown> }) => Promise<
+    Record<string, unknown>
+  >;
+  wrapGenerate?: (options: {
+    doGenerate: () => Promise<{ text?: string; [key: string]: unknown }>;
+  }) => Promise<{ text?: string; [key: string]: unknown }>;
 }
 
-/**
- * Create a Vercel AI SDK middleware that integrates agent memory.
- *
- * The middleware intercepts the model call to:
- * 1. Prepend conversation history from memory (transformParams)
- * 2. Persist the assistant's response after generation (wrapGenerate)
- *
- * Compatible with Vercel AI SDK v4+ LanguageModelV1Middleware interface.
- */
+function resolve(value?: string | (() => string)): string | undefined {
+  if (typeof value === "function") return value();
+  return value;
+}
+
+/** Memory-augmented LanguageModelV1 middleware. */
 export function agentMemoryMiddleware(
   client: MemoryClient,
   options?: AgentMemoryMiddlewareOptions,
 ): AgentMemoryLanguageModelMiddleware {
   const persistResponses = options?.persistResponses ?? true;
-  const includeHistory = options?.includeHistory ?? true;
+  const persistInput = options?.persistInput ?? true;
+  const includeContext = options?.includeContext ?? true;
+  let resolvedId: string | undefined =
+    resolve(options?.conversationId) ?? resolve(options?.sessionId);
+
+  // Lazy-create a conversation on REST transports if none was supplied.
+  async function ensureConversationId(): Promise<string> {
+    if (resolvedId) return resolvedId;
+    try {
+      const conv = await client.shortTerm.createConversation({
+        userId: options?.userId ?? "anonymous",
+      });
+      resolvedId = conv.id;
+      return resolvedId;
+    } catch (err) {
+      if (err instanceof NotSupportedError) {
+        // Bridge transport — synthesize a session ID
+        resolvedId = `session-${cryptoRandom()}`;
+        return resolvedId;
+      }
+      throw err;
+    }
+  }
 
   return {
     transformParams: async ({ params }) => {
-      if (!includeHistory) return params;
+      const id = await ensureConversationId();
 
-      const sid = resolveSessionId(options?.sessionId);
-      const limit =
-        typeof includeHistory === "number" ? includeHistory : undefined;
-
-      try {
-        const conversation = await client.shortTerm.getConversation(sid, {
-          limit,
-        });
-
-        if (conversation.messages.length === 0) return params;
-
-        // Convert memory messages to Vercel AI SDK message format
-        const historyMessages = conversation.messages.map(
-          (msg: Message) => ({
-            role: msg.role as "user" | "assistant" | "system",
-            content: msg.content,
-          }),
-        );
-
-        // Prepend history to the existing messages
-        const existingMessages = (params.prompt as unknown[]) ?? [];
-        return {
-          ...params,
-          prompt: [...historyMessages, ...existingMessages],
-        };
-      } catch {
-        // If memory retrieval fails, proceed without history
-        return params;
+      let historyMessages: Array<{ role: string; content: string }> = [];
+      if (includeContext) {
+        try {
+          const ctx = await client.shortTerm.getContext(id);
+          for (const r of ctx.reflections) {
+            historyMessages.push({ role: "system", content: `[reflection] ${r.content}` });
+          }
+          for (const o of ctx.observations) {
+            historyMessages.push({ role: "system", content: `[observation] ${o.content}` });
+          }
+          for (const m of ctx.recentMessages) {
+            historyMessages.push({ role: m.role, content: m.content });
+          }
+        } catch (err) {
+          if (!(err instanceof NotSupportedError)) {
+            // Non-fatal — fall back to flat history below.
+          }
+          historyMessages = [];
+        }
       }
+
+      // Bridge fallback or empty REST context → use flat conversation history.
+      if (historyMessages.length === 0) {
+        try {
+          const conv = await client.shortTerm.getConversation(id, {
+            limit: options?.historyLimit,
+          });
+          historyMessages = conv.messages.map((msg: Message) => ({
+            role: msg.role,
+            content: msg.content,
+          }));
+        } catch {
+          // No history — proceed without.
+        }
+      }
+
+      // Best-effort: persist the user's input message.
+      if (persistInput) {
+        const incoming = (params["prompt"] as Array<{ role: string; content: string }>) ?? [];
+        const lastUser = [...incoming].reverse().find((m) => m.role === "user");
+        if (lastUser) {
+          try {
+            await client.shortTerm.addMessage(id, lastUser.role as MessageRole, lastUser.content);
+          } catch {
+            // Non-fatal.
+          }
+        }
+      }
+
+      if (historyMessages.length === 0) return params;
+
+      const existing = (params["prompt"] as unknown[]) ?? [];
+      return {
+        ...params,
+        prompt: [...historyMessages, ...existing],
+      };
     },
 
     wrapGenerate: async ({ doGenerate }) => {
       const result = await doGenerate();
-
       if (persistResponses && result.text) {
-        const sid = resolveSessionId(options?.sessionId);
+        const id = await ensureConversationId();
         try {
-          await client.shortTerm.addMessage(sid, "assistant", result.text);
+          await client.shortTerm.addMessage(id, "assistant", result.text);
         } catch {
-          // Non-fatal: don't block the response if persistence fails
+          // Non-fatal.
         }
       }
-
       return result;
     },
   };
 }
 
-/**
- * Simplified type for the middleware interface.
- * Compatible with Vercel AI SDK's LanguageModelV1Middleware.
- */
-export interface AgentMemoryLanguageModelMiddleware {
-  transformParams?: (options: {
-    params: Record<string, unknown>;
-  }) => Promise<Record<string, unknown>>;
-  wrapGenerate?: (options: {
-    doGenerate: () => Promise<{ text?: string; [key: string]: unknown }>;
-  }) => Promise<{ text?: string; [key: string]: unknown }>;
+function cryptoRandom(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2);
 }

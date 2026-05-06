@@ -11,10 +11,17 @@ if TYPE_CHECKING:
     from lenny.agent import LennyDeps
 
 
-async def _memory_call(endpoint: str, method: str, params: dict) -> dict:
-    """Make an HTTP call to the memory service."""
+async def _memory_call(endpoint: str, method: str, params: dict, api_key: str | None = None) -> dict:
+    """Make an HTTP call to the memory service.
+
+    Sends a Bearer token when MEMORY_API_KEY is set so the demo can run
+    against the hosted service at memory.neo4jlabs.com/v1.
+    """
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{endpoint}/{method}", json=params, timeout=30)
+        resp = await client.post(f"{endpoint}/{method}", json=params, timeout=30, headers=headers)
         resp.raise_for_status()
         if resp.status_code == 204:
             return {}

@@ -15,9 +15,14 @@ using Neo4j.AgentMemory.Models;
 using Sage.Services;
 
 var memoryEndpoint = Environment.GetEnvironmentVariable("MEMORY_ENDPOINT") ?? "http://localhost:3001";
+var memoryApiKey = Environment.GetEnvironmentVariable("MEMORY_API_KEY");
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8005";
 
-var client = new MemoryClient(new MemoryClientOptions { Endpoint = memoryEndpoint });
+var client = new MemoryClient(new MemoryClientOptions
+{
+    Endpoint = memoryEndpoint,
+    ApiKey = memoryApiKey,
+});
 await client.ConnectAsync();
 
 var conflictDetector = new ConflictDetector(client);

@@ -399,6 +399,66 @@ jobs:
         run: |
           uv run pytest -m bronze --bridge-url http://localhost:3002 -v
 
+  python-client-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Build Python client
+        run: |
+          cd clients/python
+          uv pip install --system -e ".[dev]"
+          python -c "from neo4j_agent_memory_client import MemoryClient; print('imports OK')"
+
+  hosted-smoke:
+    # Gated on the MEMORY_API_KEY repo secret. Skipped on forks / when unset.
+    runs-on: ubuntu-latest
+    if: ${{ secrets.MEMORY_API_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install TCK + Python client
+        run: |
+          uv sync --extra bridge
+          uv pip install -e clients/python
+
+      - name: Probe hosted service
+        env:
+          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
+        run: |
+          curl -fsS -H "Authorization: Bearer $MEMORY_API_KEY" \
+            https://memory.neo4jlabs.com/v1/conversations >/dev/null
+          echo "hosted service reachable"
+
+      - name: Smoke-test Python client against hosted service
+        env:
+          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
+        run: |
+          uv run python -c "
+          import asyncio, os
+          from neo4j_agent_memory_client import MemoryClient
+          async def main():
+              async with MemoryClient(
+                  endpoint='https://memory.neo4jlabs.com/v1',
+                  api_key=os.environ['MEMORY_API_KEY'],
+              ) as c:
+                  convs = await c.short_term.list_conversations(limit=1)
+                  print(f'list_conversations OK ({len(convs)} convs)')
+          asyncio.run(main())
+          "
+
   go-conformance:
     runs-on: ubuntu-latest
     services:

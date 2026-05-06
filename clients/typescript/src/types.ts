@@ -1,13 +1,15 @@
 /**
  * Core type definitions for neo4j-agent-memory TypeScript client.
  *
- * These types mirror the TCK Pydantic models defined in
- * tck/adapters/base_adapter.py 1:1. All IDs are strings (UUID serialized),
- * all timestamps are ISO 8601 strings for edge runtime compatibility.
+ * Canonical types use camelCase. Wire format depends on transport:
+ *   - BridgeTransport: snake_case JSON
+ *   - RestTransport: camelCase JSON (matches the hosted service)
+ *
+ * Sub-clients translate between wire and canonical forms.
  */
 
 // ---------------------------------------------------------------------------
-// Enums (as string unions for maximum compatibility)
+// Enums
 // ---------------------------------------------------------------------------
 
 export type MessageRole = "user" | "assistant" | "system";
@@ -31,15 +33,23 @@ export interface Message {
   timestamp: string;
   embedding?: number[];
   metadata: Record<string, unknown>;
+  /** Hosted service: link back to the conversation. */
+  conversationId?: string;
 }
 
 export interface Conversation {
   id: string;
+  /** Bridge protocol session identifier (free-form string). */
   sessionId: string;
   messages: Message[];
   title?: string;
   createdAt: string;
   updatedAt?: string;
+  /** Hosted service: workspace owning this conversation. */
+  workspaceId?: string;
+  /** Hosted service: user the conversation belongs to. */
+  userId?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SessionInfo {
@@ -49,16 +59,44 @@ export interface SessionInfo {
   updatedAt?: string;
 }
 
+/** A 3-tier conversational context window — hosted service. */
+export interface ConversationContext {
+  reflections: Reflection[];
+  observations: Observation[];
+  recentMessages: Message[];
+}
+
+export interface Observation {
+  id: string;
+  conversationId: string;
+  content: string;
+  windowStart?: string;
+  windowEnd?: string;
+  createdAt: string;
+}
+
+export interface Reflection {
+  id: string;
+  conversationId: string;
+  content: string;
+  createdAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // Long-Term Memory Types
 // ---------------------------------------------------------------------------
 
-export type EntityType =
-  | "PERSON"
-  | "ORGANIZATION"
-  | "LOCATION"
-  | "EVENT"
-  | "OBJECT";
+/** Bridge taxonomy. */
+export type EntityType = "PERSON" | "ORGANIZATION" | "LOCATION" | "EVENT" | "OBJECT";
+
+/** Hosted-service entity taxonomy. */
+export type HostedEntityType =
+  | "person"
+  | "organization"
+  | "location"
+  | "concept"
+  | "tool"
+  | "custom";
 
 export interface Entity {
   id: string;
@@ -69,6 +107,63 @@ export interface Entity {
   embedding?: number[];
   canonicalName?: string;
   createdAt: string;
+  /** Hosted service. */
+  updatedAt?: string;
+  /** Hosted service: confidence score (0-1). */
+  confidence?: number;
+  /** Hosted service: which extraction stage produced the entity. */
+  sourceStage?: string;
+  /** Hosted service: relationships referenced by getEntity. */
+  relationships?: EntityRelationshipRef[];
+}
+
+export interface EntityRelationshipRef {
+  id: string;
+  type: string;
+  targetId: string;
+  targetName?: string;
+  properties?: Record<string, unknown>;
+}
+
+export interface EntityHistory {
+  entityId: string;
+  mentions: EntityMention[];
+}
+
+export interface EntityMention {
+  conversationId: string;
+  messageId?: string;
+  content: string;
+  timestamp: string;
+}
+
+export interface EntityGraphNode {
+  id: string;
+  name: string;
+  type: string;
+}
+
+export interface EntityGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+}
+
+export interface EntityGraph {
+  nodes: EntityGraphNode[];
+  edges: EntityGraphEdge[];
+}
+
+export interface EntityFeedbackResult {
+  id: string;
+  updated: boolean;
+}
+
+export interface EntityMergeResult {
+  sourceId: string;
+  targetId: string;
+  status: string;
 }
 
 export interface Preference {
@@ -139,24 +234,88 @@ export interface ToolStats {
   avgDurationMs?: number;
 }
 
+/** Hosted-service flat reasoning step (per-conversation, no trace wrapper). */
+export interface AgentStep {
+  id: string;
+  conversationId: string;
+  reasoning: string;
+  actionTaken: string;
+  result?: string;
+  createdAt: string;
+}
+
+/** Hosted: detailed step with tool calls + influenced entities. */
+export interface AgentStepExplanation extends AgentStep {
+  toolCalls: ToolCall[];
+  influencedEntities: Entity[];
+}
+
+/** Hosted: flat reasoning trace (steps + tool calls under one conversation). */
+export interface ConversationTrace {
+  conversationId: string;
+  steps: AgentStep[];
+  toolCalls: ToolCall[];
+}
+
+/** Hosted: provenance of an entity's creation. */
+export interface EntityProvenance {
+  entityId: string;
+  steps: AgentStep[];
+}
+
+// ---------------------------------------------------------------------------
+// Query Console
+// ---------------------------------------------------------------------------
+
+export interface CypherResult {
+  columns: string[];
+  rows: unknown[][];
+  stats?: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
+// Auth / API Keys (hosted service)
+// ---------------------------------------------------------------------------
+
+export interface ApiKey {
+  id: string;
+  label: string;
+  scopes: string[];
+  workspaceId: string;
+  createdAt: string;
+  expiresAt?: string;
+  /** Plaintext key — only present at creation time. */
+  key?: string;
+}
+
+export interface AccessTokenPair {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
 // ---------------------------------------------------------------------------
 // Client Configuration
 // ---------------------------------------------------------------------------
 
+export type TransportMode = "auto" | "bridge" | "rest";
+
 export interface MemoryClientOptions {
-  /** URL of the NAMS or compatible HTTP endpoint. */
+  /** Service base URL (bridge endpoint, or `https://.../v1` for REST). */
   endpoint?: string;
 
-  /** API key for authentication with the hosted service. */
+  /** API key for authentication. */
   apiKey?: string;
 
-  /** Neo4j connection URI (for direct mode). Requires neo4j-driver peer dep. */
+  /** Override transport selection. Default: "auto" (REST if endpoint contains /v1). */
+  transport?: TransportMode;
+
+  /** OAuth refresh-token-aware token provider. Overrides apiKey when supplied. */
+  tokenProvider?: () => string | Promise<string>;
+
+  /** Direct Neo4j connection — not yet implemented. */
   neo4jUri?: string;
-
-  /** Neo4j username (for direct mode). */
   neo4jUsername?: string;
-
-  /** Neo4j password (for direct mode). */
   neo4jPassword?: string;
 
   /** Shared entity namespace for multi-agent collaboration. */
@@ -164,6 +323,9 @@ export interface MemoryClientOptions {
 
   /** Request timeout in milliseconds. Default: 30000. */
   timeout?: number;
+
+  /** Additional headers to include in every request. */
+  headers?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +352,7 @@ export interface ListSessionsOptions {
 
 export interface SearchEntitiesOptions {
   limit?: number;
+  type?: string;
 }
 
 export interface SearchPreferencesOptions {
@@ -226,4 +389,49 @@ export interface AddRelationshipOptions {
 export interface GetSimilarTracesOptions {
   limit?: number;
   successOnly?: boolean;
+}
+
+// Hosted-service options ----------------------------------------------------
+
+export interface CreateConversationOptions {
+  userId: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ListConversationsOptions {
+  limit?: number;
+}
+
+export interface BulkMessageInput {
+  role: MessageRole;
+  content: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ListEntitiesOptions {
+  type?: HostedEntityType | string;
+  limit?: number;
+}
+
+export interface UpdateEntityOptions {
+  name?: string;
+  description?: string;
+}
+
+export interface SetEntityFeedbackOptions {
+  userScore: number;
+  confirmed: boolean;
+}
+
+export interface RecordStepInput {
+  conversationId: string;
+  reasoning: string;
+  actionTaken: string;
+  result?: string;
+}
+
+export interface CreateApiKeyInput {
+  label: string;
+  scopes: string[];
+  workspaceId: string;
 }

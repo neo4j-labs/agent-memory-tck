@@ -21,8 +21,10 @@ if (string.IsNullOrEmpty(endpoint))
 
 var port = Environment.GetEnvironmentVariable("TCK_BRIDGE_PORT") ?? "3001";
 
-var client = new MemoryClient(new MemoryClientOptions { Endpoint = endpoint });
-await client.ConnectAsync();
+var apiKey = Environment.GetEnvironmentVariable("MEMORY_API_KEY");
+var client = new MemoryClient(new MemoryClientOptions { Endpoint = endpoint, ApiKey = apiKey });
+try { await client.ConnectAsync(); }
+catch (Exception ex) { Console.Error.WriteLine($"warn: connect failed: {ex.Message}"); }
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
@@ -116,7 +118,7 @@ object? V(Dictionary<string, JsonElement> body, string key)
 
 // --- Lifecycle ---
 
-app.MapPost("/setup", () => Results.Ok(new { ok = true, protocol_version = "0.1.0" }));
+app.MapPost("/setup", () => Results.Ok(new { ok = true, protocol_version = "0.2.0" }));
 
 app.MapPost("/teardown", () => Results.NoContent());
 
@@ -368,6 +370,193 @@ app.MapPost("/get_similar_traces", async (HttpRequest req) =>
         I(body, "limit", 5),
         successOnly);
     return Results.Ok(traces);
+});
+
+// --- Volume 5 / Platinum (hosted-native) ---
+
+app.MapPost("/create_conversation", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var conv = await client.ShortTerm.CreateConversationAsync(S(body, "user_id"), M(body, "metadata"));
+    return Results.Ok(conv);
+});
+
+app.MapPost("/list_conversations", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    int? limit = body.ContainsKey("limit") ? I(body, "limit", 0) : null;
+    var convs = await client.ShortTerm.ListConversationsAsync(limit);
+    return Results.Ok(convs);
+});
+
+app.MapPost("/get_conversation_metadata", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var conv = await client.ShortTerm.GetConversationMetadataAsync(S(body, "conversation_id"));
+    return Results.Ok(conv);
+});
+
+app.MapPost("/delete_conversation", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    await client.ShortTerm.DeleteConversationAsync(S(body, "conversation_id"));
+    return Results.NoContent();
+});
+
+app.MapPost("/get_context", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var ctx = await client.ShortTerm.GetContextAsync(S(body, "conversation_id"));
+    return Results.Ok(ctx);
+});
+
+app.MapPost("/bulk_add_messages", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var raw = body.ContainsKey("messages") ? body["messages"] : default;
+    var messages = new List<BulkMessageInput>();
+    if (raw.ValueKind == JsonValueKind.Array)
+    {
+        foreach (var item in raw.EnumerateArray())
+        {
+            messages.Add(new BulkMessageInput
+            {
+                Role = item.TryGetProperty("role", out var r) ? r.GetString() ?? "user" : "user",
+                Content = item.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "",
+                Metadata = item.TryGetProperty("metadata", out var m) && m.ValueKind == JsonValueKind.Object
+                    ? JsonSerializer.Deserialize<Dictionary<string, object?>>(m.GetRawText()) : null,
+            });
+        }
+    }
+    var msgs = await client.ShortTerm.BulkAddMessagesAsync(S(body, "conversation_id"), messages);
+    return Results.Ok(msgs);
+});
+
+app.MapPost("/get_observations", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    int? limit = body.ContainsKey("limit") ? I(body, "limit", 0) : null;
+    var obs = await client.ShortTerm.GetObservationsAsync(S(body, "conversation_id"), limit);
+    return Results.Ok(obs);
+});
+
+app.MapPost("/get_reflections", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var refl = await client.ShortTerm.GetReflectionsAsync(S(body, "conversation_id"));
+    return Results.Ok(refl);
+});
+
+app.MapPost("/list_entities", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var t = S(body, "type");
+    int? limit = body.ContainsKey("limit") ? I(body, "limit", 0) : null;
+    var ents = await client.LongTerm.ListEntitiesAsync(string.IsNullOrEmpty(t) ? null : t, limit);
+    return Results.Ok(ents);
+});
+
+app.MapPost("/get_entity", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var ent = await client.LongTerm.GetEntityAsync(S(body, "entity_id"));
+    return Results.Ok(ent);
+});
+
+app.MapPost("/update_entity", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var name = S(body, "name");
+    var desc = S(body, "description");
+    var ent = await client.LongTerm.UpdateEntityAsync(
+        S(body, "entity_id"),
+        string.IsNullOrEmpty(name) ? null : name,
+        string.IsNullOrEmpty(desc) ? null : desc);
+    return Results.Ok(ent);
+});
+
+app.MapPost("/delete_entity", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    await client.LongTerm.DeleteEntityAsync(S(body, "entity_id"));
+    return Results.NoContent();
+});
+
+app.MapPost("/set_entity_feedback", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var fb = await client.LongTerm.SetEntityFeedbackAsync(
+        S(body, "entity_id"),
+        D(body, "user_score", 0),
+        B(body, "confirmed") ?? false);
+    return Results.Ok(fb);
+});
+
+app.MapPost("/get_entity_history", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var hist = await client.LongTerm.GetEntityHistoryAsync(S(body, "entity_id"));
+    return Results.Ok(hist);
+});
+
+app.MapPost("/merge_entities", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var res = await client.LongTerm.MergeEntitiesAsync(S(body, "source_id"), S(body, "target_id"));
+    return Results.Ok(res);
+});
+
+app.MapPost("/get_entity_graph", async () =>
+{
+    var graph = await client.LongTerm.GetEntityGraphAsync();
+    return Results.Ok(graph);
+});
+
+app.MapPost("/record_step", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var resStr = S(body, "result");
+    var step = await client.Reasoning.RecordStepAsync(
+        S(body, "conversation_id"),
+        S(body, "reasoning"),
+        S(body, "action_taken"),
+        string.IsNullOrEmpty(resStr) ? null : resStr);
+    return Results.Ok(step);
+});
+
+app.MapPost("/list_steps", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var steps = await client.Reasoning.ListStepsAsync(S(body, "conversation_id"));
+    return Results.Ok(steps);
+});
+
+app.MapPost("/explain_step", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var ex = await client.Reasoning.ExplainStepAsync(S(body, "step_id"));
+    return Results.Ok(ex);
+});
+
+app.MapPost("/get_trace_by_conversation", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var t = await client.Reasoning.GetTraceByConversationAsync(S(body, "conversation_id"));
+    return Results.Ok(t);
+});
+
+app.MapPost("/get_entity_provenance", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var p = await client.Reasoning.GetEntityProvenanceAsync(S(body, "entity_id"));
+    return Results.Ok(p);
+});
+
+app.MapPost("/cypher_query", async (HttpRequest req) =>
+{
+    var body = await ReadBody(req);
+    var result = await client.Query.CypherAsync(S(body, "cypher"), M(body, "params"));
+    return Results.Ok(result);
 });
 
 Console.WriteLine($"C# conformance server running on http://localhost:{port}");

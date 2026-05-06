@@ -26,13 +26,29 @@ import httpx
 
 from tck.adapters.base_adapter import (
     BaseAdapter,
+    TCKAgentStep,
+    TCKAgentStepExplanation,
+    TCKBulkMessageInput,
     TCKConversation,
+    TCKConversationContext,
+    TCKConversationTrace,
+    TCKCypherResult,
     TCKEntity,
+    TCKEntityFeedbackResult,
+    TCKEntityGraph,
+    TCKEntityGraphEdge,
+    TCKEntityGraphNode,
+    TCKEntityHistory,
+    TCKEntityMention,
+    TCKEntityMergeResult,
+    TCKEntityProvenance,
     TCKFact,
     TCKMessage,
+    TCKObservation,
     TCKPreference,
     TCKReasoningStep,
     TCKReasoningTrace,
+    TCKReflection,
     TCKRelationship,
     TCKSessionInfo,
     TCKToolCall,
@@ -194,6 +210,37 @@ def _tool_stats_from_dict(d: dict) -> TCKToolStats:
         failed_calls=d.get("failed_calls", 0),
         success_rate=d.get("success_rate", 0.0),
         avg_duration_ms=d.get("avg_duration_ms"),
+    )
+
+
+def _observation_from_dict(d: dict) -> TCKObservation:
+    return TCKObservation(
+        id=_parse_uuid(d["id"]),
+        conversation_id=_parse_uuid(d["conversation_id"]),
+        content=d.get("content", ""),
+        window_start=_parse_datetime(d["window_start"]) if d.get("window_start") else None,
+        window_end=_parse_datetime(d["window_end"]) if d.get("window_end") else None,
+        created_at=_parse_datetime(d.get("created_at")),
+    )
+
+
+def _reflection_from_dict(d: dict) -> TCKReflection:
+    return TCKReflection(
+        id=_parse_uuid(d["id"]),
+        conversation_id=_parse_uuid(d["conversation_id"]),
+        content=d.get("content", ""),
+        created_at=_parse_datetime(d.get("created_at")),
+    )
+
+
+def _agent_step_from_dict(d: dict) -> TCKAgentStep:
+    return TCKAgentStep(
+        id=_parse_uuid(d["id"]),
+        conversation_id=_parse_uuid(d["conversation_id"]),
+        reasoning=d.get("reasoning", ""),
+        action_taken=d.get("action_taken", ""),
+        result=d.get("result"),
+        created_at=_parse_datetime(d.get("created_at")),
     )
 
 
@@ -586,3 +633,259 @@ class HTTPBridgeAdapter(BaseAdapter):
             },
         )
         return [_trace_from_dict(t) for t in result]
+
+    # --- Platinum Tier (Volume 5 — hosted-service operations) ---
+
+    async def create_conversation(
+        self,
+        user_id: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> TCKConversation:
+        result = await self._call(
+            "create_conversation",
+            {"user_id": user_id, "metadata": metadata},
+        )
+        return _conversation_from_dict(result)
+
+    async def list_conversations(
+        self,
+        *,
+        limit: int | None = None,
+    ) -> list[TCKConversation]:
+        result = await self._call("list_conversations", {"limit": limit})
+        return [_conversation_from_dict(c) for c in result or []]
+
+    async def get_conversation_metadata(self, conversation_id: UUID) -> TCKConversation:
+        result = await self._call(
+            "get_conversation_metadata", {"conversation_id": conversation_id}
+        )
+        return _conversation_from_dict(result)
+
+    async def delete_conversation(self, conversation_id: UUID) -> None:
+        await self._call("delete_conversation", {"conversation_id": conversation_id})
+
+    async def get_context(self, conversation_id: UUID) -> TCKConversationContext:
+        result = await self._call("get_context", {"conversation_id": conversation_id})
+        result = result or {}
+        return TCKConversationContext(
+            reflections=[_reflection_from_dict(r) for r in result.get("reflections", [])],
+            observations=[_observation_from_dict(o) for o in result.get("observations", [])],
+            recent_messages=[_message_from_dict(m) for m in result.get("recent_messages", [])],
+        )
+
+    async def bulk_add_messages(
+        self,
+        conversation_id: UUID,
+        messages: list[TCKBulkMessageInput],
+    ) -> list[TCKMessage]:
+        payload = [
+            {"role": m.role, "content": m.content,
+             **({"metadata": m.metadata} if m.metadata else {})}
+            for m in messages
+        ]
+        result = await self._call(
+            "bulk_add_messages",
+            {"conversation_id": conversation_id, "messages": payload},
+        )
+        return [_message_from_dict(x) for x in result or []]
+
+    async def get_observations(
+        self,
+        conversation_id: UUID,
+        *,
+        limit: int | None = None,
+    ) -> list[TCKObservation]:
+        result = await self._call(
+            "get_observations",
+            {"conversation_id": conversation_id, "limit": limit},
+        )
+        return [_observation_from_dict(o) for o in result or []]
+
+    async def get_reflections(self, conversation_id: UUID) -> list[TCKReflection]:
+        result = await self._call(
+            "get_reflections", {"conversation_id": conversation_id}
+        )
+        return [_reflection_from_dict(r) for r in result or []]
+
+    async def list_entities(
+        self,
+        *,
+        type: str | None = None,
+        limit: int | None = None,
+    ) -> list[TCKEntity]:
+        result = await self._call("list_entities", {"type": type, "limit": limit})
+        return [_entity_from_dict(e) for e in result or []]
+
+    async def get_entity(self, entity_id: UUID) -> TCKEntity:
+        result = await self._call("get_entity", {"entity_id": entity_id})
+        return _entity_from_dict(result)
+
+    async def update_entity(
+        self,
+        entity_id: UUID,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+    ) -> TCKEntity:
+        result = await self._call(
+            "update_entity",
+            {"entity_id": entity_id, "name": name, "description": description},
+        )
+        return _entity_from_dict(result)
+
+    async def delete_entity(self, entity_id: UUID) -> None:
+        await self._call("delete_entity", {"entity_id": entity_id})
+
+    async def set_entity_feedback(
+        self,
+        entity_id: UUID,
+        *,
+        user_score: float,
+        confirmed: bool,
+    ) -> TCKEntityFeedbackResult:
+        result = await self._call(
+            "set_entity_feedback",
+            {
+                "entity_id": entity_id,
+                "user_score": user_score,
+                "confirmed": confirmed,
+            },
+        )
+        return TCKEntityFeedbackResult(
+            id=_parse_uuid(result["id"]),
+            updated=bool(result.get("updated", False)),
+        )
+
+    async def get_entity_history(self, entity_id: UUID) -> TCKEntityHistory:
+        result = await self._call(
+            "get_entity_history", {"entity_id": entity_id}
+        )
+        result = result or {}
+        return TCKEntityHistory(
+            entity_id=_parse_uuid(result.get("entity_id", str(entity_id))),
+            mentions=[
+                TCKEntityMention(
+                    conversation_id=_parse_uuid(m["conversation_id"]),
+                    message_id=_parse_uuid(m["message_id"]) if m.get("message_id") else None,
+                    content=m.get("content", ""),
+                    timestamp=_parse_datetime(m.get("timestamp")),
+                )
+                for m in result.get("mentions", [])
+            ],
+        )
+
+    async def merge_entities(
+        self,
+        source_id: UUID,
+        target_id: UUID,
+    ) -> TCKEntityMergeResult:
+        result = await self._call(
+            "merge_entities",
+            {"source_id": source_id, "target_id": target_id},
+        )
+        return TCKEntityMergeResult(
+            source_id=_parse_uuid(result.get("source_id", str(source_id))),
+            target_id=_parse_uuid(result.get("target_id", str(target_id))),
+            status=result.get("status", ""),
+        )
+
+    async def get_entity_graph(self) -> TCKEntityGraph:
+        result = await self._call("get_entity_graph")
+        result = result or {}
+        return TCKEntityGraph(
+            nodes=[
+                TCKEntityGraphNode(
+                    id=_parse_uuid(n["id"]), name=n.get("name", ""), type=n.get("type", "")
+                )
+                for n in result.get("nodes", [])
+            ],
+            edges=[
+                TCKEntityGraphEdge(
+                    id=_parse_uuid(e["id"]),
+                    source=_parse_uuid(e["source"]),
+                    target=_parse_uuid(e["target"]),
+                    type=e.get("type", ""),
+                )
+                for e in result.get("edges", [])
+            ],
+        )
+
+    async def explain_step(self, step_id: UUID) -> TCKAgentStepExplanation:
+        result = await self._call("explain_step", {"step_id": step_id})
+        result = result or {}
+        return TCKAgentStepExplanation(
+            id=_parse_uuid(result["id"]),
+            conversation_id=_parse_uuid(result["conversation_id"]),
+            reasoning=result.get("reasoning", ""),
+            action_taken=result.get("action_taken", ""),
+            result=result.get("result"),
+            created_at=_parse_datetime(result.get("created_at")),
+            tool_calls=[_tool_call_from_dict(tc) for tc in result.get("tool_calls", [])],
+            influenced_entities=[
+                _entity_from_dict(e) for e in result.get("influenced_entities", [])
+            ],
+        )
+
+    async def get_trace_by_conversation(
+        self, conversation_id: UUID
+    ) -> TCKConversationTrace:
+        result = await self._call(
+            "get_trace_by_conversation",
+            {"conversation_id": conversation_id},
+        )
+        result = result or {}
+        return TCKConversationTrace(
+            conversation_id=_parse_uuid(result.get("conversation_id", str(conversation_id))),
+            steps=[_agent_step_from_dict(s) for s in result.get("steps", [])],
+            tool_calls=[_tool_call_from_dict(tc) for tc in result.get("tool_calls", [])],
+        )
+
+    async def get_entity_provenance(self, entity_id: UUID) -> TCKEntityProvenance:
+        result = await self._call(
+            "get_entity_provenance",
+            {"entity_id": entity_id},
+        )
+        result = result or {}
+        return TCKEntityProvenance(
+            entity_id=_parse_uuid(result.get("entity_id", str(entity_id))),
+            steps=[_agent_step_from_dict(s) for s in result.get("steps", [])],
+        )
+
+    async def record_step(
+        self,
+        *,
+        conversation_id: UUID,
+        reasoning: str,
+        action_taken: str,
+        result: str | None = None,
+    ) -> TCKAgentStep:
+        resp = await self._call(
+            "record_step",
+            {
+                "conversation_id": conversation_id,
+                "reasoning": reasoning,
+                "action_taken": action_taken,
+                "result": result,
+            },
+        )
+        return _agent_step_from_dict(resp)
+
+    async def list_steps(self, conversation_id: UUID) -> list[TCKAgentStep]:
+        result = await self._call(
+            "list_steps", {"conversation_id": conversation_id}
+        )
+        return [_agent_step_from_dict(s) for s in result or []]
+
+    async def cypher_query(
+        self,
+        cypher: str,
+        params: dict[str, Any] | None = None,
+    ) -> TCKCypherResult:
+        result = await self._call("cypher_query", {"cypher": cypher, "params": params or {}})
+        result = result or {}
+        return TCKCypherResult(
+            columns=list(result.get("columns", [])),
+            rows=list(result.get("rows", [])),
+            stats=result.get("stats"),
+        )
