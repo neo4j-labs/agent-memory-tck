@@ -23,9 +23,12 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
       - name: Install Python client + dev deps
+        # uv sync creates a managed .venv at clients/python/.venv. We avoid
+        # `--system` because Ubuntu 24's Python 3.12 is marked PEP-668
+        # externally-managed.
         run: |
           cd clients/python
-          uv pip install --system -e ".[dev]"
+          uv sync --extra dev
       - name: Unit tests
         run: |
           cd clients/python

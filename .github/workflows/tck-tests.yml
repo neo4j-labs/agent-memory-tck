@@ -414,10 +414,12 @@ jobs:
         run: uv python install 3.12
 
       - name: Build Python client
+        # uv sync creates a managed .venv; --system is blocked under
+        # Ubuntu 24's externally-managed Python.
         run: |
           cd clients/python
-          uv pip install --system -e ".[dev]"
-          python -c "from neo4j_agent_memory_client import MemoryClient; print('imports OK')"
+          uv sync --extra dev
+          uv run python -c "from neo4j_agent_memory_client import MemoryClient; print('imports OK')"
 
   hosted-smoke:
     # Gated on the MEMORY_API_KEY repo secret. Skipped on forks / when unset.
@@ -435,7 +437,7 @@ jobs:
       - name: Install TCK + Python client
         run: |
           uv sync --extra bridge
-          uv pip install -e clients/python
+          (cd clients/python && uv sync --extra dev)
 
       - name: Probe hosted service
         env:
@@ -449,6 +451,7 @@ jobs:
         env:
           MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
         run: |
+          cd clients/python
           uv run python -c "
           import asyncio, os
           from neo4j_agent_memory_client import MemoryClient
