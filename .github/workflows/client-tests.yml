@@ -12,6 +12,11 @@ on:
   pull_request:
     branches: [main]
 
+# Restrict the GITHUB_TOKEN to least privilege. Reading repo contents is
+# enough for these jobs — they only build and run tests.
+permissions:
+  contents: read
+
 jobs:
   # ---------------- Python ----------------
   python-tests:

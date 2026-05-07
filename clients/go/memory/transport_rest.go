@@ -24,11 +24,51 @@ type restTransport struct {
 	tokenProvider TokenProvider
 	headers       map[string]string
 	httpClient    *http.Client
+	// invalidErr holds the validation error (if any) from
+	// validateRestEndpoint so we can surface it on the first Call rather
+	// than panicking at construction time.
+	invalidErr error
+}
+
+// validateRestEndpoint enforces that the configured endpoint is an absolute
+// http(s) URL with no embedded user-info, query, or fragment. Path params
+// supplied by the caller are escaped via url.PathEscape later, so this gate
+// ensures the constructed request URL is always rooted at a known base —
+// not arbitrary user-controlled bytes.
+func validateRestEndpoint(endpoint string) (string, error) {
+	if endpoint == "" {
+		return "", fmt.Errorf("rest endpoint is empty")
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", fmt.Errorf("rest endpoint is not a valid URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("rest endpoint must use http(s): got %q", u.Scheme)
+	}
+	if u.Host == "" {
+		return "", fmt.Errorf("rest endpoint must include a host")
+	}
+	if u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return "", fmt.Errorf("rest endpoint must not include user-info, query, or fragment")
+	}
+	return strings.TrimRight(endpoint, "/"), nil
 }
 
 func newRestTransport(cfg Config, timeout time.Duration) Transport {
+	// Validate at construction time. Errors here surface through the first
+	// Call invocation as ConnectionError, matching the existing pattern.
+	endpoint, err := validateRestEndpoint(cfg.Endpoint)
+	if err != nil {
+		// Defer the error until first Call so New() stays infallible.
+		return &restTransport{
+			endpoint:    "",
+			invalidErr:  err,
+			httpClient:  &http.Client{Timeout: timeout},
+		}
+	}
 	return &restTransport{
-		endpoint:      strings.TrimRight(cfg.Endpoint, "/"),
+		endpoint:      endpoint,
 		apiKey:        cfg.APIKey,
 		tokenProvider: cfg.TokenProvider,
 		headers:       cfg.Headers,
@@ -221,6 +261,10 @@ func extractReflections(raw interface{}, _ map[string]interface{}) interface{} {
 }
 
 func (t *restTransport) Call(ctx context.Context, method string, params map[string]interface{}, result interface{}) error {
+	if t.invalidErr != nil {
+		return &ConnectionError{MemoryError{Message: t.invalidErr.Error(), Cause: t.invalidErr}}
+	}
+
 	route, ok := restRoutes[method]
 	if !ok {
 		return &NotSupportedError{MemoryError{Message: fmt.Sprintf("method %q is not supported by RestTransport", method)}}
@@ -280,8 +324,24 @@ func (t *restTransport) Call(ctx context.Context, method string, params map[stri
 		bodyReader = bytes.NewReader(buf)
 	}
 
+	// Re-validate the fully-assembled URL before issuing the request. The
+	// endpoint was already vetted in newRestTransport, the path is taken
+	// from a static route table, and path params are escaped via
+	// url.PathEscape — but we parse the final URL once more so the scheme
+	// and host stay anchored to the configured endpoint, blocking any
+	// host/scheme injection through pathological input.
 	fullURL := t.endpoint + path + queryString
-	req, err := http.NewRequestWithContext(ctx, route.method, fullURL, bodyReader)
+	parsed, err := url.Parse(fullURL)
+	if err != nil {
+		return &ConnectionError{MemoryError{Message: "invalid request URL", Cause: err}}
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return &ConnectionError{MemoryError{Message: fmt.Sprintf("rejected request URL scheme: %q", parsed.Scheme)}}
+	}
+	if parsed.Host == "" {
+		return &ConnectionError{MemoryError{Message: "rejected request URL with empty host"}}
+	}
+	req, err := http.NewRequestWithContext(ctx, route.method, parsed.String(), bodyReader)
 	if err != nil {
 		return &ConnectionError{MemoryError{Message: "failed to create request", Cause: err}}
 	}

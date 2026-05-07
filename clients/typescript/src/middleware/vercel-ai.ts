@@ -196,8 +196,19 @@ export function agentMemoryMiddleware(
 }
 
 function cryptoRandom(): string {
+  // Every supported runtime (Node 20+, Bun, Deno, Workers, modern browsers)
+  // exposes crypto.randomUUID. We fall back to crypto.getRandomValues with
+  // base36 encoding for older or stripped-down environments — both APIs use
+  // the platform CSPRNG. Math.random would be cryptographically insecure.
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
-  return Math.random().toString(36).slice(2);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const buf = new Uint8Array(16);
+    crypto.getRandomValues(buf);
+    return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  throw new Error(
+    "Secure randomness is unavailable in this runtime; supply an explicit conversationId.",
+  );
 }

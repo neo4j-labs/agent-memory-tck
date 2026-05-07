@@ -289,8 +289,12 @@ const server = createServer(async (req, res) => {
     if (result === undefined) noContent(res);
     else jsonResponse(res, result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    jsonResponse(res, { error: message }, 500);
+    // The conformance server is a dev-only tool: log the full error
+    // (including any stack) to stderr where the operator can read it, but
+    // return a generic message to the caller so we don't leak internals
+    // (file paths, server config) over the wire.
+    console.error("[conformance]", method, error);
+    jsonResponse(res, { error: `${method} failed` }, 500);
   }
 });
 

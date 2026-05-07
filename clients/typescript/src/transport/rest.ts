@@ -19,6 +19,13 @@ import {
 import { camelToSnake, snakeToCamel } from "./casing.js";
 import type { Transport } from "./index.js";
 
+/** Strip trailing `/` from a URL without using a polynomial regex. */
+function trimTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 export type TokenProvider = () => string | Promise<string>;
 
 export interface RestTransportOptions {
@@ -313,7 +320,7 @@ export class RestTransport implements Transport {
   private readonly headers: Record<string, string>;
 
   constructor(options: RestTransportOptions) {
-    this.endpoint = options.endpoint.replace(/\/+$/, "");
+    this.endpoint = trimTrailingSlashes(options.endpoint);
     this.apiKey = options.apiKey;
     this.tokenProvider = options.tokenProvider;
     this.timeout = options.timeout ?? 30_000;

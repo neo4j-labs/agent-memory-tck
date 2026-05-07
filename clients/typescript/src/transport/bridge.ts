@@ -9,6 +9,13 @@
 import { AuthenticationError, ConnectionError, TransportError } from "../errors.js";
 import type { Transport } from "./index.js";
 
+/** Strip trailing `/` from a URL without using a polynomial regex. */
+function trimTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 export interface BridgeTransportOptions {
   /** Base URL of the bridge endpoint (no trailing /v1). */
   endpoint: string;
@@ -30,7 +37,7 @@ export class BridgeTransport implements Transport {
   private readonly headers: Record<string, string>;
 
   constructor(options: BridgeTransportOptions) {
-    this.endpoint = options.endpoint.replace(/\/+$/, "");
+    this.endpoint = trimTrailingSlashes(options.endpoint);
     this.apiKey = options.apiKey;
     this.timeout = options.timeout ?? 30_000;
     this.headers = options.headers ?? {};
