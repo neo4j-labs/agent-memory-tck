@@ -223,10 +223,17 @@ class _LongTerm:
     async def update_entity(
         self, entity_id: str, *, name: str | None = None, description: str | None = None
     ) -> Entity:
+        # The hosted PUT /v1/entities/{id} returns {"status": "updated"} on
+        # success rather than the full entity. To keep the SDK contract —
+        # "update returns the updated Entity" — we follow the PUT with a
+        # GET. Bridge transports return the entity directly, so we tolerate
+        # both shapes.
         d = await self._t.request("update_entity", {
             "entity_id": entity_id, "name": name, "description": description,
         })
-        return P.parse_entity(d)  # type: ignore[return-value]
+        if isinstance(d, dict) and "id" in d:
+            return P.parse_entity(d)  # type: ignore[return-value]
+        return await self.get_entity(entity_id)
 
     async def delete_entity(self, entity_id: str) -> None:
         await self._t.request("delete_entity", {"entity_id": entity_id})

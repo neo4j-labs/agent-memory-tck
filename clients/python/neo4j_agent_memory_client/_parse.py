@@ -296,9 +296,12 @@ def parse_conversation_trace(d: dict[str, Any]) -> ConversationTrace:
 
 
 def parse_provenance(d: dict[str, Any]) -> EntityProvenance:
+    # Hosted REST returns the chain under `provenance`; bridge / older
+    # responses use `steps`. Accept either.
+    raw_steps = d.get("steps") or d.get("provenance") or []
     return EntityProvenance(
         entity_id=d.get("entity_id", ""),
-        steps=[parse_agent_step(x) for x in d.get("steps") or []],
+        steps=[parse_agent_step(x) for x in raw_steps],
     )
 
 
