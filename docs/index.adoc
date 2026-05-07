@@ -1,7 +1,7 @@
 = neo4j-agent-memory TCK Documentation
 :author: Neo4j Labs
-:revnumber: 1.0.0
-:revdate: March 2026
+:revnumber: 1.0.0 + Volume 5
+:revdate: May 2026
 :toc: left
 :toclevels: 3
 :icons: font
@@ -11,6 +11,8 @@
 :experimental:
 
 The neo4j-agent-memory Technology Compatibility Kit (TCK) provides a formal specification, executable test suite, and compliance framework for the neo4j-agent-memory ecosystem.
+
+Each language client (TypeScript, Go, C#, R, Python) ships **two transports** behind a single `MemoryClient` API: a `BridgeTransport` for TCK conformance tests and a `RestTransport` for the hosted Neo4j Agent Memory Service at `https://memory.neo4jlabs.com/v1`. Selection is automatic — endpoints containing a `/v1` segment route through REST.
 
 This documentation follows the https://diataxis.fr/[Diataxis framework], organized into four sections:
 
@@ -36,6 +38,7 @@ This documentation follows the https://diataxis.fr/[Diataxis framework], organiz
 
 Learning-oriented guides that walk you through a complete task from start to finish.
 
+* link:tutorials/hosted-quickstart.html[Hosted-Service Quickstart] — Five-minute path from zero to a working agent against `memory.neo4jlabs.com/v1`, with snippets in TS / Python / Go / C# / R
 * link:tutorials/getting-started.html[Getting Started with the TCK] — Install the TCK, write your first adapter, and run the test suite
 * link:tutorials/first-typescript-agent.html[Building Your First TypeScript Agent with Memory] — Use `@neo4j-labs/agent-memory` to add memory to a Vercel AI SDK application
 
@@ -44,8 +47,10 @@ Learning-oriented guides that walk you through a complete task from start to fin
 
 Task-oriented guides for accomplishing specific goals.
 
+* link:how-to/authenticate.html[Authenticate] — `nams_*` API keys, OAuth refresh-token rotation, and scope management
+* link:how-to/framework-integrations.html[Framework Integrations] — Vercel AI SDK, LangChain JS, Mastra, LangGraph, PydanticAI, Semantic Kernel, ellmer, MCP
 * link:how-to/writing-an-adapter.html[Writing a TCK Adapter] — Implement `BaseAdapter` for your memory system
-* link:how-to/cross-language-testing.html[Cross-Language Conformance Testing] — Test TypeScript, Go, C#, or R implementations via the HTTP bridge
+* link:how-to/cross-language-testing.html[Cross-Language Conformance Testing] — Test TypeScript, Go, C#, R, or Python implementations via the HTTP bridge
 * link:how-to/ci-integration.html[Adding TCK to Your CI Pipeline] — Run conformance tests in GitHub Actions
 * link:how-to/certification.html[Obtaining TCK Certification] — Generate compliance reports and submit to the registry
 
@@ -54,9 +59,11 @@ Task-oriented guides for accomplishing specific goals.
 
 Technical descriptions of types, protocols, and interfaces.
 
-* link:reference/base-adapter.html[BaseAdapter Interface Reference] — All 26 abstract methods with signatures, parameters, and return types
-* link:reference/bridge-protocol.html[HTTP Bridge Protocol Specification] — Endpoints, request/response schemas, and data types
-* link:reference/compliance-tiers.html[Compliance Tier Definitions] — Bronze, Silver, and Gold requirements
+* link:reference/rest-api.html[REST API Reference] — Hosted-service endpoints mapped to client SDK methods in each language
+* link:reference/mcp-tools.html[MCP Tool Reference] — The 12 standard memory tools matching `memory.neo4jlabs.com/mcp`
+* link:reference/base-adapter.html[BaseAdapter Interface Reference] — All abstract methods (Bronze + Silver + Gold + Volume 5 / Platinum) with signatures
+* link:reference/bridge-protocol.html[HTTP Bridge Protocol Specification] — Endpoints, request/response schemas, and data types (v0.2.0)
+* link:reference/compliance-tiers.html[Compliance Tier Definitions] — Bronze, Silver, Gold, and Platinum requirements
 * link:reference/scenario-registry.html[Scenario ID Registry Format] — Stable scenario ID scheme and registry structure
 
 [[explanation]]
@@ -64,6 +71,6 @@ Technical descriptions of types, protocols, and interfaces.
 
 Background concepts and architectural decisions.
 
-* link:explanation/architecture.html[TCK Architecture and Design Decisions] — Why pytest over Gherkin, the adapter pattern, and the bridge protocol
-* link:explanation/memory-model.html[The Agent Memory Model] — Short-term, long-term, and reasoning memory explained
-* link:explanation/multi-agent-sharing.html[Cross-Agent Memory Sharing] — How agents in different languages share the same Neo4j graph
+* link:explanation/architecture.html[TCK Architecture and Design Decisions] — Why pytest over Gherkin, the adapter pattern, the bridge protocol, and the dual-transport client architecture
+* link:explanation/memory-model.html[The Agent Memory Model] — Short-term, long-term, and reasoning memory, plus observations, reflections, and provenance
+* link:explanation/multi-agent-sharing.html[Cross-Agent Memory Sharing] — How agents in different languages share the same memory graph
