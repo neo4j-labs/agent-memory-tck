@@ -1,3 +1,5 @@
+//go:build bridge
+
 package memory_test
 
 import (
