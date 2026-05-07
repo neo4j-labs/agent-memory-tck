@@ -11,6 +11,7 @@ from urllib.parse import quote, urlencode
 import httpx
 
 from .casing import camel_to_snake, snake_to_camel
+from .casing import _camel_key as _snake_to_camel_key  # noqa: F401
 from .errors import (
     AuthenticationError,
     ConnectionError as MemoryConnectionError,
@@ -126,6 +127,20 @@ def _shape_observations(raw: Any, _: dict[str, Any]) -> Any:
 def _shape_reflections(raw: Any, _: dict[str, Any]) -> Any:
     if isinstance(raw, dict) and "reflections" in raw:
         return raw["reflections"]
+    return raw
+
+
+def _shape_steps(raw: Any, _: dict[str, Any]) -> Any:
+    if isinstance(raw, dict) and "steps" in raw:
+        return raw["steps"]
+    return raw
+
+
+def _shape_api_keys(raw: Any, _: dict[str, Any]) -> Any:
+    if isinstance(raw, dict) and "keys" in raw:
+        return raw["keys"]
+    if isinstance(raw, dict) and "api_keys" in raw:
+        return raw["api_keys"]
     return raw
 
 
@@ -248,17 +263,19 @@ _ROUTES: dict[str, _Route] = {
         path_params=("entityId",)),
     "record_step": _Route("POST", "/reasoning/steps", has_body=True),
     "list_steps": _Route(
-        "GET", "/reasoning/steps", query_params=("conversationId",)),
+        "GET", "/reasoning/steps", query_params=("conversation_id",),
+        shape=_shape_steps),
     "cypher_query": _Route("POST", "/query", has_body=True),
 
     "list_api_keys": _Route(
-        "GET", "/auth/api-keys", query_params=("workspaceId",)),
+        "GET", "/auth/api-keys", query_params=("workspace_id",),
+        shape=_shape_api_keys),
     "create_api_key": _Route("POST", "/auth/api-keys", has_body=True),
     "revoke_api_key": _Route(
         "DELETE", "/auth/api-keys/{keyId}", path_params=("keyId",)),
     "reveal_api_key": _Route(
         "GET", "/auth/api-keys/{keyId}/reveal",
-        path_params=("keyId",), query_params=("workspaceId",)),
+        path_params=("keyId",), query_params=("workspace_id",)),
     "refresh_access_token": _Route("POST", "/auth/refresh", has_body=True),
 }
 
@@ -308,9 +325,11 @@ class RestTransport(Transport):
                 f"Method '{method}' has no equivalent in the hosted REST API"
             )
 
-        camel = snake_to_camel(params or {})
+        original = params or {}
+        camel = snake_to_camel(original)
         consumed: set[str] = set()
 
+        # Path params use camelCase placeholders (matching the route literal).
         path = route.path
         for name in route.path_params:
             v = camel.get(name)
@@ -321,12 +340,25 @@ class RestTransport(Transport):
             path = path.replace("{" + name + "}", quote(str(v), safe=""))
             consumed.add(name)
 
+        # Query params on this hosted service are snake_case ("conversation_id",
+        # "workspace_id", etc.) — NOT camelCase. So we look up the value from
+        # the original snake_case params and emit the snake_case key on the
+        # wire. We also mark the camelCase form as consumed so it doesn't
+        # leak into the body.
         query: dict[str, Any] = {}
-        for name in route.query_params:
-            if name in camel and camel[name] is not None:
-                query[name] = camel[name]
-                consumed.add(name)
+        for snake_name in route.query_params:
+            v = original.get(snake_name)
+            if v is None:
+                # Fall back to the camelCase form just in case the caller
+                # passed it that way.
+                camel_name = _snake_to_camel_key(snake_name)
+                v = camel.get(camel_name)
+            if v is not None:
+                query[snake_name] = v
+                consumed.add(snake_name)
+                consumed.add(_snake_to_camel_key(snake_name))
 
+        # Body uses camelCase (matching the hosted POST/PUT body shape).
         body_obj: dict[str, Any] | None = None
         if route.has_body:
             body_obj = {
