@@ -307,14 +307,27 @@ export class LongTermMemory {
     return toEntity(wire);
   }
 
-  /** Update an existing entity's name and/or description. */
+  /** Update an existing entity's name and/or description.
+   *
+   * The hosted PUT /v1/entities/{id} returns `{status: "updated"}` rather
+   * than the full entity, so when the response lacks an `id` we follow up
+   * with a GET to keep the SDK contract — "update returns the updated
+   * Entity". Bridge transports return the entity directly, so we tolerate
+   * both shapes.
+   */
   async updateEntity(entityId: string, options: UpdateEntityOptions): Promise<Entity> {
-    const wire = await this.transport.request<WireEntity>("update_entity", {
-      entity_id: entityId,
-      name: options.name,
-      description: options.description,
-    });
-    return toEntity(wire);
+    const wire = await this.transport.request<WireEntity | { status: string }>(
+      "update_entity",
+      {
+        entity_id: entityId,
+        name: options.name,
+        description: options.description,
+      },
+    );
+    if (wire && typeof wire === "object" && "id" in wire && (wire as WireEntity).id) {
+      return toEntity(wire as WireEntity);
+    }
+    return this.getEntity(entityId);
   }
 
   /** Delete an entity and its relationships. */

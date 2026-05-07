@@ -206,12 +206,12 @@ var restRoutes = map[string]*restRoute{
 	"get_trace_by_conversation": {method: http.MethodGet, path: "/reasoning/trace/{conversationId}", pathParams: []string{"conversationId"}},
 	"get_entity_provenance":     {method: http.MethodGet, path: "/reasoning/provenance/{entityId}", pathParams: []string{"entityId"}},
 	"record_step":               {method: http.MethodPost, path: "/reasoning/steps", hasBody: true},
-	"list_steps":                {method: http.MethodGet, path: "/reasoning/steps", queryParams: []string{"conversationId"}},
+	"list_steps":                {method: http.MethodGet, path: "/reasoning/steps", queryParams: []string{"conversation_id"}, shape: extractSteps},
 	"cypher_query":              {method: http.MethodPost, path: "/query", hasBody: true},
-	"list_api_keys":             {method: http.MethodGet, path: "/auth/api-keys", queryParams: []string{"workspaceId"}},
+	"list_api_keys":             {method: http.MethodGet, path: "/auth/api-keys", queryParams: []string{"workspace_id"}, shape: extractAPIKeys},
 	"create_api_key":            {method: http.MethodPost, path: "/auth/api-keys", hasBody: true},
 	"revoke_api_key":            {method: http.MethodDelete, path: "/auth/api-keys/{keyId}", pathParams: []string{"keyId"}},
-	"reveal_api_key":            {method: http.MethodGet, path: "/auth/api-keys/{keyId}/reveal", pathParams: []string{"keyId"}, queryParams: []string{"workspaceId"}},
+	"reveal_api_key":            {method: http.MethodGet, path: "/auth/api-keys/{keyId}/reveal", pathParams: []string{"keyId"}, queryParams: []string{"workspace_id"}},
 	"refresh_access_token":      {method: http.MethodPost, path: "/auth/refresh", hasBody: true},
 }
 
@@ -260,6 +260,27 @@ func extractReflections(raw interface{}, _ map[string]interface{}) interface{} {
 	return raw
 }
 
+func extractSteps(raw interface{}, _ map[string]interface{}) interface{} {
+	if m, ok := raw.(map[string]interface{}); ok {
+		if x, ok := m["steps"]; ok {
+			return x
+		}
+	}
+	return raw
+}
+
+func extractAPIKeys(raw interface{}, _ map[string]interface{}) interface{} {
+	if m, ok := raw.(map[string]interface{}); ok {
+		if x, ok := m["keys"]; ok {
+			return x
+		}
+		if x, ok := m["api_keys"]; ok {
+			return x
+		}
+	}
+	return raw
+}
+
 func (t *restTransport) Call(ctx context.Context, method string, params map[string]interface{}, result interface{}) error {
 	if t.invalidErr != nil {
 		return &ConnectionError{MemoryError{Message: t.invalidErr.Error(), Cause: t.invalidErr}}
@@ -296,12 +317,27 @@ func (t *restTransport) Call(ctx context.Context, method string, params map[stri
 		consumed[name] = true
 	}
 
+	// The hosted REST API uses snake_case for query params
+	// (conversation_id, workspace_id, etc.) — NOT camelCase. Look up the
+	// value from the original snake-cased params dict and emit the
+	// snake_case key on the wire. We mark both the snake form (consumed in
+	// the original params) and the camel form (consumed in the camel dict
+	// for body construction) so neither leaks into the body.
 	q := url.Values{}
 	for _, name := range route.queryParams {
-		v, ok := camel[name]
-		if ok && v != nil {
+		var v interface{}
+		if got, ok := params[name]; ok && got != nil {
+			v = got
+		} else {
+			camelName := camelKey(name)
+			if got, ok := camel[camelName]; ok && got != nil {
+				v = got
+			}
+		}
+		if v != nil {
 			q.Set(name, fmt.Sprintf("%v", v))
 			consumed[name] = true
+			consumed[camelKey(name)] = true
 		}
 	}
 	queryString := ""

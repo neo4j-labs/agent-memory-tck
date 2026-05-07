@@ -300,12 +300,24 @@ func (r *ReasoningMemory) GetTraceByConversation(ctx context.Context, conversati
 }
 
 // GetEntityProvenance returns the reasoning chain that influenced an entity.
+//
+// The hosted REST API returns the chain under the `provenance` key while
+// the bridge protocol uses `steps`. Decode into a permissive intermediate
+// struct and accept either.
 func (r *ReasoningMemory) GetEntityProvenance(ctx context.Context, entityID string) (*EntityProvenance, error) {
-	var result EntityProvenance
+	var raw struct {
+		EntityID   string      `json:"entity_id"`
+		Steps      []AgentStep `json:"steps"`
+		Provenance []AgentStep `json:"provenance"`
+	}
 	if err := r.transport.Call(ctx, "get_entity_provenance", map[string]interface{}{
 		"entity_id": entityID,
-	}, &result); err != nil {
+	}, &raw); err != nil {
 		return nil, err
 	}
-	return &result, nil
+	steps := raw.Steps
+	if len(steps) == 0 && len(raw.Provenance) > 0 {
+		steps = raw.Provenance
+	}
+	return &EntityProvenance{EntityID: raw.EntityID, Steps: steps}, nil
 }

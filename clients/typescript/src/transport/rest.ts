@@ -26,6 +26,11 @@ function trimTrailingSlashes(s: string): string {
   return s.slice(0, end);
 }
 
+/** snake_case → camelCase, single-key form (no recursion into objects). */
+function snakeToCamelKey(s: string): string {
+  return s.replace(/_([a-z0-9])/g, (_, c) => (c as string).toUpperCase());
+}
+
 export type TokenProvider = () => string | Promise<string>;
 
 export interface RestTransportOptions {
@@ -275,7 +280,8 @@ const ROUTES: Record<string, RestCall | "noop" | "unsupported"> = {
   list_steps: {
     method: "GET",
     path: "/reasoning/steps",
-    queryParams: ["conversationId"],
+    queryParams: ["conversation_id"],
+    shape: (raw) => (raw as { steps?: unknown[] })?.steps ?? raw,
   },
   cypher_query: {
     method: "POST",
@@ -287,7 +293,11 @@ const ROUTES: Record<string, RestCall | "noop" | "unsupported"> = {
   list_api_keys: {
     method: "GET",
     path: "/auth/api-keys",
-    queryParams: ["workspaceId"],
+    queryParams: ["workspace_id"],
+    shape: (raw) => {
+      const r = raw as { keys?: unknown[]; api_keys?: unknown[] };
+      return r?.keys ?? r?.api_keys ?? raw;
+    },
   },
   create_api_key: {
     method: "POST",
@@ -303,7 +313,7 @@ const ROUTES: Record<string, RestCall | "noop" | "unsupported"> = {
     method: "GET",
     path: "/auth/api-keys/{keyId}/reveal",
     pathParams: ["keyId"],
-    queryParams: ["workspaceId"],
+    queryParams: ["workspace_id"],
   },
   refresh_access_token: {
     method: "POST",
@@ -381,9 +391,10 @@ export class RestTransport implements Transport {
       );
     }
 
-    const camelParams = snakeToCamel<Record<string, unknown>>(params);
+    const original = params ?? {};
+    const camelParams = snakeToCamel<Record<string, unknown>>(original);
 
-    // Substitute path params
+    // Substitute path params (placeholders match camelCase route literals).
     let path = route.path;
     const consumed = new Set<string>();
     for (const name of route.pathParams ?? []) {
@@ -399,13 +410,21 @@ export class RestTransport implements Transport {
       consumed.add(name);
     }
 
-    // Build query string
+    // Build query string. The hosted REST API uses snake_case for query
+    // params (conversation_id, workspace_id) — NOT camelCase. Look up by
+    // the snake_case name from the original params; fall back to the
+    // camelCase form if the caller already passed it that way.
     const queryEntries: [string, string][] = [];
     for (const name of route.queryParams ?? []) {
-      const v = camelParams[name];
+      let v: unknown = original[name];
+      if (v === undefined || v === null) {
+        const camel = snakeToCamelKey(name);
+        v = camelParams[camel];
+      }
       if (v !== undefined && v !== null) {
         queryEntries.push([name, String(v)]);
         consumed.add(name);
+        consumed.add(snakeToCamelKey(name));
       }
     }
     const query = queryEntries.length

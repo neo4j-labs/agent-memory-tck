@@ -312,14 +312,19 @@ export class ReasoningMemory {
     };
   }
 
-  /** All reasoning steps that influenced an entity's creation. */
+  /** All reasoning steps that influenced an entity's creation.
+   *
+   * Hosted REST returns the chain under `provenance`; bridge / older
+   * responses use `steps`. Accept either.
+   */
   async getEntityProvenance(entityId: string): Promise<EntityProvenance> {
-    const wire = await this.transport.request<WireEntityProvenance>("get_entity_provenance", {
-      entity_id: entityId,
-    });
+    const wire = await this.transport.request<
+      WireEntityProvenance & { provenance?: WireAgentStep[] }
+    >("get_entity_provenance", { entity_id: entityId });
+    const rawSteps = wire.steps ?? wire.provenance ?? [];
     return {
       entityId: wire.entity_id,
-      steps: (wire.steps ?? []).map(toAgentStep),
+      steps: rawSteps.map(toAgentStep),
     };
   }
 }

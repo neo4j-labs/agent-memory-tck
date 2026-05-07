@@ -240,6 +240,12 @@ type UpdateEntityParams struct {
 }
 
 // UpdateEntity updates an existing entity's name and/or description.
+//
+// The hosted PUT /v1/entities/{id} returns {"status": "updated"} rather
+// than the full entity, so when the response lacks an "id" we fall back to
+// a follow-up GET to keep the public contract — "update returns the
+// updated entity". Bridge transports return the entity directly, so the
+// raw-decode path also works.
 func (l *LongTermMemory) UpdateEntity(ctx context.Context, entityID string, p UpdateEntityParams) (*BaseEntity, error) {
 	params := map[string]interface{}{
 		"entity_id": entityID,
@@ -253,6 +259,9 @@ func (l *LongTermMemory) UpdateEntity(ctx context.Context, entityID string, p Up
 	var result BaseEntity
 	if err := l.transport.Call(ctx, "update_entity", params, &result); err != nil {
 		return nil, err
+	}
+	if result.ID == "" {
+		return l.GetEntity(ctx, entityID)
 	}
 	return &result, nil
 }
