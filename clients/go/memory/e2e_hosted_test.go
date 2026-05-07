@@ -265,6 +265,12 @@ func TestE2ECypherReadOnly(t *testing.T) {
 		Cypher: "MATCH (n) RETURN count(n) AS total",
 	})
 	if err != nil {
+		// /v1/query requires an elevated workspace scope that not every API
+		// key carries. Skip cleanly if the service refuses the call.
+		var ae *memory.AuthenticationError
+		if errors.As(err, &ae) {
+			t.Skipf("API key lacks Cypher scope: %v", err)
+		}
 		t.Fatalf("Cypher: %v", err)
 	}
 	if len(res.Columns) == 0 || res.Columns[0] != "total" {

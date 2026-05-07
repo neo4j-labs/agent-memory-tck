@@ -133,11 +133,21 @@ describeOrSkip("hosted service e2e", () => {
 
   // -- Cypher console ------------------------------------------------------
 
-  it("cypher_query executes read-only Cypher", async () => {
-    const result = await client.query.cypher({
-      cypher: "MATCH (n) RETURN count(n) AS total",
-    });
-    expect(result.columns).toContain("total");
-    expect(result.rows.length).toBeGreaterThanOrEqual(1);
+  it("cypher_query executes read-only Cypher", async (ctx) => {
+    // /v1/query requires an elevated workspace scope that not every API key
+    // carries. Skip cleanly if the service refuses the call.
+    try {
+      const result = await client.query.cypher({
+        cypher: "MATCH (n) RETURN count(n) AS total",
+      });
+      expect(result.columns).toContain("total");
+      expect(result.rows.length).toBeGreaterThanOrEqual(1);
+    } catch (err) {
+      if (err instanceof AuthenticationError) {
+        ctx.skip();
+        return;
+      }
+      throw err;
+    }
   });
 });

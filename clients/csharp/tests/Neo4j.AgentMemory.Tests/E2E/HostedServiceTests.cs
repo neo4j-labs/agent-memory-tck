@@ -150,8 +150,18 @@ public class HostedServiceTests : IClassFixture<HostedServiceFixture>, IAsyncLif
     public async Task CypherQuery_ReadOnlyRoundTrip()
     {
         Skip.If(_fx.Client == null, "MEMORY_API_KEY not set");
-        var result = await _fx.Client!.Query.CypherAsync(
-            "MATCH (n) RETURN count(n) AS total");
+        Models.CypherResult result;
+        try
+        {
+            result = await _fx.Client!.Query.CypherAsync(
+                "MATCH (n) RETURN count(n) AS total");
+        }
+        catch (AuthenticationException e)
+        {
+            // /v1/query requires an elevated workspace scope that not every
+            // API key carries. Skip cleanly when the service refuses.
+            throw new SkipException($"API key lacks Cypher scope: {e.Message}");
+        }
         Assert.Contains("total", result.Columns);
         Assert.NotEmpty(result.Rows);
     }

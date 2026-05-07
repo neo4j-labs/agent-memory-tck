@@ -159,20 +159,26 @@ def parse_entity_history(d: dict[str, Any]) -> EntityHistory:
 
 
 def parse_graph(d: dict[str, Any]) -> EntityGraph:
-    return EntityGraph(
-        nodes=[
+    nodes: list[EntityGraphNode] = []
+    for n in d.get("nodes") or []:
+        nodes.append(
             EntityGraphNode(
-                id=n["id"], name=n.get("name", ""), type=n.get("type", "")
+                id=str(n.get("id") or ""),
+                name=n.get("name", ""),
+                type=n.get("type", ""),
             )
-            for n in d.get("nodes") or []
-        ],
-        edges=[
-            EntityGraphEdge(
-                id=e["id"], source=e.get("source", ""), target=e.get("target", ""), type=e.get("type", "")
-            )
-            for e in d.get("edges") or []
-        ],
-    )
+        )
+    edges: list[EntityGraphEdge] = []
+    for e in d.get("edges") or []:
+        # Hosted edges expose source_id/target_id and no top-level id.
+        source = str(e.get("source") or e.get("source_id") or "")
+        target = str(e.get("target") or e.get("target_id") or "")
+        edge_type = e.get("type") or e.get("predicate") or ""
+        edge_id = str(e.get("id") or f"{source}-{edge_type}-{target}")
+        edges.append(
+            EntityGraphEdge(id=edge_id, source=source, target=target, type=edge_type)
+        )
+    return EntityGraph(nodes=nodes, edges=edges)
 
 
 def parse_preference(d: dict[str, Any]) -> Preference:

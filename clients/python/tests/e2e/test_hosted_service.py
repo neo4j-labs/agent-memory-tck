@@ -202,6 +202,13 @@ async def test_get_trace_by_conversation(
 
 
 async def test_cypher_read_only(client: MemoryClient):
-    result = await client.query.cypher("MATCH (n) RETURN count(n) AS total")
+    from neo4j_agent_memory_client.errors import AuthenticationError
+
+    try:
+        result = await client.query.cypher("MATCH (n) RETURN count(n) AS total")
+    except AuthenticationError as e:
+        # /v1/query requires an elevated workspace scope that not every API
+        # key carries. Skip if the service refuses the call.
+        pytest.skip(f"API key lacks Cypher scope: {e}")
     assert "total" in result.columns
     assert len(result.rows) >= 1

@@ -96,7 +96,17 @@ test_that("e2e: record_step + get_trace_by_conversation round-trip", {
 
 test_that("e2e: cypher_query executes read-only Cypher", {
   client <- new_e2e_client()
-  result <- client$query$cypher("MATCH (n) RETURN count(n) AS total")
+  # /v1/query requires an elevated workspace scope that not every API key
+  # carries. Skip cleanly when the service refuses the call.
+  result <- tryCatch(
+    client$query$cypher("MATCH (n) RETURN count(n) AS total"),
+    error = function(e) {
+      if (grepl("[Aa]uthentication|403", conditionMessage(e))) {
+        testthat::skip(paste("API key lacks Cypher scope:", conditionMessage(e)))
+      }
+      stop(e)
+    }
+  )
   expect_true("total" %in% result$columns)
   expect_true(length(result$rows) >= 1)
 })
