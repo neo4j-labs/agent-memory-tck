@@ -15,6 +15,7 @@
 import {
   afterAll,
   beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
@@ -27,6 +28,12 @@ import {
   ValidationError,
 } from "../../src/errors.js";
 import type { Entity } from "../../src/types.js";
+import {
+  metadataFor,
+  provenanceReasoning,
+  provenanceResult,
+  tagDescription,
+} from "./tck-provenance.js";
 
 const API_KEY = (process.env.MEMORY_API_KEY ?? "").trim();
 const ENDPOINT = process.env.MEMORY_ENDPOINT ?? "https://memory.neo4jlabs.com/v1";
@@ -68,12 +75,20 @@ async function waitUntil<T>(
 
 describeOrSkip("hosted service e2e", () => {
   let client: MemoryClient;
+  let currentTestName = "unknown";
   const cleanupConversations: string[] = [];
   const cleanupEntities: string[] = [];
 
   beforeAll(async () => {
     client = new MemoryClient({ endpoint: ENDPOINT, apiKey: API_KEY });
     await client.connect();
+  });
+
+  // Capture the current test name for provenance tagging. Vitest exposes
+  // the task on the context handed to each test; we mirror it into a
+  // closure variable so newConv / newEntity helpers can read it.
+  beforeEach((ctx) => {
+    currentTestName = ctx?.task?.name ?? "unknown";
   });
 
   afterAll(async () => {
@@ -94,24 +109,50 @@ describeOrSkip("hosted service e2e", () => {
     await client.close();
   });
 
+  /**
+   * Create a conversation tagged with full provenance metadata + record an
+   * `record_step` on it so the hosted reasoning graph can trace this
+   * conversation back to the originating test (client + run + sha).
+   */
   async function newConv(opts?: { userId?: string; metadata?: Record<string, unknown> }) {
+    const baseMeta = metadataFor(currentTestName, { tck_phase: "fixture" });
     const conv = await client.shortTerm.createConversation({
       userId: opts?.userId ?? userId(),
-      metadata: opts?.metadata,
+      metadata: { ...baseMeta, ...(opts?.metadata ?? {}) },
     });
     cleanupConversations.push(conv.id);
+    // Provenance is best-effort — never fail a test on tagging noise.
+    try {
+      await client.reasoning.recordStep({
+        conversationId: conv.id,
+        reasoning: provenanceReasoning(currentTestName, "setup"),
+        actionTaken: "create_conversation",
+        result: provenanceResult(currentTestName, { conversation_id: conv.id }),
+      });
+    } catch {
+      // ignore
+    }
     return conv;
   }
 
+  /**
+   * Create an entity whose `description` is prefixed with a provenance tag
+   * (e.g. `[tck:typescript:run123:test_name] tck e2e probe entity`) so even
+   * a workspace operator without graph access can grep for test data.
+   */
   async function newEntity(opts?: {
     name?: string;
     entityType?: string;
     description?: string;
   }): Promise<Entity> {
+    const description = tagDescription(
+      currentTestName,
+      opts?.description ?? "tck e2e probe entity",
+    );
     const e = await client.longTerm.addEntity(
       opts?.name ?? `TCK-Probe-${randomHex(8)}`,
       opts?.entityType ?? "concept",
-      { description: opts?.description ?? "tck e2e probe entity" },
+      { description },
     );
     cleanupEntities.push(e.id);
     return e;
@@ -346,7 +387,10 @@ describeOrSkip("hosted service e2e", () => {
       const e = await newEntity({ name: "TCK Alice", description: "test person" });
       expect(e.id.length).toBeGreaterThanOrEqual(8);
       expect(e.name).toBe("TCK Alice");
-      expect(e.description).toBe("test person");
+      // newEntity tags the description with a tck-provenance prefix; the
+      // original payload is preserved at the end of the string.
+      expect(e.description ?? "").toMatch(/test person$/);
+      expect(e.description ?? "").toContain("tck:typescript");
     });
 
     it("listEntities returns array", async () => {

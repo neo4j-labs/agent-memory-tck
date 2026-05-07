@@ -50,26 +50,57 @@ public class HostedServiceTests : IClassFixture<HostedServiceFixture>, IAsyncLif
         }
     }
 
-    private async Task<Conversation> NewConvAsync(string suffix = "")
+    private string CurrentTestName([System.Runtime.CompilerServices.CallerMemberName] string caller = "")
+        => caller;
+
+    /// <summary>
+    /// Create a conversation tagged with full provenance metadata (client,
+    /// test, run id, sha, …) and record a reasoning step on it tying the
+    /// conversation back to this test. Cleanup is registered automatically.
+    /// </summary>
+    private async Task<Conversation> NewConvAsync(string suffix = "", [System.Runtime.CompilerServices.CallerMemberName] string callerTest = "")
     {
-        var conv = await Client.ShortTerm.CreateConversationAsync(_fx.UserId(suffix));
+        var conv = await Client.ShortTerm.CreateConversationAsync(
+            _fx.UserId(suffix),
+            metadata: TckProvenance.MetadataFor(callerTest, new Dictionary<string, object?>
+            {
+                ["tck_phase"] = "fixture",
+            }));
         _createdConversationIds.Add(conv.Id);
+        await TckProvenance.RecordStepAsync(Client, conv.Id, callerTest);
         return conv;
     }
 
-    private async Task<Conversation> NewConvAsync(string userId, Dictionary<string, object?>? metadata)
+    private async Task<Conversation> NewConvAsync(string userId, Dictionary<string, object?>? metadata, [System.Runtime.CompilerServices.CallerMemberName] string callerTest = "")
     {
-        var conv = await Client.ShortTerm.CreateConversationAsync(userId, metadata);
+        var merged = TckProvenance.MetadataFor(callerTest, new Dictionary<string, object?>
+        {
+            ["tck_phase"] = "fixture",
+        });
+        if (metadata != null)
+        {
+            foreach (var kv in metadata) merged[kv.Key] = kv.Value;
+        }
+        var conv = await Client.ShortTerm.CreateConversationAsync(userId, merged);
         _createdConversationIds.Add(conv.Id);
+        await TckProvenance.RecordStepAsync(Client, conv.Id, callerTest);
         return conv;
     }
 
-    private async Task<Entity> NewEntityAsync(string? name = null, string entityType = "concept", string? description = null)
+    /// <summary>
+    /// Create an entity whose description is prefixed with a `[tck:csharp:run:test]`
+    /// provenance tag.
+    /// </summary>
+    private async Task<Entity> NewEntityAsync(
+        string? name = null, string entityType = "concept",
+        string? description = null,
+        [System.Runtime.CompilerServices.CallerMemberName] string callerTest = "")
     {
+        var tagged = TckProvenance.TagDescription(callerTest, description ?? "tck e2e probe entity");
         var e = await Client.LongTerm.AddEntityAsync(
             name ?? $"TCK-Probe-{Guid.NewGuid():N}".Substring(0, 18),
             entityType,
-            description ?? "tck e2e probe entity");
+            tagged);
         _createdEntityIds.Add(e.Id);
         return e;
     }
@@ -343,7 +374,11 @@ public class HostedServiceTests : IClassFixture<HostedServiceFixture>, IAsyncLif
     {
         var e = await NewEntityAsync(name: $"TCK Alice {RandomHex(4)}", description: "test person");
         Assert.True(e.Id.Length >= 8);
-        Assert.Equal("test person", e.Description);
+        // NewEntityAsync tags the description with a tck-provenance prefix;
+        // the original payload is preserved at the end of the string.
+        Assert.NotNull(e.Description);
+        Assert.EndsWith("test person", e.Description);
+        Assert.Contains("tck:csharp", e.Description);
     }
 
     [SkippableFact]

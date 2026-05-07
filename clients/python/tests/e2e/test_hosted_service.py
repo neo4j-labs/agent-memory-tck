@@ -31,6 +31,14 @@ from neo4j_agent_memory_client.errors import (
     TransportError,
 )
 
+from tests.e2e._tck_provenance import (
+    metadata_for as _tck_meta,
+    provenance_reasoning,
+    provenance_result,
+    run_info,
+    tag_description,
+)
+
 
 # ---------------------------------------------------------------------------
 # Fixtures + helpers
@@ -70,10 +78,46 @@ async def client():
 
 
 @pytest.fixture
-async def conv(client: MemoryClient):
-    """Disposable conversation; deleted after the test."""
-    c = await client.short_term.create_conversation(user_id=_user_id())
+async def _test_name(request) -> str:
+    return request.node.name
+
+
+@pytest.fixture
+async def conv(client: MemoryClient, _test_name: str):
+    """Disposable conversation; deleted after the test.
+
+    The conversation's `metadata` is tagged with provenance keys
+    (tck_client, tck_test, tck_run_id, tck_sha, …) so the hosted graph
+    records exactly which language + test created it. After the test
+    completes, a reasoning step is appended to the conversation that closes
+    the provenance loop on the service side.
+    """
+    c = await client.short_term.create_conversation(
+        user_id=_user_id(), metadata=_tck_meta(_test_name, tck_phase="fixture")
+    )
+    # Anchor a provenance step on this conversation. The reasoning + result
+    # fields are queryable via cypher / list_steps.
+    try:
+        await client.reasoning.record_step(
+            conversation_id=c.id,
+            reasoning=provenance_reasoning(_test_name, "setup"),
+            action_taken="create_conversation",
+            result=provenance_result(_test_name, conversation_id=c.id),
+        )
+    except Exception:
+        # Provenance is best-effort — never fail a test on provenance noise.
+        pass
+
     yield c
+
+    try:
+        await client.reasoning.record_step(
+            conversation_id=c.id,
+            reasoning=provenance_reasoning(_test_name, "teardown"),
+            action_taken="delete_conversation",
+        )
+    except Exception:
+        pass
     try:
         await client.short_term.delete_conversation(c.id)
     except Exception:
@@ -81,15 +125,30 @@ async def conv(client: MemoryClient):
 
 
 @pytest.fixture
-async def conv_factory(client: MemoryClient):
-    """Make several conversations in one test; all are deleted in teardown."""
+async def conv_factory(client: MemoryClient, _test_name: str):
+    """Make several conversations in one test; all are deleted in teardown.
+
+    Auto-tags each conversation's metadata with provenance keys.
+    """
     created: list[str] = []
 
     async def _make(*, user_id: str | None = None, metadata: dict | None = None):
+        merged = _tck_meta(_test_name, tck_phase="fixture")
+        if metadata:
+            merged.update(metadata)
         c = await client.short_term.create_conversation(
-            user_id=user_id or _user_id(), metadata=metadata
+            user_id=user_id or _user_id(), metadata=merged
         )
         created.append(c.id)
+        try:
+            await client.reasoning.record_step(
+                conversation_id=c.id,
+                reasoning=provenance_reasoning(_test_name, "setup"),
+                action_taken="create_conversation",
+                result=provenance_result(_test_name, conversation_id=c.id),
+            )
+        except Exception:
+            pass
         return c
 
     yield _make
@@ -101,15 +160,22 @@ async def conv_factory(client: MemoryClient):
 
 
 @pytest.fixture
-async def entity_factory(client: MemoryClient):
-    """Make scratch entities; all deleted in teardown."""
+async def entity_factory(client: MemoryClient, _test_name: str):
+    """Make scratch entities; all deleted in teardown.
+
+    Each entity's `description` is prefixed with `[tck:<client>:<run>:<test>]`
+    so the test's data is grep-able even without graph access.
+    """
     created: list[str] = []
 
     async def _make(*, name: str | None = None, entity_type: str = "concept", description: str | None = None):
+        tagged_description = tag_description(
+            _test_name, description or "tck e2e probe entity"
+        )
         ent = await client.long_term.add_entity(
             name=name or f"TCK-Probe-{uuid.uuid4().hex[:8]}",
             entity_type=entity_type,
-            description=description or "tck e2e probe entity",
+            description=tagged_description,
         )
         created.append(ent.id)
         return ent
@@ -367,7 +433,10 @@ class TestEntityCRUD:
         e = await entity_factory(name="TCK Alice", description="test person")
         assert e.id and len(e.id) >= 8
         assert e.name == "TCK Alice"
-        assert e.description == "test person"
+        # entity_factory tags the description with a tck-provenance prefix;
+        # the original payload is preserved at the end of the string.
+        assert e.description and e.description.endswith("test person")
+        assert "tck:python" in (e.description or "")
 
     async def test_list_entities_returns_array(self, client: MemoryClient):
         ents = await client.long_term.list_entities(limit=5)

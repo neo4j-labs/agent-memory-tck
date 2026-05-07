@@ -116,20 +116,29 @@ func e2eRandomHex(n int) string {
 	return hex.EncodeToString(buf)[:n]
 }
 
+// e2eNewConv creates a disposable conversation tagged with full provenance
+// metadata, plus records a reasoning step on it linking the conversation
+// back to the originating test (client + run + sha). Cleanup is registered
+// via t.Cleanup.
 func e2eNewConv(t *testing.T, c *memory.Client, suffix string) *memory.Conversation {
 	t.Helper()
 	conv, err := c.ShortTerm.CreateConversation(context.Background(), memory.CreateConversationParams{
-		UserID: e2eUserID(t, suffix),
+		UserID:   e2eUserID(t, suffix),
+		Metadata: tckMetadataFor(t.Name(), map[string]interface{}{"tck_phase": "fixture"}),
 	})
 	if err != nil {
 		t.Fatalf("CreateConversation: %v", err)
 	}
+	tckRecordProvenanceStep(c, conv.ID, t.Name(), "setup", "create_conversation")
 	t.Cleanup(func() {
 		_ = c.ShortTerm.DeleteConversation(context.Background(), conv.ID)
 	})
 	return conv
 }
 
+// e2eNewEntity creates a scratch entity whose description is prefixed with
+// a `[tck:go:<run>:<test>]` provenance tag so even ungraphed operators can
+// grep for test data. Cleanup is registered via t.Cleanup.
 func e2eNewEntity(t *testing.T, c *memory.Client, name, entityType, description string) *memory.BaseEntity {
 	t.Helper()
 	if name == "" {
@@ -141,7 +150,8 @@ func e2eNewEntity(t *testing.T, c *memory.Client, name, entityType, description 
 	if description == "" {
 		description = "tck e2e probe entity"
 	}
-	e, err := c.LongTerm.AddEntity(context.Background(), name, entityType, memory.WithDescription(description))
+	tagged := tckTagDescription(t.Name(), description)
+	e, err := c.LongTerm.AddEntity(context.Background(), name, entityType, memory.WithDescription(tagged))
 	if err != nil {
 		t.Fatalf("AddEntity: %v", err)
 	}
@@ -534,8 +544,13 @@ func TestE2EAddEntityReturnsIDAndFields(t *testing.T) {
 	if len(e.ID) < 8 {
 		t.Errorf("entity ID too short: %q", e.ID)
 	}
-	if e.Description != "test person" {
-		t.Errorf("Description = %q", e.Description)
+	// e2eNewEntity tags the description with a tck-provenance prefix; the
+	// original payload is preserved at the end of the string.
+	if !strings.HasSuffix(e.Description, "test person") {
+		t.Errorf("Description = %q, should end with 'test person'", e.Description)
+	}
+	if !strings.Contains(e.Description, "tck:go") {
+		t.Errorf("Description = %q, should contain provenance tag", e.Description)
 	}
 }
 
