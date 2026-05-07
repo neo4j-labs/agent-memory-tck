@@ -127,9 +127,12 @@ ReasoningMemory <- R6::R6Class("ReasoningMemory",
       result <- private$transport$request("get_entity_provenance", list(
         entity_id = as.character(entity_id)
       ))
+      # Hosted REST returns the chain under `provenance`; bridge / older
+      # responses use `steps`. Accept either.
+      raw_steps <- if (!is.null(result$steps)) result$steps else result$provenance
       list(
         entity_id = result$entity_id,
-        steps = if (is.null(result$steps)) list() else lapply(result$steps, parse_agent_step)
+        steps = if (is.null(raw_steps)) list() else lapply(raw_steps, parse_agent_step)
       )
     }
   ),

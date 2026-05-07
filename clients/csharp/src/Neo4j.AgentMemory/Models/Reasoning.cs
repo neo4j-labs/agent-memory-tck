@@ -159,14 +159,26 @@ public class ConversationTrace
     public List<ToolCall> ToolCalls { get; set; } = new();
 }
 
-/// <summary>Reasoning chain that influenced an entity.</summary>
+/// <summary>Reasoning chain that influenced an entity.
+///
+/// Hosted REST returns the chain under <c>provenance</c>; bridge / older
+/// responses use <c>steps</c>. We bind both and prefer whichever is
+/// non-empty.
+/// </summary>
 public class EntityProvenance
 {
     [JsonPropertyName("entity_id")]
     public string EntityId { get; set; } = "";
 
     [JsonPropertyName("steps")]
-    public List<AgentStep> Steps { get; set; } = new();
+    public List<AgentStep> StepsField { get; set; } = new();
+
+    [JsonPropertyName("provenance")]
+    public List<AgentStep> ProvenanceField { get; set; } = new();
+
+    [JsonIgnore]
+    public List<AgentStep> Steps =>
+        StepsField.Count > 0 ? StepsField : ProvenanceField;
 }
 
 /// <summary>Read-only Cypher result.</summary>

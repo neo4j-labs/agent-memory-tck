@@ -152,15 +152,25 @@ public class RestTransport : ITransport, IDisposable
         ["get_trace_by_conversation"] = new("GET", "/reasoning/trace/{conversationId}", PathParams: new[] { "conversationId" }),
         ["get_entity_provenance"] = new("GET", "/reasoning/provenance/{entityId}", PathParams: new[] { "entityId" }),
         ["record_step"] = new("POST", "/reasoning/steps", HasBody: true),
-        ["list_steps"] = new("GET", "/reasoning/steps", QueryParams: new[] { "conversationId" }),
+        ["list_steps"] = new("GET", "/reasoning/steps", QueryParams: new[] { "conversation_id" },
+            Shape: (raw, _) => raw is IDictionary<string, object?> m && m.TryGetValue("steps", out var s) ? s : raw),
         ["cypher_query"] = new("POST", "/query", HasBody: true),
 
         // Auth
-        ["list_api_keys"] = new("GET", "/auth/api-keys", QueryParams: new[] { "workspaceId" }),
+        ["list_api_keys"] = new("GET", "/auth/api-keys", QueryParams: new[] { "workspace_id" },
+            Shape: (raw, _) =>
+            {
+                if (raw is IDictionary<string, object?> m)
+                {
+                    if (m.TryGetValue("keys", out var k)) return k;
+                    if (m.TryGetValue("api_keys", out var ak)) return ak;
+                }
+                return raw;
+            }),
         ["create_api_key"] = new("POST", "/auth/api-keys", HasBody: true),
         ["revoke_api_key"] = new("DELETE", "/auth/api-keys/{keyId}", PathParams: new[] { "keyId" }),
         ["reveal_api_key"] = new("GET", "/auth/api-keys/{keyId}/reveal",
-            PathParams: new[] { "keyId" }, QueryParams: new[] { "workspaceId" }),
+            PathParams: new[] { "keyId" }, QueryParams: new[] { "workspace_id" }),
         ["refresh_access_token"] = new("POST", "/auth/refresh", HasBody: true),
     };
 
@@ -226,17 +236,36 @@ public class RestTransport : ITransport, IDisposable
             }
         }
 
-        // Query
+        // Query — the hosted REST API uses snake_case for query params
+        // (conversation_id, workspace_id, etc.). Look up the value from the
+        // ORIGINAL snake-cased params; fall back to the camelCase form if
+        // the caller already supplied it that way. Mark both forms as
+        // consumed so neither leaks into the body.
         var qs = "";
+        var originalParams = parameters ?? new Dictionary<string, object?>();
         if (route.QueryParams != null)
         {
             var pairs = new List<string>();
             foreach (var qp in route.QueryParams)
             {
-                if (camelParams.TryGetValue(qp, out var v) && v != null)
+                object? v = null;
+                if (originalParams.TryGetValue(qp, out var got) && got != null)
+                {
+                    v = got;
+                }
+                else
+                {
+                    var camelName = Casing.ToCamel(qp);
+                    if (camelParams.TryGetValue(camelName, out var camelGot) && camelGot != null)
+                    {
+                        v = camelGot;
+                    }
+                }
+                if (v != null)
                 {
                     pairs.Add($"{qp}={HttpUtility.UrlEncode(v.ToString())}");
                     consumed.Add(qp);
+                    consumed.Add(Casing.ToCamel(qp));
                 }
             }
             if (pairs.Count > 0) qs = "?" + string.Join("&", pairs);

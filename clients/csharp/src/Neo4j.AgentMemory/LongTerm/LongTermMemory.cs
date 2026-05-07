@@ -125,6 +125,14 @@ public class LongTermMemory
         return result!;
     }
 
+    /// <summary>Update an entity's name and/or description.
+    ///
+    /// The hosted PUT /v1/entities/{id} returns {"status": "updated"}
+    /// rather than the full entity, so when the response is missing an
+    /// id we fall back to a follow-up GET to keep the public contract —
+    /// "update returns the updated Entity". Bridge transports return the
+    /// entity directly.
+    /// </summary>
     public async Task<Entity> UpdateEntityAsync(string entityId, string? name = null, string? description = null, CancellationToken ct = default)
     {
         var result = await _transport.RequestAsync<Entity>("update_entity", new()
@@ -133,7 +141,11 @@ public class LongTermMemory
             ["name"] = name,
             ["description"] = description
         }, ct);
-        return result!;
+        if (result != null && !string.IsNullOrEmpty(result.Id))
+        {
+            return result;
+        }
+        return await GetEntityAsync(entityId, ct);
     }
 
     public async Task DeleteEntityAsync(string entityId, CancellationToken ct = default)

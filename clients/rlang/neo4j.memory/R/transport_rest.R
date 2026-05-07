@@ -68,13 +68,21 @@ RestTransport <- R6::R6Class("RestTransport",
         consumed <- c(consumed, name)
       }
 
+      # Query params on the hosted REST API are snake_case
+      # (conversation_id, workspace_id, etc.), NOT camelCase. Look up from
+      # the original snake-cased params first; fall back to the camel form
+      # if the caller passed it that way. Mark both as consumed so neither
+      # leaks into the body.
       qs_pairs <- character(0)
       for (name in route$query_params %||% character(0)) {
-        v <- camel[[name]]
+        v <- params[[name]]
+        if (is.null(v)) {
+          v <- camel[[snake_to_camel_key(name)]]
+        }
         if (!is.null(v)) {
           qs_pairs <- c(qs_pairs,
             paste0(name, "=", utils::URLencode(as.character(v), reserved = TRUE)))
-          consumed <- c(consumed, name)
+          consumed <- c(consumed, name, snake_to_camel_key(name))
         }
       }
       qs <- if (length(qs_pairs)) paste0("?", paste(qs_pairs, collapse = "&")) else ""
@@ -267,18 +275,26 @@ RestTransport <- R6::R6Class("RestTransport",
       record_step = list(method = "POST", path = "/reasoning/steps",
         has_body = TRUE),
       list_steps = list(method = "GET", path = "/reasoning/steps",
-        query_params = c("conversationId")),
+        query_params = c("conversation_id"),
+        shape = function(raw, p) {
+          if (is.list(raw) && !is.null(raw$steps)) raw$steps else raw
+        }),
       cypher_query = list(method = "POST", path = "/query", has_body = TRUE),
 
       list_api_keys = list(method = "GET", path = "/auth/api-keys",
-        query_params = c("workspaceId")),
+        query_params = c("workspace_id"),
+        shape = function(raw, p) {
+          if (is.list(raw) && !is.null(raw$keys)) return(raw$keys)
+          if (is.list(raw) && !is.null(raw$api_keys)) return(raw$api_keys)
+          raw
+        }),
       create_api_key = list(method = "POST", path = "/auth/api-keys",
         has_body = TRUE),
       revoke_api_key = list(method = "DELETE", path = "/auth/api-keys/{keyId}",
         path_params = c("keyId")),
       reveal_api_key = list(method = "GET",
         path = "/auth/api-keys/{keyId}/reveal",
-        path_params = c("keyId"), query_params = c("workspaceId")),
+        path_params = c("keyId"), query_params = c("workspace_id")),
       refresh_access_token = list(method = "POST", path = "/auth/refresh",
         has_body = TRUE)
     )

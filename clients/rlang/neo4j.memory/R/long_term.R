@@ -109,13 +109,22 @@ LongTermMemory <- R6::R6Class("LongTermMemory",
       parse_entity(result)
     },
 
+    # Update an existing entity's name and/or description.
+    #
+    # The hosted PUT /v1/entities/{id} returns {"status": "updated"}
+    # rather than the full entity, so when the response lacks an `id` we
+    # follow up with a GET to keep the contract — "update returns the
+    # updated entity". Bridge transports return the entity directly.
     update_entity = function(entity_id, name = NULL, description = NULL) {
       result <- private$transport$request("update_entity", list(
         entity_id = as.character(entity_id),
         name = name,
         description = description
       ))
-      parse_entity(result)
+      if (!is.null(result) && !is.null(result$id) && nchar(result$id) > 0) {
+        return(parse_entity(result))
+      }
+      self$get_entity(entity_id)
     },
 
     delete_entity = function(entity_id) {
