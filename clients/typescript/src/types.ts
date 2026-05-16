@@ -217,6 +217,8 @@ export interface ReasoningStep {
 
 export interface ToolCall {
   id: string;
+  /** Reasoning step this tool call hangs off (hosted service exposes this). */
+  stepId?: string;
   toolName: string;
   arguments: Record<string, unknown>;
   result?: unknown;

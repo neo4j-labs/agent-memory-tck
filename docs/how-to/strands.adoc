@@ -1,0 +1,148 @@
+= How to: integrate with AWS Strands Agents
+:toc: left
+:source-highlighter: rouge
+
+The `@neo4j-labs/agent-memory/integrations/strands` subpath plugs into
+all three of Strands' orthogonal extension surfaces:
+
+* **`SnapshotStorage`** — session state persists to a NAMS conversation
+  automatically. Messages live as real `Message` graph nodes; opaque
+  framework state round-trips through the conversation's metadata.
+* **`ConversationManager`** — three-tier context (reflections + observations
+  from `getContext()`) is prepended to every model invocation, *on top of*
+  a configurable inner manager (defaults to `SlidingWindowConversationManager`).
+* **`HookRegistry` events** — `BeforeInvocation`, `AfterInvocation`,
+  `BeforeToolCall`, and `AfterToolCall` are wired to the reasoning subclient
+  so every agent turn becomes a queryable `ReasoningStep` with tool calls
+  attached.
+
+A runnable example lives at
+link:../../clients/typescript/examples/strands[`clients/typescript/examples/strands`].
+
+== When to use this
+
+You want any of:
+
+* Agent state that survives process restarts AND is queryable as a graph
+* Reflections/observations injected into the model context automatically
+* A full reasoning trace of every agent turn, browseable later via
+  `client.reasoning.getTraceByConversation(id)`
+* Cross-agent memory sharing through the same conversation
+
+== One-line wiring with `connectMemoryToAgent`
+
+[source,typescript]
+----
+import { Agent } from "@strands-agents/sdk";
+import { OpenAIModel } from "@strands-agents/sdk/models/openai";
+import { MemoryClient } from "@neo4j-labs/agent-memory";
+import { connectMemoryToAgent } from "@neo4j-labs/agent-memory/integrations/strands";
+
+const memory = new MemoryClient();
+const conv = await memory.shortTerm.createConversation({ userId: "alice" });
+
+const agent = new Agent({
+  ...await connectMemoryToAgent(memory, { conversationId: conv.id }),
+  model: new OpenAIModel({ modelId: "gpt-4o-mini" }),
+  tools: [/* ... */],
+});
+
+await agent.invoke("Tell me about graph databases.");
+----
+
+The factory returns `{ sessionManager, conversationManager }` — spread it
+into `new Agent({...})`. Reasoning hooks attach automatically when the
+conversation manager's `initAgent` runs.
+
+== Individual pieces (advanced)
+
+For finer control:
+
+[source,typescript]
+----
+import {
+  SessionManager,
+  SlidingWindowConversationManager,
+} from "@strands-agents/sdk";
+import {
+  Neo4jSessionStorage,
+  Neo4jConversationManager,
+  registerReasoningHooks,
+} from "@neo4j-labs/agent-memory/integrations/strands";
+
+const sessionManager = new SessionManager({
+  sessionId: conv.id,
+  storage: { snapshot: new Neo4jSessionStorage(memory) },
+});
+
+const conversationManager = new Neo4jConversationManager(memory, {
+  conversationId: conv.id,
+  inner: new SlidingWindowConversationManager(),  // or any custom CM
+  includeReflections: true,
+  includeObservations: true,
+});
+
+const agent = new Agent({ sessionManager, conversationManager, model, tools });
+
+// If you skipped connectMemoryToAgent, attach reasoning hooks explicitly:
+await registerReasoningHooks(memory, agent, { conversationId: conv.id });
+----
+
+== What gets stored where
+
+[options="header"]
+|===
+| Strands construct | Where it lands in NAMS
+| Conversation messages | `Message` nodes attached to the Conversation
+| Agent state (`Snapshot.data`, non-message fields) | `Conversation.metadata.strands_state` (JSON-stringified)
+| Application state (`Snapshot.appData`) | inside the same `strands_state` blob
+| Tool calls | `ToolCall` nodes attached to a `ReasoningStep`
+| Per-turn reasoning | `ReasoningStep` nodes attached to the Conversation
+| Manifests (snapshot metadata) | `strands_state.manifest`
+|===
+
+The non-message snapshot fields are stored as a single JSON-stringified
+blob to stay opaque to the REST transport's casing transform. This means
+the entire `Snapshot` round-trips losslessly: `loadSnapshot` reconstructs
+exactly what `saveSnapshot` was given.
+
+== Behaviour details
+
+=== ConversationManager layering
+
+`Neo4jConversationManager` does NOT replace your inner manager's trimming
+or summarization logic — it layers context injection *on top* of it. So:
+
+* Sliding-window trimming still happens (if you use `SlidingWindowConversationManager`)
+* Summarization still happens (if you use `SummarizingConversationManager`)
+* If `getContext()` fails (cold conversation, transient error), the inner
+  manager's output is used unchanged
+
+=== Reasoning capture is best-effort
+
+Every reasoning write (`recordStep`, `recordToolCall`) is wrapped in
+try/catch. A failed reasoning write logs through the constructor `logger`
+but never breaks the agent run. If you depend on the trace being complete,
+check `getTraceByConversation(id)` after the run and replay missing steps
+yourself.
+
+=== Auth errors propagate
+
+`SnapshotStorage` failures are *not* best-effort. If the integration
+can't read or write the snapshot blob, Strands' own retry semantics kick
+in. An auth failure surfaces as `AuthenticationError` from
+`saveSnapshot` / `loadSnapshot`.
+
+== Version compatibility
+
+We test against `@strands-agents/sdk@^1.2.0`. Strands' v1 API is stable
+under semver — the integration should track v1 minor releases without
+adjustment. We will not break the integration API across minor releases
+of `@neo4j-labs/agent-memory` without a CHANGELOG callout.
+
+== See also
+
+- link:../../clients/typescript/examples/strands[Runnable Strands example]
+- link:observability.adoc[Enable request logging]
+- link:handle-errors.adoc[Error handling]
+- https://strandsagents.com[Strands Agents docs]
