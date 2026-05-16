@@ -1,0 +1,75 @@
+= How to: integrate with LangChain JS
+:toc: left
+:source-highlighter: rouge
+
+The `@neo4j-labs/agent-memory/integrations/langchain` subpath exposes
+two duck-typed adapters that fit common LangChain JS shapes:
+
+* `Neo4jChatMessageHistory` — slots into `RunnableWithMessageHistory`
+  wherever a `BaseChatMessageHistory` is expected.
+* `Neo4jEntityRetriever` — slots into retriever chains wherever a
+  `BaseRetriever`-shaped object is expected.
+
+A runnable example lives at
+link:../../clients/typescript/examples/langchain[`clients/typescript/examples/langchain`].
+
+== Why duck-typed
+
+LangChain JS evolves quickly and the published interfaces shift between
+minor versions. Importing concrete base classes from `@langchain/core`
+would bind us to a specific version; duck-typing lets these adapters
+slot in regardless.
+
+The cost: type information about the LangChain interfaces is not
+imported. If you want stronger types in your own app, cast at the call
+site:
+
+[source,typescript]
+----
+import type { BaseChatMessageHistory } from "@langchain/core/chat_history";
+import { Neo4jChatMessageHistory } from "@neo4j-labs/agent-memory/integrations/langchain";
+
+const history: BaseChatMessageHistory =
+  new Neo4jChatMessageHistory(memory, conv.id) as unknown as BaseChatMessageHistory;
+----
+
+== Chat message history
+
+[source,typescript]
+----
+import { RunnableWithMessageHistory } from "@langchain/core/runnables";
+import { Neo4jChatMessageHistory } from "@neo4j-labs/agent-memory/integrations/langchain";
+
+const chain = baseChain.pipe(...);
+
+const memoryChain = new RunnableWithMessageHistory({
+  runnable: chain,
+  getMessageHistory: (sessionId) => new Neo4jChatMessageHistory(memory, sessionId),
+  inputMessagesKey: "input",
+  historyMessagesKey: "history",
+});
+
+await memoryChain.invoke(
+  { input: "Hello!" },
+  { configurable: { sessionId: conv.id } },
+);
+----
+
+== Entity retriever
+
+[source,typescript]
+----
+import { Neo4jEntityRetriever } from "@neo4j-labs/agent-memory/integrations/langchain";
+
+const retriever = new Neo4jEntityRetriever(memory, { limit: 5 });
+const docs = await retriever.invoke("Neo4j graph database");
+// docs[i].pageContent === entity.description
+// docs[i].metadata.name === entity.name
+----
+
+== Version compatibility
+
+These adapters are tested against LangChain JS 0.2+ shapes. We will not
+break the adapter signatures across minor releases without a CHANGELOG
+callout, but upstream interface drift can still surface — if you hit it,
+please file an issue with the LangChain JS version you're on.

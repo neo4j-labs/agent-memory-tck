@@ -1,7 +1,7 @@
 {
   "name": "@neo4j-labs/agent-memory",
-  "version": "0.2.0",
-  "description": "TypeScript client for neo4j-agent-memory — shared memory layer for AI agents backed by Neo4j",
+  "version": "0.3.0",
+  "description": "Neo4j Labs: TypeScript client for the Neo4j Agent Memory Service (NAMS)",
   "type": "module",
   "license": "Apache-2.0",
   "author": "Neo4j Labs",
@@ -30,17 +30,24 @@
     "./integrations/mastra": {
       "import": "./dist/integrations/mastra.js",
       "types": "./dist/integrations/mastra.d.ts"
+    },
+    "./testing": {
+      "import": "./dist/testing.js",
+      "types": "./dist/testing.d.ts"
     }
   },
+  "homepage": "https://neo4j-labs.github.io/agent-memory-tck/typescript/",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "npm run check:version && tsup",
+    "check:version": "node ./scripts/check-version-sync.mjs",
     "dev": "tsup --watch",
     "test": "vitest run test/unit test/integration",
     "test:unit": "vitest run test/unit",
@@ -51,6 +58,7 @@
     "test:tck": "RUN_TCK_BRIDGE=1 vitest run test/tck",
     "tck:bronze": "RUN_TCK_BRIDGE=1 vitest run test/tck --grep Bronze",
     "lint": "tsc --noEmit && eslint src/",
+    "docs:api": "typedoc",
     "conformance:server": "tsx conformance/server.ts",
     "prepublishOnly": "npm run build"
   },
@@ -60,16 +68,9 @@
     "msw": "^2.14.3",
     "tsup": "^8.0.0",
     "tsx": "^4.0.0",
+    "typedoc": "^0.26.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
-  },
-  "peerDependencies": {
-    "neo4j-driver": "^5.20.0"
-  },
-  "peerDependenciesMeta": {
-    "neo4j-driver": {
-      "optional": true
-    }
   },
   "engines": {
     "node": ">=20.0.0"

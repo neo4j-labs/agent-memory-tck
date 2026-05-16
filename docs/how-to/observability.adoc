@@ -1,0 +1,97 @@
+= How to: enable request logging
+:toc: left
+:source-highlighter: rouge
+
+The TypeScript client emits a typed event stream around every HTTP
+exchange via the `logger` constructor option. Hook this into your
+favourite logger (Pino, Winston, console) for tracing, request-id
+correlation, and ops dashboards.
+
+== Basic usage
+
+[source,typescript]
+----
+import { MemoryClient, type LogEvent } from "@neo4j-labs/agent-memory";
+
+const client = new MemoryClient({
+  logger: (event: LogEvent) => {
+    console.log(JSON.stringify(event));
+  },
+});
+----
+
+You'll see two events per successful call:
+
+[source,json]
+----
+{ "kind": "request", "method": "create_conversation", "url": "...", "httpMethod": "POST" }
+{ "kind": "response", "method": "create_conversation", "url": "...", "status": 200,
+  "requestId": "req-abc", "durationMs": 142 }
+----
+
+Failures emit `request` then `error`:
+
+[source,json]
+----
+{ "kind": "request", "method": "create_conversation", "url": "...", "httpMethod": "POST" }
+{ "kind": "error", "method": "create_conversation", "url": "...", "status": 500,
+  "requestId": "req-abc", "durationMs": 87, "message": "..." }
+----
+
+== Event shape
+
+[source,typescript]
+----
+type LogEvent =
+  | { kind: "request"; method: string; url: string; httpMethod?: string }
+  | { kind: "response"; method: string; url: string; status: number;
+      requestId?: string; durationMs: number }
+  | { kind: "error"; method: string; url: string; status?: number;
+      requestId?: string; durationMs: number; message: string };
+----
+
+`method` is the snake_case bridge method name
+(`create_conversation`, `search_entities`, `record_step`, …). `httpMethod`
+is the HTTP verb (`POST`, `GET`, …).
+
+== Bodies are never logged by default
+
+To avoid leaking PII, the logger never receives request or response
+bodies. If you need bodies during development, log them yourself by
+wrapping the call:
+
+[source,typescript]
+----
+const msg = await client.shortTerm.addMessage(conv.id, "user", "hi");
+console.debug("addMessage result:", msg);
+----
+
+== Logger exceptions are swallowed
+
+If your logger throws, the SDK catches the error and continues. This
+means a misbehaving logger can't take down your application — but it
+also means logging is best-effort. Wrap calls into your structured
+logger in your own try/catch if you care.
+
+== User-Agent customization
+
+The client sends a default `User-Agent` like
+`@neo4j-labs/agent-memory/0.3.0 (node/22.5.0; darwin)`. To override,
+pass your own:
+
+[source,typescript]
+----
+new MemoryClient({
+  headers: { "User-Agent": "my-app/2.1 (CI runner)" },
+});
+----
+
+Wrapping SDKs should append their own identifier (e.g.,
+`@neo4j-labs/agent-memory/0.3.0 my-wrapper/1.0`) so server-side metrics
+can break the population down.
+
+== Request-id correlation
+
+Every error carries `error.requestId`. Use it to find the failing
+request in service-side logs. See
+link:handle-errors.adoc[How-to: handle errors].

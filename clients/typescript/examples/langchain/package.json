@@ -1,0 +1,16 @@
+{
+  "name": "agent-memory-example-langchain",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@neo4j-labs/agent-memory": "file:.."
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "@types/node": "^20.0.0"
+  }
+}

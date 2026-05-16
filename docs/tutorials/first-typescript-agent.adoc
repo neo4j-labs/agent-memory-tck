@@ -26,19 +26,27 @@ npm install @neo4j-labs/agent-memory ai @ai-sdk/openai
 
 == Step 2: Connect the Memory Client
 
+Set `MEMORY_API_KEY` in your environment, then:
+
 [source,typescript]
 ----
 // index.ts
 import { MemoryClient } from "@neo4j-labs/agent-memory";
 
-// Auto-selects RestTransport when endpoint contains /v1.
-const client = new MemoryClient({
-  endpoint: process.env.MEMORY_ENDPOINT ?? "https://memory.neo4jlabs.com/v1",
-  apiKey: process.env.MEMORY_API_KEY,
-});
+// Zero-config: defaults to https://memory.neo4jlabs.com/v1 and reads
+// MEMORY_API_KEY from the environment.
+const client = new MemoryClient();
+----
 
-await client.connect();
-console.log("Connected to memory service");
+The first request acts as the implicit auth check. To fail fast at
+startup, call `await client.connect()` explicitly.
+
+On Cloudflare Workers or Vercel Edge, pass the key explicitly because
+`process.env` is not available at module init:
+
+[source,typescript]
+----
+const client = new MemoryClient({ apiKey: env.MEMORY_API_KEY });
 ----
 
 == Step 3: Store and Retrieve Messages

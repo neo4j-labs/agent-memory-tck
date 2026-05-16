@@ -1,0 +1,84 @@
+= How to: integrate with the Vercel AI SDK
+:toc: left
+:source-highlighter: rouge
+
+The TypeScript client ships a `LanguageModelV1`-shaped middleware that
+auto-injects context and persists messages around any Vercel AI SDK call.
+This page covers the wiring; a runnable example lives at
+link:../../clients/typescript/examples/vercel-ai[`clients/typescript/examples/vercel-ai`].
+
+== What the middleware does
+
+For every model invocation:
+
+1. Fetches three-tier context for the conversation (reflections,
+   observations, recent messages) and prepends it to the prompt.
+2. Persists the user's input message before generation.
+3. Persists the assistant's response after generation.
+
+If three-tier context is unavailable (bridge transport, or a service
+error), the middleware falls back to flat conversation history.
+
+== Basic wiring
+
+[source,typescript]
+----
+import { generateText, experimental_wrapLanguageModel as wrapModel } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { MemoryClient } from "@neo4j-labs/agent-memory";
+import { agentMemoryMiddleware } from "@neo4j-labs/agent-memory/middleware/vercel-ai";
+
+const memory = new MemoryClient();
+const conv = await memory.shortTerm.createConversation({ userId: "alice" });
+
+const model = wrapModel({
+  model: openai("gpt-4o-mini"),
+  middleware: agentMemoryMiddleware(memory, { conversationId: conv.id }),
+});
+
+const { text } = await generateText({
+  model,
+  messages: [{ role: "user", content: "Hello!" }],
+});
+----
+
+== Options
+
+[source,typescript]
+----
+agentMemoryMiddleware(client, {
+  conversationId: "conv-uuid",     // or a function returning one
+  userId: "alice",                  // used if conversation is lazily created
+  includeContext: true,             // default true on REST
+  historyLimit: 20,                 // flat-history fallback cap
+  persistInput: true,               // default true
+  persistResponses: true,           // default true
+});
+----
+
+`conversationId` can be a string or a function. The function form is useful
+when the id is derived from request state (e.g., from `req.user.id` in a
+Next.js route handler).
+
+== Streaming
+
+The same middleware works with `streamText` because Vercel AI handles
+streaming via the wrapped model — the middleware's `wrapGenerate` is
+called once the stream completes.
+
+== Edge runtimes
+
+Pass `apiKey` explicitly because `process.env` is not available at
+module-init scope on Cloudflare Workers and Vercel Edge:
+
+[source,typescript]
+----
+export default {
+  async fetch(req, env) {
+    const memory = new MemoryClient({ apiKey: env.MEMORY_API_KEY });
+    // ... wire middleware as above
+  },
+};
+----
+
+See link:edge-runtime.adoc[How-to: deploy to edge runtimes] for details.

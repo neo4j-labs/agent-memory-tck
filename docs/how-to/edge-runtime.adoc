@@ -1,0 +1,75 @@
+= How to: deploy to edge runtimes
+:toc: left
+:source-highlighter: rouge
+
+The `@neo4j-labs/agent-memory` package is first-class on Cloudflare
+Workers and Vercel Edge. The package uses `fetch` only, has zero runtime
+dependencies, and defensively guards every `process.env` lookup behind a
+`typeof process !== "undefined"` check.
+
+== The one gotcha: API key resolution
+
+Edge runtimes expose environment variables via the request handler
+scope, not `process.env`. The zero-config form
+
+[source,typescript]
+----
+const client = new MemoryClient();   // reads MEMORY_API_KEY from process.env
+----
+
+works on Node, Bun, and Deno. On edge, pass the key explicitly:
+
+[source,typescript]
+----
+// Cloudflare Workers
+export default {
+  async fetch(req: Request, env: { MEMORY_API_KEY: string }) {
+    const client = new MemoryClient({ apiKey: env.MEMORY_API_KEY });
+    // ...
+  },
+};
+----
+
+[source,typescript]
+----
+// Vercel Edge — pages/api or route handler
+export const runtime = "edge";
+
+export async function GET(req: Request) {
+  const client = new MemoryClient({ apiKey: process.env.MEMORY_API_KEY });
+  // Vercel Edge does expose process.env in the handler scope,
+  // but reading it explicitly avoids any surprise.
+  // ...
+}
+----
+
+== What works on edge
+
+* All `MemoryClient` short-term, long-term, and reasoning operations
+* The Vercel AI SDK middleware
+* The MCP tool dispatcher (`handleMemoryToolCall`)
+* The LangChain JS and Mastra adapters
+
+== What doesn't (and why)
+
+* The TCK bridge transport (`./testing` subpath) is intended for
+  Node-based conformance testing; we don't test it on edge.
+* `User-Agent` overrides via `headers: { "User-Agent": ... }` may be
+  silently stripped by Cloudflare Workers due to a runtime restriction on
+  setting that header in `fetch`. The default User-Agent is best-effort.
+
+== Streaming + memory persistence
+
+When using `streamText` from the Vercel AI SDK, the middleware persists
+the assistant response only after the stream completes (in
+`wrapGenerate`). On edge runtimes you must `await` the result or your
+function will return before persistence finishes.
+
+== Verifying
+
+A unit-level edge sanity test ships with the package; it constructs a
+client in an environment where `process` is undefined. To exercise the
+full path against a real Worker, deploy with `wrangler` and watch tail
+logs for request-id-tagged failures.
+
+See link:observability.adoc[How-to: enable request logging] for tracing.

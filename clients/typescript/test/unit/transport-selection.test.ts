@@ -4,10 +4,18 @@
 
 import { describe, it, expect } from "vitest";
 import { MemoryClient } from "../../src/client.js";
-import { BridgeTransport, RestTransport } from "../../src/transport/index.js";
+import { ValidationError } from "../../src/errors.js";
+import { RestTransport } from "../../src/transport/index.js";
+import { BridgeTransport } from "../../src/transport/bridge.js";
 
 function getInternalTransport(client: MemoryClient): unknown {
-  return (client as unknown as { transport: unknown }).transport;
+  const t = (client as unknown as { transport: unknown }).transport;
+  // Auto-created transports are wrapped in LazyConnectTransport; unwrap for the
+  // instanceof check. User-supplied transports are passed through as-is.
+  if (t && typeof t === "object" && "inner" in t) {
+    return (t as { inner: unknown }).inner;
+  }
+  return t;
 }
 
 describe("transport auto-selection", () => {
@@ -57,5 +65,9 @@ describe("transport auto-selection", () => {
     };
     const c = new MemoryClient(fake);
     expect(getInternalTransport(c)).toBe(fake);
+  });
+
+  it("requires an explicit endpoint for bridge transport", () => {
+    expect(() => new MemoryClient({ transport: "bridge" })).toThrowError(ValidationError);
   });
 });

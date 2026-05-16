@@ -1,12 +1,20 @@
 /**
  * MemoryClient — root entry point for all memory operations.
  *
- * Picks a transport automatically based on the endpoint shape:
- *   - Endpoints containing `/v1` → RestTransport (hosted service)
- *   - Otherwise → BridgeTransport (TCK conformance servers, local reference)
+ * Zero-config form (Node, Bun, Deno):
  *
- * Override with `transport: "rest" | "bridge"` in MemoryClientOptions, or
- * pass a custom Transport instance directly.
+ *     const client = new MemoryClient();
+ *
+ * defaults the endpoint to https://memory.neo4jlabs.com/v1 and reads
+ * MEMORY_API_KEY from the environment.
+ *
+ * Edge runtimes (Cloudflare Workers, Vercel Edge) read env from the request
+ * handler scope, not module init, so pass apiKey explicitly:
+ *
+ *     const client = new MemoryClient({ apiKey: env.MEMORY_API_KEY });
+ *
+ * The first request triggers the auth probe automatically; calling
+ * `connect()` upfront is supported but optional.
  */
 
 import { AuthClient } from "./auth/index.js";
@@ -19,6 +27,8 @@ import { BridgeTransport } from "./transport/bridge.js";
 import type { Transport } from "./transport/index.js";
 import { RestTransport } from "./transport/rest.js";
 import type { MemoryClientOptions } from "./types.js";
+
+const DEFAULT_ENDPOINT = "https://memory.neo4jlabs.com/v1";
 
 export class MemoryClient {
   /** Short-term (conversational) memory operations. */
@@ -38,13 +48,13 @@ export class MemoryClient {
 
   private readonly transport: Transport;
 
-  constructor(options: MemoryClientOptions);
+  constructor(options?: MemoryClientOptions);
   constructor(transport: Transport);
-  constructor(optionsOrTransport: MemoryClientOptions | Transport) {
+  constructor(optionsOrTransport: MemoryClientOptions | Transport = {}) {
     if (isTransport(optionsOrTransport)) {
       this.transport = optionsOrTransport;
     } else {
-      this.transport = createTransport(optionsOrTransport);
+      this.transport = new LazyConnectTransport(createTransport(optionsOrTransport));
     }
 
     this.shortTerm = new ShortTermMemory(this.transport);
@@ -74,34 +84,76 @@ function isTransport(obj: unknown): obj is Transport {
 
 function pickTransport(endpoint: string, mode: MemoryClientOptions["transport"]): "bridge" | "rest" {
   if (mode === "bridge" || mode === "rest") return mode;
-  // Auto: REST if the endpoint path contains /v1 (the canonical hosted root).
+  // Auto: REST if the endpoint path contains /vN (the canonical hosted root).
   return /\/v\d+\b/.test(endpoint) ? "rest" : "bridge";
 }
 
-function createTransport(options: MemoryClientOptions): Transport {
-  if (!options.endpoint) {
-    if (options.neo4jUri) {
-      throw new ValidationError(
-        "Direct Neo4j connection is not yet implemented. Use endpoint with the hosted service.",
-      );
-    }
-    throw new ValidationError("Either endpoint or neo4jUri must be provided.");
-  }
+/**
+ * Resolve the API key from explicit option or MEMORY_API_KEY env var.
+ *
+ * Explicit `undefined` falls through to env. Explicit empty string does NOT
+ * — passing `apiKey: ""` is treated as "I am intentionally unauthenticated."
+ */
+function resolveApiKey(option: string | undefined): string | undefined {
+  if (option !== undefined) return option;
+  if (typeof process === "undefined" || !process.env) return undefined;
+  return process.env.MEMORY_API_KEY;
+}
 
-  const choice = pickTransport(options.endpoint, options.transport);
+function createTransport(options: MemoryClientOptions): Transport {
+  const endpoint = options.endpoint;
+  const apiKey = resolveApiKey(options.apiKey);
+
+  const choice = pickTransport(endpoint ?? DEFAULT_ENDPOINT, options.transport);
   if (choice === "rest") {
     return new RestTransport({
-      endpoint: options.endpoint,
-      apiKey: options.apiKey,
+      endpoint: endpoint ?? DEFAULT_ENDPOINT,
+      apiKey,
       tokenProvider: options.tokenProvider,
       timeout: options.timeout,
       headers: options.headers,
+      logger: options.logger,
     });
   }
+  if (!endpoint) {
+    throw new ValidationError("endpoint must be provided for bridge transport.");
+  }
   return new BridgeTransport({
-    endpoint: options.endpoint,
-    apiKey: options.apiKey,
+    endpoint,
+    apiKey,
     timeout: options.timeout,
     headers: options.headers,
+    logger: options.logger,
   });
+}
+
+/**
+ * Wraps a Transport so requests are issued without an upfront connectivity
+ * probe — the first real request becomes the de facto health check. An
+ * explicit `connect()` still triggers the inner connect (and is idempotent
+ * across concurrent callers), letting apps that prefer fail-fast at startup
+ * opt in.
+ */
+class LazyConnectTransport implements Transport {
+  private connectPromise: Promise<void> | null = null;
+
+  constructor(public readonly inner: Transport) {}
+
+  async request<T>(method: string, params: Record<string, unknown>): Promise<T> {
+    return this.inner.request<T>(method, params);
+  }
+
+  async connect(): Promise<void> {
+    if (!this.connectPromise) {
+      this.connectPromise = this.inner.connect().catch((err) => {
+        this.connectPromise = null;
+        throw err;
+      });
+    }
+    return this.connectPromise;
+  }
+
+  async close(): Promise<void> {
+    return this.inner.close();
+  }
 }

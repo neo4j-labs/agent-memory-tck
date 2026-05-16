@@ -1,0 +1,88 @@
+= How to: use the MCP tools
+:toc: left
+:source-highlighter: rouge
+
+The `@neo4j-labs/agent-memory/mcp` subpath ships the 12 standard
+neo4j-agent-memory tool definitions plus a dispatcher. Use it to register
+the same tool surface on your own MCP server, or to programmatically
+invoke tools against a `MemoryClient`.
+
+A runnable example lives at
+link:../../clients/typescript/examples/mcp[`clients/typescript/examples/mcp`].
+
+== When to self-host MCP
+
+Most users don't need to. The hosted service already exposes the same 12
+tools at `https://memory.neo4jlabs.com/mcp`. Reach for self-hosting when
+you want to add a logging layer, filter or rewrite tool calls, or run an
+MCP server inside a corporate boundary.
+
+== The 12 tools
+
+[options="header"]
+|===
+| Tool | Wraps
+| `memory_create_conversation` | `shortTerm.createConversation`
+| `memory_add_messages` | `shortTerm.addMessage` (bulk-aware)
+| `memory_get_context` | `shortTerm.getContext`
+| `memory_search_messages` | `shortTerm.searchMessages`
+| `memory_search_entities` | `longTerm.searchEntities`
+| `memory_get_entity` | `longTerm.getEntity`
+| `memory_add_entity` | `longTerm.addEntity`
+| `memory_get_entity_history` | `longTerm.getEntityHistory`
+| `memory_record_step` | `reasoning.recordStep`
+| `memory_record_tool_call` | `reasoning.recordToolCall`
+| `memory_get_trace` | `reasoning.getTraceByConversation`
+| `memory_explain_decision` | `reasoning.explainStep`
+|===
+
+== Registering with an MCP server
+
+[source,typescript]
+----
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { CallToolRequestSchema, ListToolsRequestSchema }
+  from "@modelcontextprotocol/sdk/types.js";
+import { MemoryClient } from "@neo4j-labs/agent-memory";
+import { createMemoryTools, handleMemoryToolCall }
+  from "@neo4j-labs/agent-memory/mcp";
+
+const memory = new MemoryClient();
+const tools = createMemoryTools();
+const server = new Server({ name: "...", version: "..." }, { capabilities: { tools: {} } });
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: tools.map((t) => ({
+    name: t.name, description: t.description, inputSchema: t.inputSchema,
+  })),
+}));
+
+server.setRequestHandler(CallToolRequestSchema, async (req) => {
+  const result = await handleMemoryToolCall(
+    memory, req.params.name, (req.params.arguments ?? {}) as Record<string, unknown>,
+  );
+  return { content: [{ type: "text", text: JSON.stringify(result) }] };
+});
+----
+
+== Programmatic dispatch
+
+You can also call `handleMemoryToolCall` directly — useful for tests, or
+when bridging an LLM that uses a different tool-calling convention than
+MCP:
+
+[source,typescript]
+----
+const conv = await handleMemoryToolCall(memory, "memory_create_conversation", {
+  user_id: "alice",
+});
+----
+
+Argument keys use snake_case (matching the JSON schema published by
+`createMemoryTools()`).
+
+== Deprecated tool names
+
+A few `memory.<verb>` aliases from earlier drafts are still accepted and
+forward to the new names with a warning. Migrate to the
+`memory_<noun>_<verb>` form when you can.

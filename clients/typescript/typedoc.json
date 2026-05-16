@@ -1,0 +1,22 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/middleware/vercel-ai.ts",
+    "src/mcp/index.ts",
+    "src/integrations/langchain.ts",
+    "src/integrations/mastra.ts",
+    "src/testing.ts"
+  ],
+  "out": "docs-api",
+  "name": "@neo4j-labs/agent-memory",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "categorizeByGroup": true,
+  "navigationLinks": {
+    "GitHub": "https://github.com/neo4j-labs/agent-memory-tck",
+    "Community": "https://community.neo4j.com"
+  }
+}

@@ -7,6 +7,7 @@ export default defineConfig({
     "mcp/index": "src/mcp/index.ts",
     "integrations/langchain": "src/integrations/langchain.ts",
     "integrations/mastra": "src/integrations/mastra.ts",
+    testing: "src/testing.ts",
   },
   format: ["esm"],
   dts: true,

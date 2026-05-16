@@ -1,22 +1,19 @@
 /**
- * @neo4j-labs/agent-memory — TypeScript client for neo4j-agent-memory.
- *
- * Two transports ship in-box:
- *   - BridgeTransport: TCK bridge protocol, snake_case JSON.
- *   - RestTransport: the hosted REST API at https://memory.neo4jlabs.com/v1.
+ * @neo4j-labs/agent-memory — TypeScript client for the Neo4j Agent Memory Service.
  *
  * Usage against the hosted service:
  *
  *     import { MemoryClient } from "@neo4j-labs/agent-memory";
  *
- *     const client = new MemoryClient({
- *       endpoint: "https://memory.neo4jlabs.com/v1",
- *       apiKey: process.env.MEMORY_API_KEY!,
- *     });
+ *     // Reads MEMORY_API_KEY from env; defaults to the hosted endpoint.
+ *     const client = new MemoryClient();
  *
  *     const conv = await client.shortTerm.createConversation({ userId: "alice" });
  *     await client.shortTerm.addMessage(conv.id, "user", "Hello!");
  *     const ctx = await client.shortTerm.getContext(conv.id);
+ *
+ * Bridge transport for TCK conformance testing is available via the
+ * `@neo4j-labs/agent-memory/testing` subpath.
  */
 
 export { MemoryClient } from "./client.js";
@@ -94,13 +91,8 @@ export type {
 
 // Transports
 export type { Transport } from "./transport/index.js";
-export { BridgeTransport, RestTransport, HttpTransport } from "./transport/index.js";
-export type {
-  BridgeTransportOptions,
-  RestTransportOptions,
-  TokenProvider,
-  HttpTransportOptions,
-} from "./transport/index.js";
+export { RestTransport } from "./transport/index.js";
+export type { RestTransportOptions, TokenProvider } from "./transport/index.js";
 
 // Sub-clients (advanced)
 export { ShortTermMemory } from "./short-term/index.js";
@@ -119,3 +111,9 @@ export {
   ValidationError,
   TransportError,
 } from "./errors.js";
+
+// Observability
+export type { Logger, LogEvent } from "./observability.js";
+
+// Version
+export { VERSION } from "./version.js";
