@@ -88,8 +88,8 @@ tck_record_provenance_step <- function(client, conversation_id, test_name,
 # which test they were called from without each test having to pass the
 # name explicitly. Returns "unknown" if not called from inside test_that.
 tck_infer_current_test_name <- function() {
-  if (sys.nframes() < 1) return("unknown")
-  for (i in sys.nframes():1) {
+  if (sys.nframe() < 1) return("unknown")
+  for (i in sys.nframe():1) {
     fn <- tryCatch(sys.function(i), error = function(e) NULL)
     if (identical(fn, testthat::test_that)) {
       env <- sys.frame(i)
