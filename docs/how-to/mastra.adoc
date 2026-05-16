@@ -1,0 +1,49 @@
+= How to: integrate with Mastra
+:toc: left
+:source-highlighter: rouge
+
+The `@neo4j-labs/agent-memory/integrations/mastra` subpath exports
+`Neo4jMastraMemory` — a duck-typed Mastra memory provider backed by a
+`MemoryClient`. Hand it to `new Agent({ memory })` and your agent gets
+graph-backed conversation history and entity memory.
+
+A runnable example lives at
+link:../../clients/typescript/examples/mastra[`clients/typescript/examples/mastra`].
+
+== Wiring
+
+[source,typescript]
+----
+import { Agent } from "@mastra/core/agent";
+import { MemoryClient } from "@neo4j-labs/agent-memory";
+import { Neo4jMastraMemory } from "@neo4j-labs/agent-memory/integrations/mastra";
+
+const memory = new Neo4jMastraMemory(new MemoryClient());
+
+const agent = new Agent({
+  name: "scout",
+  instructions: "You help users plan trips.",
+  memory,
+});
+----
+
+== What the adapter implements
+
+* `createThread({ resourceId, title?, metadata? })` — wraps
+  `createConversation`. `resourceId` becomes the `userId`.
+* `getMessages(threadId, { limit? })` — wraps `getConversation`.
+* `saveMessage({ threadId, role, content, metadata? })` — wraps
+  `addMessage`.
+* `deleteThread(threadId)` — wraps `deleteConversation`.
+
+Bridge transports (TCK conformance servers, local reference) don't
+implement `createConversation`; in that case `createThread` synthesizes
+a thread id from the supplied `resourceId`.
+
+== Versioning
+
+Mastra's interfaces are still evolving. We duck-type rather than
+importing `@mastra/core` so this adapter doesn't pin you to a specific
+version. If your Mastra version expects shapes the adapter doesn't
+produce, file an issue with the Mastra version pinned in your
+`package.json`.

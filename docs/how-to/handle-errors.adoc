@@ -1,0 +1,90 @@
+= How to: handle errors
+:toc: left
+:source-highlighter: rouge
+
+Every error thrown by `@neo4j-labs/agent-memory` is a subclass of
+`MemoryError`. Errors from HTTP exchanges carry a `requestId` (when the
+service emitted one) so you can quote it in support threads.
+
+== The hierarchy
+
+[source]
+----
+MemoryError                     // base class
+├── ConnectionError            // network / DNS / timeout / 5xx on connect
+├── AuthenticationError        // 401, 403
+├── NotFoundError              // 404 (rarely raised — most operations soft-handle)
+├── ValidationError            // client-side argument validation
+├── TransportError             // 4xx/5xx from the service; carries statusCode
+└── NotSupportedError          // operation not implemented by current transport
+----
+
+== The `requestId` field
+
+Every error from a failed HTTP exchange has an optional `requestId`
+field, populated from `x-request-id` (or `request-id`, or
+`x-amzn-RequestId`) on the response. It's also embedded in the error's
+`toString()`:
+
+[source,typescript]
+----
+try {
+  await client.shortTerm.createConversation({ userId: "alice" });
+} catch (err) {
+  if (err instanceof MemoryError) {
+    console.error(err.message, "requestId:", err.requestId);
+  }
+  throw err;
+}
+----
+
+Sample stack-trace line:
+
+[source]
+----
+TransportError: create_conversation failed: internal error [requestId=req-abc123]
+----
+
+== Choosing what to catch
+
+[options="header"]
+|===
+| Catch | When
+| `AuthenticationError` | Renew tokens, prompt the user, log them out.
+| `NotSupportedError` | Switch transports, or skip the optional feature gracefully.
+| `TransportError` (4xx) | Validate inputs; not retryable.
+| `TransportError` (5xx) | Retry with backoff; quote `requestId` if it persists.
+| `ConnectionError` | Retry with backoff; usually network-transient.
+| `ValidationError` | Fix the call site; never retryable.
+|===
+
+== Retries
+
+The client does **not** retry automatically. Wrap your calls in a small
+retry helper if you need it — be careful with non-idempotent operations
+(`addMessage`, `recordStep`, `recordToolCall` are NOT idempotent and a
+retry may produce a duplicate).
+
+[source,typescript]
+----
+async function retry<T>(fn: () => Promise<T>, max = 3): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < max; i++) {
+    try { return await fn(); }
+    catch (err) {
+      lastErr = err;
+      if (err instanceof TransportError && err.statusCode && err.statusCode < 500) throw err;
+      if (err instanceof AuthenticationError) throw err;
+      await new Promise((r) => setTimeout(r, 100 * 2 ** i));
+    }
+  }
+  throw lastErr;
+}
+----
+
+== Logging errors in production
+
+The `logger` constructor option emits a typed `error` event per failed
+request — useful for routing into structured logging without writing
+your own try/catch around every call. See
+link:observability.adoc[How-to: enable request logging].

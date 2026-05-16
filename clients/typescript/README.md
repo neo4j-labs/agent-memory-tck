@@ -1,145 +1,139 @@
 # @neo4j-labs/agent-memory
 
-[![neo4j-labs](https://img.shields.io/badge/Neo4j_Labs-Experimental-orange?logo=neo4j)](https://neo4j.com/labs/)
-[![TCK Bronze](https://img.shields.io/badge/agent--memory--tck-Bronze-F97316?logo=neo4j)](https://github.com/neo4j-labs/agent-memory-tck)
+![Neo4j Labs](https://img.shields.io/badge/Neo4j-Labs-6366F1?logo=neo4j)
+![Status: Beta](https://img.shields.io/badge/Status-Beta-6366F1)
+![Community Supported](https://img.shields.io/badge/Support-Community-6B7280)
 
-TypeScript client for [neo4j-agent-memory](https://github.com/neo4j-labs/agent-memory) — a shared memory layer for AI agents backed by Neo4j.
+> TypeScript client for the Neo4j Agent Memory Service — short-term,
+> long-term, and reasoning memory for AI agents, backed by Neo4j.
 
-> **Neo4j Labs Project** — This is an experimental project under active development. APIs may change without notice.
+> ⚠️ **Neo4j Labs Project**
+>
+> This project is part of Neo4j Labs and is actively maintained, but not
+> officially supported. There are no SLAs or guarantees around backwards
+> compatibility and deprecation. For questions and support, please use
+> the [Neo4j Community Forum](https://community.neo4j.com).
 
-## Installation
+## ✨ Features
+
+- Three memory subclients in one client: **short-term** (conversations,
+  messages, three-tier context), **long-term** (entities, search,
+  relationships, graph view), and **reasoning** (steps, traces,
+  provenance, tool calls).
+- Zero-config construction — reads `MEMORY_API_KEY` from the
+  environment and defaults to the hosted service.
+- Works in Node 20+, Bun, Deno, Cloudflare Workers, and Vercel Edge.
+- Four framework integrations: Vercel AI SDK middleware, MCP tools,
+  LangChain JS, Mastra.
+- Built-in request logging, request-id correlation, and edge-friendly
+  `fetch`-only transports.
+- TCK Bronze conformance verified by the
+  [agent-memory-tck](https://github.com/neo4j-labs/agent-memory-tck)
+  cross-language test suite.
+
+## 📦 Installation
 
 ```bash
 npm install @neo4j-labs/agent-memory
 ```
 
-## Quick Start
+Requires Node.js 20+.
 
-```typescript
+## 🚀 Quick start
+
+Get an API key from [memory.neo4jlabs.com](https://memory.neo4jlabs.com),
+export it as `MEMORY_API_KEY`, then:
+
+```ts
 import { MemoryClient } from "@neo4j-labs/agent-memory";
 
-const client = new MemoryClient({
-  endpoint: "https://nams.neo4jsandbox.com",
-  apiKey: process.env.MEMORY_API_KEY,
-});
-await client.connect();
+const client = new MemoryClient();
 
-// Short-term memory: conversation history
-const msg = await client.shortTerm.addMessage("session-1", "user", "Hello!");
-const conversation = await client.shortTerm.getConversation("session-1");
+const conv = await client.shortTerm.createConversation({ userId: "alice" });
+await client.shortTerm.addMessage(conv.id, "user", "Hello!");
 
-// Long-term memory: knowledge graph
-const entity = await client.longTerm.addEntity("Alice Johnson", "PERSON", {
-  description: "Software engineer at Acme Corp",
-});
-const results = await client.longTerm.searchEntities("Alice");
-
-// Reasoning memory: trace agent decisions
-const trace = await client.reasoning.startTrace("session-1", "Research task");
-const step = await client.reasoning.addStep(trace.id, {
-  thought: "I need to search for Alice's employer",
-  action: "search_entities",
-});
-await client.reasoning.recordToolCall(step.id, "search_entities", { query: "Alice" });
-await client.reasoning.completeTrace(trace.id, {
-  outcome: "Found Alice at Acme Corp",
-  success: true,
+const entity = await client.longTerm.addEntity("Alice Johnson", "person", {
+  description: "Software engineer working on graph memory.",
 });
 
-await client.close();
+const ctx = await client.shortTerm.getContext(conv.id);
+console.log(ctx.recentMessages, ctx.observations, ctx.reflections);
 ```
 
-## Vercel AI SDK Integration
+### On the edge
 
-```typescript
-import { streamText } from "ai";
-import { MemoryClient } from "@neo4j-labs/agent-memory";
-import { agentMemoryMiddleware } from "@neo4j-labs/agent-memory/middleware/vercel-ai";
+Edge runtimes (Cloudflare Workers, Vercel Edge) expose environment
+variables via the request handler scope, not `process.env`. Pass the key
+explicitly:
 
-const client = new MemoryClient({ endpoint: "..." });
-await client.connect();
+```ts
+export default {
+  async fetch(req: Request, env: { MEMORY_API_KEY: string }) {
+    const client = new MemoryClient({ apiKey: env.MEMORY_API_KEY });
+    // ...
+  },
+};
+```
 
-const result = await streamText({
-  model: yourModel,
-  experimental_middleware: agentMemoryMiddleware(client, {
-    sessionId: "user-session-123",
-  }),
-  messages: [{ role: "user", content: "Tell me about Alice" }],
+## 🧩 Integrations
+
+All four ship as subpath exports. See each integration's
+[example](./examples) and how-to guide for a runnable walkthrough.
+
+| Integration | Import | Example |
+|---|---|---|
+| **Vercel AI SDK** | `@neo4j-labs/agent-memory/middleware/vercel-ai` | [`examples/vercel-ai`](./examples/vercel-ai) |
+| **MCP tools** | `@neo4j-labs/agent-memory/mcp` | [`examples/mcp`](./examples/mcp) |
+| **LangChain JS** | `@neo4j-labs/agent-memory/integrations/langchain` | [`examples/langchain`](./examples/langchain) |
+| **Mastra** | `@neo4j-labs/agent-memory/integrations/mastra` | [`examples/mastra`](./examples/mastra) |
+
+## 📖 Documentation
+
+- [Tutorial: Build your first memory-backed agent](../../docs/tutorials/first-typescript-agent.adoc)
+- [How-to guides](../../docs/how-to/) — authentication, edge deployment,
+  error handling, observability, framework integrations
+- [Concept: short-term vs long-term vs reasoning memory](../../docs/explanation/memory-model.adoc)
+- [Architecture overview](../../docs/explanation/architecture.adoc)
+- [Troubleshooting](../../docs/how-to/troubleshooting.adoc)
+
+Full API reference (TypeDoc) ships with each release — see the package
+`homepage`.
+
+## 🔧 Configuration
+
+The client accepts a small options bag:
+
+```ts
+new MemoryClient({
+  endpoint: "https://memory.neo4jlabs.com/v1",  // default
+  apiKey: "nams_...",                            // falls back to MEMORY_API_KEY env
+  timeout: 30_000,                               // ms; default 30s
+  headers: { "X-My-Trace": "..." },              // additional request headers
+  logger: (event) => console.log(event),         // request/response/error events
 });
 ```
 
-## MCP Tools
+`connect()` is optional — the first request acts as the implicit auth
+check. Call it explicitly if you prefer fail-fast at startup.
 
-```typescript
-import { createMemoryTools, handleMemoryToolCall } from "@neo4j-labs/agent-memory/mcp";
+## 🤝 Contributing
 
-const tools = createMemoryTools();
-// Register with your MCP server...
+We welcome contributions. See [CONTRIBUTING.md](../../CONTRIBUTING.md)
+for the development setup, test commands, and PR conventions.
 
-const result = await handleMemoryToolCall(client, "memory.addEntity", {
-  name: "Alice",
-  entityType: "PERSON",
-});
-```
+This package is part of the
+[neo4j-labs/agent-memory-tck](https://github.com/neo4j-labs/agent-memory-tck)
+monorepo. The TCK defines the cross-language behavioral contract every
+client implements.
 
-## API Reference
+## 💬 Support
 
-### MemoryClient
+- [Neo4j Community Forum](https://community.neo4j.com) — questions and
+  discussion (primary)
+- [GitHub Issues](https://github.com/neo4j-labs/agent-memory-tck/issues) —
+  bug reports and feature requests
+- Security vulnerabilities: see [SECURITY.md](../../SECURITY.md)
 
-| Property | Description |
-|----------|-------------|
-| `shortTerm` | Short-term (conversational) memory operations |
-| `longTerm` | Long-term (entity/preference/fact) memory operations |
-| `reasoning` | Reasoning (trace/step/tool call) memory operations |
+## 📝 License
 
-### Short-Term Memory
-
-| Method | Description |
-|--------|-------------|
-| `addMessage(sessionId, role, content, options?)` | Add a message to a session |
-| `getConversation(sessionId, options?)` | Retrieve conversation with messages |
-| `searchMessages(query, options?)` | Semantic search across messages |
-| `listSessions(options?)` | List all sessions |
-| `deleteMessage(messageId)` | Delete a specific message |
-| `clearSession(sessionId)` | Clear all messages in a session |
-
-### Long-Term Memory
-
-| Method | Description |
-|--------|-------------|
-| `addEntity(name, entityType, options?)` | Create an entity |
-| `addPreference(category, preference, options?)` | Store a preference |
-| `addFact(subject, predicate, obj)` | Store a fact triple |
-| `searchEntities(query, options?)` | Search entities |
-| `searchPreferences(query, options?)` | Search preferences |
-| `getEntityByName(name)` | Lookup entity by name |
-| `getRelatedEntities(entityId, options?)` | Traverse relationships |
-
-### Reasoning Memory
-
-| Method | Description |
-|--------|-------------|
-| `startTrace(sessionId, task)` | Start a reasoning trace |
-| `addStep(traceId, options?)` | Add a step to a trace |
-| `recordToolCall(stepId, toolName, args, options?)` | Record a tool call |
-| `completeTrace(traceId, options?)` | Complete a trace |
-| `getTraceWithSteps(traceId)` | Get full trace with steps |
-| `listTraces(options?)` | List traces |
-| `getToolStats(toolName?)` | Get tool usage statistics |
-
-## TCK Compliance
-
-This client is tested against the [neo4j-agent-memory TCK](https://github.com/neo4j-labs/agent-memory-tck).
-
-```bash
-# Run Bronze-tier conformance tests
-npm run tck:bronze
-
-# Run full TCK via Python bridge
-MEMORY_ENDPOINT=http://localhost:3001 npm run conformance:server &
-pytest -m bronze --bridge-url http://localhost:3001
-```
-
-## License
-
-Apache 2.0 — See [LICENSE](../../LICENSE).
+Apache-2.0 — see [LICENSE](./LICENSE).

@@ -1,0 +1,52 @@
+name: Publish TypeScript client
+
+# Triggers on tag pushes of the form `ts-vX.Y.Z`. The workflow builds,
+# tests, and publishes @neo4j-labs/agent-memory to npm with provenance.
+on:
+  push:
+    tags:
+      - "ts-v*"
+
+permissions:
+  contents: read
+  id-token: write  # required for npm provenance attestation
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/typescript
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install
+        run: npm ci || npm install
+
+      - name: Verify package.json version matches tag
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#ts-v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${PKG_VERSION}" >&2
+            exit 1
+          fi
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Test (unit + integration)
+        run: npm test
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

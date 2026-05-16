@@ -1,0 +1,78 @@
+= Troubleshooting
+:toc: left
+:source-highlighter: rouge
+
+== `AuthenticationError: Authentication failed: 401`
+
+Your `MEMORY_API_KEY` is missing, mistyped, or revoked.
+
+* Check the env var is set: `echo $MEMORY_API_KEY` (Node/Bun/Deno).
+* On Cloudflare Workers or Vercel Edge, `process.env` is not in scope at
+  module init — pass the key explicitly:
+  `new MemoryClient({ apiKey: env.MEMORY_API_KEY })`.
+* Sign up for a key at https://memory.neo4jlabs.com if you don't have
+  one.
+* The error's `requestId` field can be quoted in a Community Forum
+  thread for service-side correlation.
+
+== `NotSupportedError: Method 'X' has no equivalent in the hosted REST API`
+
+You're calling a bridge-only operation against the hosted service (or
+vice versa). The hosted service exposes a richer surface (three-tier
+context, observations, reflections, entity feedback, graph view); the
+bridge supports the legacy long-term/reasoning operations from the TCK.
+
+Either:
+
+* Switch operations to the hosted-native equivalent (most of `shortTerm`,
+  `longTerm`, `reasoning` is supported on both transports).
+* Use the bridge transport explicitly for conformance testing — import
+  `BridgeTransport` from `@neo4j-labs/agent-memory/testing` and supply
+  it to the `MemoryClient` constructor.
+
+== Entity search returns empty
+
+Long-term entity extraction is asynchronous on the hosted service.
+After you add a message, the service runs entity extraction in the
+background and indexes the result for search. Typical lag is a few
+seconds.
+
+If you need the entity immediately, call `longTerm.addEntity()` to add
+it explicitly rather than relying on extraction from a message.
+
+== Edge runtime: `process is not defined`
+
+Some edge bundlers throw at *build* time if `process.env` appears in
+imported code. The client guards every `process.env` read with
+`typeof process !== "undefined"` — if you still see this error, it's
+likely coming from a different dependency. Run with
+`wrangler dev --verbose` (Workers) to see which module is referencing
+`process` directly.
+
+== TypeScript: `Cannot find module '@neo4j-labs/agent-memory/middleware/vercel-ai'`
+
+Make sure `tsconfig.json` has `"moduleResolution": "bundler"` or
+`"NodeNext"`. The package uses subpath exports, which require modern
+module resolution.
+
+== Hook timeout in Vitest e2e tests
+
+If you wrote your own e2e tests against the live hosted service and see
+"Hook timed out in 10000ms" on `beforeAll(client.connect)`: vitest's
+default `hookTimeout` is 10s, but the first connect on a cold path can
+take longer. Bump it in `vitest.config.ts`:
+
+[source,typescript]
+----
+test: { testTimeout: 30_000, hookTimeout: 30_000 }
+----
+
+== Still stuck?
+
+* Ask on the
+  https://community.neo4j.com[Neo4j Community Forum] (primary
+  support channel).
+* File a https://github.com/neo4j-labs/agent-memory-tck/issues[GitHub
+  issue]. Include the `requestId` from any failing request.
+* For suspected security issues, see
+  https://github.com/neo4j-labs/agent-memory-tck/blob/main/SECURITY.md[SECURITY.md].

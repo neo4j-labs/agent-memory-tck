@@ -1,0 +1,54 @@
+name: Publish TypeScript API docs
+
+# Generates TypeDoc and deploys to GitHub Pages on every push to main
+# and on tag pushes. The deployed site lives at
+# https://neo4j-labs.github.io/agent-memory-tck/typescript/
+on:
+  push:
+    branches: [main]
+    paths:
+      - "clients/typescript/src/**"
+      - "clients/typescript/typedoc.json"
+      - "clients/typescript/package.json"
+      - ".github/workflows/ts-typedoc.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci || npm install
+      - run: npm run docs:api
+      - name: Move output into the deploy directory
+        run: |
+          mkdir -p ../../_site/typescript
+          cp -R docs-api/* ../../_site/typescript/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

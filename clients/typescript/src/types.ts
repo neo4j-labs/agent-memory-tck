@@ -313,11 +313,6 @@ export interface MemoryClientOptions {
   /** OAuth refresh-token-aware token provider. Overrides apiKey when supplied. */
   tokenProvider?: () => string | Promise<string>;
 
-  /** Direct Neo4j connection — not yet implemented. */
-  neo4jUri?: string;
-  neo4jUsername?: string;
-  neo4jPassword?: string;
-
   /** Shared entity namespace for multi-agent collaboration. */
   namespace?: string;
 
@@ -326,6 +321,13 @@ export interface MemoryClientOptions {
 
   /** Additional headers to include in every request. */
   headers?: Record<string, string>;
+
+  /**
+   * Optional logger invoked once per request / response / error. Useful for
+   * tracing requests in development. Caller controls log level by ignoring
+   * unwanted event kinds. See {@link LogEvent}.
+   */
+  logger?: import("./observability.js").Logger;
 }
 
 // ---------------------------------------------------------------------------

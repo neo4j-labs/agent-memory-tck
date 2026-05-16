@@ -16,6 +16,7 @@ import {
   NotSupportedError,
   TransportError,
 } from "../errors.js";
+import { defaultUserAgent, extractRequestId, type Logger } from "../observability.js";
 import { camelToSnake, snakeToCamel } from "./casing.js";
 import type { Transport } from "./index.js";
 
@@ -24,6 +25,14 @@ function trimTrailingSlashes(s: string): string {
   let end = s.length;
   while (end > 0 && s.charCodeAt(end - 1) === 47) end--;
   return s.slice(0, end);
+}
+
+/** Monotonic-ish timestamp for duration measurement. Works on all runtimes. */
+function nowMs(): number {
+  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+    return performance.now();
+  }
+  return Date.now();
 }
 
 /** snake_case → camelCase, single-key form (no recursion into objects). */
@@ -48,6 +57,9 @@ export interface RestTransportOptions {
 
   /** Additional headers to include in every request. */
   headers?: Record<string, string>;
+
+  /** Per-request logger; see {@link Logger}. */
+  logger?: Logger;
 }
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
@@ -328,6 +340,7 @@ export class RestTransport implements Transport {
   private readonly tokenProvider?: TokenProvider;
   private readonly timeout: number;
   private readonly headers: Record<string, string>;
+  private readonly logger?: Logger;
 
   constructor(options: RestTransportOptions) {
     this.endpoint = trimTrailingSlashes(options.endpoint);
@@ -335,42 +348,82 @@ export class RestTransport implements Transport {
     this.tokenProvider = options.tokenProvider;
     this.timeout = options.timeout ?? 30_000;
     this.headers = options.headers ?? {};
+    this.logger = options.logger;
   }
 
   async connect(): Promise<void> {
-    // GET /conversations is a cheap auth check.
+    const url = `${this.endpoint}/conversations?limit=1`;
+    const start = nowMs();
+    this.emit({ kind: "request", method: "connect", url, httpMethod: "GET" });
+    let response: Response;
     try {
-      const response = await fetch(`${this.endpoint}/conversations?limit=1`, {
+      response = await fetch(url, {
         method: "GET",
         headers: await this.buildHeaders(),
         signal: AbortSignal.timeout(this.timeout),
       });
-      if (response.status === 401 || response.status === 403) {
-        throw new AuthenticationError(
-          `Authentication failed against ${this.endpoint}: ${response.status} ${response.statusText}`,
-        );
-      }
-      if (!response.ok && response.status >= 500) {
-        throw new ConnectionError(
-          `Server error from ${this.endpoint}: ${response.status} ${response.statusText}`,
-        );
-      }
     } catch (error) {
-      if (error instanceof AuthenticationError || error instanceof ConnectionError) throw error;
+      const durationMs = nowMs() - start;
       if (error instanceof TypeError) {
-        throw new ConnectionError(
+        const err = new ConnectionError(
           `Failed to connect to ${this.endpoint}: ${(error as Error).message}`,
           { cause: error },
         );
+        this.emit({ kind: "error", method: "connect", url, durationMs, message: err.message });
+        throw err;
       }
       if (error instanceof DOMException && error.name === "TimeoutError") {
-        throw new ConnectionError(
+        const err = new ConnectionError(
           `Connection to ${this.endpoint} timed out after ${this.timeout}ms`,
           { cause: error },
         );
+        this.emit({ kind: "error", method: "connect", url, durationMs, message: err.message });
+        throw err;
       }
       throw error;
     }
+    const durationMs = nowMs() - start;
+    const requestId = extractRequestId(response.headers);
+    if (response.status === 401 || response.status === 403) {
+      const err = new AuthenticationError(
+        `Authentication failed against ${this.endpoint}: ${response.status} ${response.statusText}`,
+        { requestId },
+      );
+      this.emit({
+        kind: "error",
+        method: "connect",
+        url,
+        status: response.status,
+        requestId,
+        durationMs,
+        message: err.message,
+      });
+      throw err;
+    }
+    if (!response.ok && response.status >= 500) {
+      const err = new ConnectionError(
+        `Server error from ${this.endpoint}: ${response.status} ${response.statusText}`,
+        { requestId },
+      );
+      this.emit({
+        kind: "error",
+        method: "connect",
+        url,
+        status: response.status,
+        requestId,
+        durationMs,
+        message: err.message,
+      });
+      throw err;
+    }
+    this.emit({
+      kind: "response",
+      method: "connect",
+      url,
+      status: response.status,
+      requestId,
+      durationMs,
+    });
   }
 
   async close(): Promise<void> {}
@@ -444,6 +497,8 @@ export class RestTransport implements Transport {
     }
 
     const url = `${this.endpoint}${path}${query}`;
+    const start = nowMs();
+    this.emit({ kind: "request", method, url, httpMethod: route.method });
     let response: Response;
     try {
       response = await fetch(url, {
@@ -453,22 +508,42 @@ export class RestTransport implements Transport {
         signal: AbortSignal.timeout(this.timeout),
       });
     } catch (error) {
+      const durationMs = nowMs() - start;
       if (error instanceof TypeError) {
-        throw new ConnectionError(
+        const err = new ConnectionError(
           `Request to ${url} failed: ${(error as Error).message}`,
           { cause: error },
         );
+        this.emit({ kind: "error", method, url, durationMs, message: err.message });
+        throw err;
       }
       throw error;
     }
 
+    const requestId = extractRequestId(response.headers);
+    const durationMs = nowMs() - start;
+
     if (response.status === 401 || response.status === 403) {
-      throw new AuthenticationError(
+      const err = new AuthenticationError(
         `Authentication failed: ${response.status} ${response.statusText}`,
+        { requestId },
       );
+      this.emit({
+        kind: "error",
+        method,
+        url,
+        status: response.status,
+        requestId,
+        durationMs,
+        message: err.message,
+      });
+      throw err;
     }
 
-    if (response.status === 204) return undefined as T;
+    if (response.status === 204) {
+      this.emit({ kind: "response", method, url, status: 204, requestId, durationMs });
+      return undefined as T;
+    }
 
     const text = await response.text();
 
@@ -483,8 +558,25 @@ export class RestTransport implements Transport {
         typeof errorBody === "object" && errorBody !== null && "error" in errorBody
           ? String((errorBody as Record<string, unknown>)["error"])
           : `HTTP ${response.status}`;
-      throw new TransportError(`${method} failed: ${errMsg}`, response.status, errorBody);
+      const err = new TransportError(
+        `${method} failed: ${errMsg}`,
+        response.status,
+        errorBody,
+        { requestId },
+      );
+      this.emit({
+        kind: "error",
+        method,
+        url,
+        status: response.status,
+        requestId,
+        durationMs,
+        message: err.message,
+      });
+      throw err;
     }
+
+    this.emit({ kind: "response", method, url, status: response.status, requestId, durationMs });
 
     if (!text) return undefined as T;
     let parsed: unknown = JSON.parse(text);
@@ -492,8 +584,17 @@ export class RestTransport implements Transport {
     return camelToSnake<T>(parsed);
   }
 
+  private emit(event: Parameters<Logger>[0]): void {
+    if (!this.logger) return;
+    try {
+      this.logger(event);
+    } catch {
+      // Logger errors must never propagate.
+    }
+  }
+
   private async buildHeaders(includeContentType = false): Promise<Record<string, string>> {
-    const headers: Record<string, string> = { ...this.headers };
+    const headers: Record<string, string> = { "User-Agent": defaultUserAgent(), ...this.headers };
     if (includeContentType) headers["Content-Type"] = "application/json";
     const token = this.tokenProvider ? await this.tokenProvider() : this.apiKey;
     if (token) headers["Authorization"] = `Bearer ${token}`;

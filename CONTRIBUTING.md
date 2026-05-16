@@ -66,6 +66,15 @@ uv run python -m tck.registry.validator
 3. Update `SPEC.md` if adding behavioral requirements.
 4. Update `scenario_ids.yaml` for new tests.
 5. Ensure CI passes.
+6. **For user-visible changes to a published client**, add a changeset:
+   ```bash
+   npx changeset
+   ```
+   This drops a Markdown file into `.changeset/` describing the change
+   and the appropriate bump (patch / minor / major). A bot aggregates
+   pending changesets into a "Version Packages" PR. For 0.x clients
+   (e.g., `@neo4j-labs/agent-memory`), breaking changes can ship as a
+   `minor` bump — but the CHANGELOG callout is mandatory.
 
 ## License
 
