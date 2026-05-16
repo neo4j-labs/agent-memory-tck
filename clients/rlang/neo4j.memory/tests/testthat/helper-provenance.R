@@ -82,3 +82,21 @@ tck_record_provenance_step <- function(client, conversation_id, test_name,
   )
   invisible(NULL)
 }
+
+# Walk the call stack looking for the enclosing testthat::test_that frame
+# and read its `desc` argument. Lets new_conv() / new_entity() figure out
+# which test they were called from without each test having to pass the
+# name explicitly. Returns "unknown" if not called from inside test_that.
+tck_infer_current_test_name <- function() {
+  if (sys.nframes() < 1) return("unknown")
+  for (i in sys.nframes():1) {
+    fn <- tryCatch(sys.function(i), error = function(e) NULL)
+    if (identical(fn, testthat::test_that)) {
+      env <- sys.frame(i)
+      if (exists("desc", envir = env, inherits = FALSE)) {
+        return(get("desc", envir = env))
+      }
+    }
+  }
+  "unknown"
+}

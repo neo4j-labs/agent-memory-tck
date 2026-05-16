@@ -22,7 +22,12 @@ new_e2e_client <- function() {
 }
 
 new_conv <- function(client, suffix = "") {
-  conv <- client$short_term$create_conversation(user_id = e2e_user_id_with(suffix))
+  test_name <- tck_infer_current_test_name()
+  conv <- client$short_term$create_conversation(
+    user_id = e2e_user_id_with(suffix),
+    metadata = tck_metadata_for(test_name, list(tck_phase = "fixture"))
+  )
+  tck_record_provenance_step(client, conv$id, test_name)
   attr(conv, ".cleanup") <- function() {
     tryCatch(client$short_term$delete_conversation(conv$id), error = function(e) NULL)
   }
@@ -33,7 +38,9 @@ new_entity <- function(client, name = NULL, entity_type = "concept", description
   if (is.null(name)) {
     name <- paste0("TCK-Probe-", paste(sample(c(letters, 0:9), 8, replace = TRUE), collapse = ""))
   }
-  e <- client$long_term$add_entity(name, entity_type, description = description)
+  test_name <- tck_infer_current_test_name()
+  tagged_description <- tck_tag_description(test_name, description)
+  e <- client$long_term$add_entity(name, entity_type, description = tagged_description)
   attr(e, ".cleanup") <- function() {
     tryCatch(client$long_term$delete_entity(e$id), error = function(err) NULL)
   }
@@ -289,7 +296,10 @@ test_that("e2e: addEntity returns id + fields", {
                   description = "test person")
   on.exit(cleanup(e))
   expect_true(nchar(e$id) >= 8)
-  expect_equal(e$description, "test person")
+  # new_entity tags the description with a tck-provenance prefix; the
+  # original payload is preserved at the end of the string.
+  expect_match(e$description, "test person$")
+  expect_match(e$description, "tck:r")
 })
 
 test_that("e2e: listEntities returns list", {
