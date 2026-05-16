@@ -1,27 +1,40 @@
 /**
  * MemoryClient — root entry point for all memory operations.
  *
- * Provides access to short-term, long-term, and reasoning memory
- * through a unified client with configurable transport.
+ * Picks a transport automatically based on the endpoint shape:
+ *   - Endpoints containing `/v1` → RestTransport (hosted service)
+ *   - Otherwise → BridgeTransport (TCK conformance servers, local reference)
+ *
+ * Override with `transport: "rest" | "bridge"` in MemoryClientOptions, or
+ * pass a custom Transport instance directly.
  */
 
+import { AuthClient } from "./auth/index.js";
 import { ValidationError } from "./errors.js";
 import { LongTermMemory } from "./long-term/index.js";
+import { QueryConsole } from "./query/index.js";
 import { ReasoningMemory } from "./reasoning/index.js";
 import { ShortTermMemory } from "./short-term/index.js";
+import { BridgeTransport } from "./transport/bridge.js";
 import type { Transport } from "./transport/index.js";
-import { HttpTransport } from "./transport/http.js";
+import { RestTransport } from "./transport/rest.js";
 import type { MemoryClientOptions } from "./types.js";
 
 export class MemoryClient {
   /** Short-term (conversational) memory operations. */
   readonly shortTerm: ShortTermMemory;
 
-  /** Long-term (entity/preference/fact) memory operations. */
+  /** Long-term (entity / preference / fact / graph) memory operations. */
   readonly longTerm: LongTermMemory;
 
-  /** Reasoning (trace/step/tool call) memory operations. */
+  /** Reasoning (trace / step / tool call / provenance) memory operations. */
   readonly reasoning: ReasoningMemory;
+
+  /** Read-only Cypher query console (hosted service only). */
+  readonly query: QueryConsole;
+
+  /** API-key & OAuth management (hosted service only). */
+  readonly auth: AuthClient;
 
   private readonly transport: Transport;
 
@@ -37,14 +50,14 @@ export class MemoryClient {
     this.shortTerm = new ShortTermMemory(this.transport);
     this.longTerm = new LongTermMemory(this.transport);
     this.reasoning = new ReasoningMemory(this.transport);
+    this.query = new QueryConsole(this.transport);
+    this.auth = new AuthClient(this.transport);
   }
 
-  /** Establish the connection to the backend. */
   async connect(): Promise<void> {
     await this.transport.connect();
   }
 
-  /** Close the connection and release resources. */
   async close(): Promise<void> {
     await this.transport.close();
   }
@@ -59,25 +72,36 @@ function isTransport(obj: unknown): obj is Transport {
   );
 }
 
+function pickTransport(endpoint: string, mode: MemoryClientOptions["transport"]): "bridge" | "rest" {
+  if (mode === "bridge" || mode === "rest") return mode;
+  // Auto: REST if the endpoint path contains /v1 (the canonical hosted root).
+  return /\/v\d+\b/.test(endpoint) ? "rest" : "bridge";
+}
+
 function createTransport(options: MemoryClientOptions): Transport {
-  if (options.endpoint) {
-    return new HttpTransport({
+  if (!options.endpoint) {
+    if (options.neo4jUri) {
+      throw new ValidationError(
+        "Direct Neo4j connection is not yet implemented. Use endpoint with the hosted service.",
+      );
+    }
+    throw new ValidationError("Either endpoint or neo4jUri must be provided.");
+  }
+
+  const choice = pickTransport(options.endpoint, options.transport);
+  if (choice === "rest") {
+    return new RestTransport({
       endpoint: options.endpoint,
       apiKey: options.apiKey,
+      tokenProvider: options.tokenProvider,
       timeout: options.timeout,
+      headers: options.headers,
     });
   }
-
-  if (options.neo4jUri) {
-    // Direct Neo4j connection would be loaded dynamically to avoid
-    // requiring neo4j-driver as a hard dependency.
-    throw new ValidationError(
-      "Direct Neo4j connection is not yet implemented. " +
-        "Use the endpoint option to connect to the hosted service.",
-    );
-  }
-
-  throw new ValidationError(
-    "Either endpoint or neo4jUri must be provided in MemoryClientOptions.",
-  );
+  return new BridgeTransport({
+    endpoint: options.endpoint,
+    apiKey: options.apiKey,
+    timeout: options.timeout,
+    headers: options.headers,
+  });
 }

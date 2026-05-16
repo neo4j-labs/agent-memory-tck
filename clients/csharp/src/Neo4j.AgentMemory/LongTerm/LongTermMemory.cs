@@ -3,40 +3,30 @@ using Neo4j.AgentMemory.Transport;
 
 namespace Neo4j.AgentMemory.LongTerm;
 
-/// <summary>Long-term (entity/preference/fact) memory operations — Silver + Gold tier.</summary>
+/// <summary>Long-term (entity / preference / fact / graph) memory operations.</summary>
 public class LongTermMemory
 {
     private readonly ITransport _transport;
 
-    internal LongTermMemory(ITransport transport)
-    {
-        _transport = transport;
-    }
+    internal LongTermMemory(ITransport transport) { _transport = transport; }
 
-    /// <summary>Create or update an entity in the knowledge graph.</summary>
-    public async Task<Entity> AddEntityAsync(
-        string name,
-        string entityType,
-        string? description = null,
-        CancellationToken ct = default)
+    // ---- Silver tier (bridge) -------------------------------------------
+
+    public async Task<Entity> AddEntityAsync(string name, string entityType, string? description = null, CancellationToken ct = default)
     {
-        var result = await _transport.RequestAsync<Entity>("add_entity", new Dictionary<string, object?>
+        var result = await _transport.RequestAsync<Entity>("add_entity", new()
         {
             ["name"] = name,
             ["entity_type"] = entityType,
+            ["type"] = entityType,
             ["description"] = description
         }, ct);
         return result!;
     }
 
-    /// <summary>Store a user preference.</summary>
-    public async Task<Preference> AddPreferenceAsync(
-        string category,
-        string preference,
-        string? context = null,
-        CancellationToken ct = default)
+    public async Task<Preference> AddPreferenceAsync(string category, string preference, string? context = null, CancellationToken ct = default)
     {
-        var result = await _transport.RequestAsync<Preference>("add_preference", new Dictionary<string, object?>
+        var result = await _transport.RequestAsync<Preference>("add_preference", new()
         {
             ["category"] = category,
             ["preference"] = preference,
@@ -45,14 +35,9 @@ public class LongTermMemory
         return result!;
     }
 
-    /// <summary>Store a subject-predicate-object fact triple.</summary>
-    public async Task<Fact> AddFactAsync(
-        string subject,
-        string predicate,
-        string obj,
-        CancellationToken ct = default)
+    public async Task<Fact> AddFactAsync(string subject, string predicate, string obj, CancellationToken ct = default)
     {
-        var result = await _transport.RequestAsync<Fact>("add_fact", new Dictionary<string, object?>
+        var result = await _transport.RequestAsync<Fact>("add_fact", new()
         {
             ["subject"] = subject,
             ["predicate"] = predicate,
@@ -61,28 +46,20 @@ public class LongTermMemory
         return result!;
     }
 
-    /// <summary>Search entities by semantic similarity.</summary>
-    public async Task<List<Entity>> SearchEntitiesAsync(
-        string query,
-        int limit = 10,
-        CancellationToken ct = default)
+    public async Task<List<Entity>> SearchEntitiesAsync(string query, int limit = 10, string? type = null, CancellationToken ct = default)
     {
-        var result = await _transport.RequestAsync<List<Entity>>("search_entities", new Dictionary<string, object?>
+        var result = await _transport.RequestAsync<List<Entity>>("search_entities", new()
         {
             ["query"] = query,
-            ["limit"] = limit
+            ["limit"] = limit,
+            ["type"] = type
         }, ct);
         return result ?? new List<Entity>();
     }
 
-    /// <summary>Search preferences by semantic similarity.</summary>
-    public async Task<List<Preference>> SearchPreferencesAsync(
-        string query,
-        string? category = null,
-        int limit = 10,
-        CancellationToken ct = default)
+    public async Task<List<Preference>> SearchPreferencesAsync(string query, string? category = null, int limit = 10, CancellationToken ct = default)
     {
-        var result = await _transport.RequestAsync<List<Preference>>("search_preferences", new Dictionary<string, object?>
+        var result = await _transport.RequestAsync<List<Preference>>("search_preferences", new()
         {
             ["query"] = query,
             ["category"] = category,
@@ -91,25 +68,14 @@ public class LongTermMemory
         return result ?? new List<Preference>();
     }
 
-    /// <summary>Look up an entity by exact name. Returns null if not found.</summary>
-    public async Task<Entity?> GetEntityByNameAsync(
-        string name,
-        CancellationToken ct = default)
+    public async Task<Entity?> GetEntityByNameAsync(string name, CancellationToken ct = default)
     {
-        return await _transport.RequestAsync<Entity>("get_entity_by_name", new Dictionary<string, object?>
-        {
-            ["name"] = name
-        }, ct);
+        return await _transport.RequestAsync<Entity>("get_entity_by_name", new() { ["name"] = name }, ct);
     }
 
-    /// <summary>Get entities related to the given entity.</summary>
-    public async Task<List<Entity>> GetRelatedEntitiesAsync(
-        string entityId,
-        string? relationshipType = null,
-        int depth = 1,
-        CancellationToken ct = default)
+    public async Task<List<Entity>> GetRelatedEntitiesAsync(string entityId, string? relationshipType = null, int depth = 1, CancellationToken ct = default)
     {
-        var result = await _transport.RequestAsync<List<Entity>>("get_related_entities", new Dictionary<string, object?>
+        var result = await _transport.RequestAsync<List<Entity>>("get_related_entities", new()
         {
             ["entity_id"] = entityId,
             ["relationship_type"] = relationshipType,
@@ -118,17 +84,9 @@ public class LongTermMemory
         return result ?? new List<Entity>();
     }
 
-    // --- Gold Tier ---
-
-    /// <summary>Create a typed relationship between two entities.</summary>
-    public async Task<Relationship> AddRelationshipAsync(
-        string sourceId,
-        string targetId,
-        string relationshipType,
-        Dictionary<string, object?>? properties = null,
-        CancellationToken ct = default)
+    public async Task<Relationship> AddRelationshipAsync(string sourceId, string targetId, string relationshipType, Dictionary<string, object?>? properties = null, CancellationToken ct = default)
     {
-        var result = await _transport.RequestAsync<Relationship>("add_relationship", new Dictionary<string, object?>
+        var result = await _transport.RequestAsync<Relationship>("add_relationship", new()
         {
             ["source_id"] = sourceId,
             ["target_id"] = targetId,
@@ -138,19 +96,93 @@ public class LongTermMemory
         return result!;
     }
 
-    /// <summary>Merge two duplicate entities into one.</summary>
-    public async Task<Entity> MergeDuplicateEntitiesAsync(
-        string sourceId,
-        string targetId,
-        string? canonicalName = null,
-        CancellationToken ct = default)
+    public async Task<Entity> MergeDuplicateEntitiesAsync(string sourceId, string targetId, string? canonicalName = null, CancellationToken ct = default)
     {
-        var result = await _transport.RequestAsync<Entity>("merge_duplicate_entities", new Dictionary<string, object?>
+        var result = await _transport.RequestAsync<Entity>("merge_duplicate_entities", new()
         {
             ["source_id"] = sourceId,
             ["target_id"] = targetId,
             ["canonical_name"] = canonicalName
         }, ct);
         return result!;
+    }
+
+    // ---- Volume 5 / hosted-native ---------------------------------------
+
+    public async Task<List<Entity>> ListEntitiesAsync(string? type = null, int? limit = null, CancellationToken ct = default)
+    {
+        var result = await _transport.RequestAsync<List<Entity>>("list_entities", new()
+        {
+            ["type"] = type,
+            ["limit"] = limit
+        }, ct);
+        return result ?? new List<Entity>();
+    }
+
+    public async Task<Entity> GetEntityAsync(string entityId, CancellationToken ct = default)
+    {
+        var result = await _transport.RequestAsync<Entity>("get_entity", new() { ["entity_id"] = entityId }, ct);
+        return result!;
+    }
+
+    /// <summary>Update an entity's name and/or description.
+    ///
+    /// The hosted PUT /v1/entities/{id} returns {"status": "updated"}
+    /// rather than the full entity, so when the response is missing an
+    /// id we fall back to a follow-up GET to keep the public contract —
+    /// "update returns the updated Entity". Bridge transports return the
+    /// entity directly.
+    /// </summary>
+    public async Task<Entity> UpdateEntityAsync(string entityId, string? name = null, string? description = null, CancellationToken ct = default)
+    {
+        var result = await _transport.RequestAsync<Entity>("update_entity", new()
+        {
+            ["entity_id"] = entityId,
+            ["name"] = name,
+            ["description"] = description
+        }, ct);
+        if (result != null && !string.IsNullOrEmpty(result.Id))
+        {
+            return result;
+        }
+        return await GetEntityAsync(entityId, ct);
+    }
+
+    public async Task DeleteEntityAsync(string entityId, CancellationToken ct = default)
+    {
+        await _transport.RequestAsync("delete_entity", new() { ["entity_id"] = entityId }, ct);
+    }
+
+    public async Task<EntityFeedbackResult> SetEntityFeedbackAsync(string entityId, double userScore, bool confirmed, CancellationToken ct = default)
+    {
+        var result = await _transport.RequestAsync<EntityFeedbackResult>("set_entity_feedback", new()
+        {
+            ["entity_id"] = entityId,
+            ["user_score"] = userScore,
+            ["confirmed"] = confirmed
+        }, ct);
+        return result!;
+    }
+
+    public async Task<EntityHistory> GetEntityHistoryAsync(string entityId, CancellationToken ct = default)
+    {
+        var result = await _transport.RequestAsync<EntityHistory>("get_entity_history", new() { ["entity_id"] = entityId }, ct);
+        return result ?? new EntityHistory { EntityId = entityId };
+    }
+
+    public async Task<EntityMergeResult> MergeEntitiesAsync(string sourceId, string targetId, CancellationToken ct = default)
+    {
+        var result = await _transport.RequestAsync<EntityMergeResult>("merge_entities", new()
+        {
+            ["source_id"] = sourceId,
+            ["target_id"] = targetId
+        }, ct);
+        return result!;
+    }
+
+    public async Task<EntityGraph> GetEntityGraphAsync(CancellationToken ct = default)
+    {
+        var result = await _transport.RequestAsync<EntityGraph>("get_entity_graph", null, ct);
+        return result ?? new EntityGraph();
     }
 }

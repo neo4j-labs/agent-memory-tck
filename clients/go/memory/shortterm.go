@@ -4,7 +4,7 @@ import "context"
 
 // ShortTermMemory provides conversational memory operations.
 type ShortTermMemory struct {
-	transport *transport
+	transport Transport
 }
 
 // AddMessage adds a message to a conversation session.
@@ -24,7 +24,7 @@ func (s *ShortTermMemory) AddMessage(ctx context.Context, sessionID string, role
 	}
 
 	var result Message
-	if err := s.transport.call(ctx, "add_message", params, &result); err != nil {
+	if err := s.transport.Call(ctx, "add_message", params, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -54,7 +54,7 @@ func (s *ShortTermMemory) GetConversation(ctx context.Context, sessionID string,
 	}
 
 	var result Conversation
-	if err := s.transport.call(ctx, "get_conversation", params, &result); err != nil {
+	if err := s.transport.Call(ctx, "get_conversation", params, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -86,7 +86,7 @@ func (s *ShortTermMemory) SearchMessages(ctx context.Context, query string, opts
 	}
 
 	var result []Message
-	if err := s.transport.call(ctx, "search_messages", params, &result); err != nil {
+	if err := s.transport.Call(ctx, "search_messages", params, &result); err != nil {
 		return nil, err
 	}
 	if result == nil {
@@ -128,7 +128,7 @@ func (s *ShortTermMemory) ListSessions(ctx context.Context, opts ...func(*ListSe
 	}
 
 	var result []SessionInfo
-	if err := s.transport.call(ctx, "list_sessions", params, &result); err != nil {
+	if err := s.transport.Call(ctx, "list_sessions", params, &result); err != nil {
 		return nil, err
 	}
 	if result == nil {
@@ -151,7 +151,7 @@ func (s *ShortTermMemory) DeleteMessage(ctx context.Context, messageID string) (
 	var result struct {
 		Deleted bool `json:"deleted"`
 	}
-	if err := s.transport.call(ctx, "delete_message", map[string]interface{}{
+	if err := s.transport.Call(ctx, "delete_message", map[string]interface{}{
 		"message_id": messageID,
 	}, &result); err != nil {
 		return false, err
@@ -161,7 +161,126 @@ func (s *ShortTermMemory) DeleteMessage(ctx context.Context, messageID string) (
 
 // ClearSession removes all messages for a session.
 func (s *ShortTermMemory) ClearSession(ctx context.Context, sessionID string) error {
-	return s.transport.call(ctx, "clear_session", map[string]interface{}{
+	return s.transport.Call(ctx, "clear_session", map[string]interface{}{
 		"session_id": sessionID,
 	}, nil)
+}
+
+// ============================================================================
+// Volume 5 / hosted-native methods
+// ============================================================================
+
+// CreateConversationParams configures CreateConversation.
+type CreateConversationParams struct {
+	UserID   string
+	Metadata map[string]interface{}
+}
+
+// CreateConversation creates a new conversation (hosted service).
+func (s *ShortTermMemory) CreateConversation(ctx context.Context, p CreateConversationParams) (*Conversation, error) {
+	params := map[string]interface{}{
+		"user_id": p.UserID,
+	}
+	if p.Metadata != nil {
+		params["metadata"] = p.Metadata
+	}
+	var result Conversation
+	if err := s.transport.Call(ctx, "create_conversation", params, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ListConversations lists conversations the API key has access to.
+func (s *ShortTermMemory) ListConversations(ctx context.Context, limit int) ([]Conversation, error) {
+	params := map[string]interface{}{}
+	if limit > 0 {
+		params["limit"] = limit
+	}
+	var result []Conversation
+	if err := s.transport.Call(ctx, "list_conversations", params, &result); err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return []Conversation{}, nil
+	}
+	return result, nil
+}
+
+// GetConversationMetadata fetches conversation metadata (no messages).
+func (s *ShortTermMemory) GetConversationMetadata(ctx context.Context, conversationID string) (*Conversation, error) {
+	var result Conversation
+	if err := s.transport.Call(ctx, "get_conversation_metadata", map[string]interface{}{
+		"conversation_id": conversationID,
+	}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteConversation deletes a conversation and all its messages.
+func (s *ShortTermMemory) DeleteConversation(ctx context.Context, conversationID string) error {
+	return s.transport.Call(ctx, "delete_conversation", map[string]interface{}{
+		"conversation_id": conversationID,
+	}, nil)
+}
+
+// GetContext returns the three-tier context (reflections + observations +
+// recent messages) for a conversation.
+func (s *ShortTermMemory) GetContext(ctx context.Context, conversationID string) (*ConversationContext, error) {
+	var result ConversationContext
+	if err := s.transport.Call(ctx, "get_context", map[string]interface{}{
+		"conversation_id": conversationID,
+	}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// BulkMessageInput is one message inside a bulk add.
+type BulkMessageInput struct {
+	Role     MessageRole            `json:"role"`
+	Content  string                 `json:"content"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// BulkAddMessages bulk-adds up to 100 messages in one request.
+func (s *ShortTermMemory) BulkAddMessages(ctx context.Context, conversationID string, messages []BulkMessageInput) ([]Message, error) {
+	if len(messages) > 100 {
+		return nil, &MemoryError{Message: "BulkAddMessages accepts max 100 messages"}
+	}
+	var result []Message
+	if err := s.transport.Call(ctx, "bulk_add_messages", map[string]interface{}{
+		"conversation_id": conversationID,
+		"messages":        messages,
+	}, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetObservations returns the auto-generated observation summaries.
+func (s *ShortTermMemory) GetObservations(ctx context.Context, conversationID string, limit int) ([]Observation, error) {
+	params := map[string]interface{}{
+		"conversation_id": conversationID,
+	}
+	if limit > 0 {
+		params["limit"] = limit
+	}
+	var result []Observation
+	if err := s.transport.Call(ctx, "get_observations", params, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetReflections returns the higher-level reflections for a conversation.
+func (s *ShortTermMemory) GetReflections(ctx context.Context, conversationID string) ([]Reflection, error) {
+	var result []Reflection
+	if err := s.transport.Call(ctx, "get_reflections", map[string]interface{}{
+		"conversation_id": conversationID,
+	}, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

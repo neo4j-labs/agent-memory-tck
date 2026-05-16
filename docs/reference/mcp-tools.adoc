@@ -1,0 +1,96 @@
+= MCP Tool Reference
+:description: The 12 standard memory tools matching memory.neo4jlabs.com/mcp.
+
+The hosted service exposes 12 MCP tools at `https://memory.neo4jlabs.com/mcp`.
+Each language SDK ships the same surface so you can register it on your own
+MCP server with one helper call.
+
+== The 12 tools
+
+[cols="2,5"]
+|===
+| Tool | Description
+
+| `memory_create_conversation` | Create a new conversation session for a user.
+| `memory_add_messages` | Append one or more messages to a conversation.
+| `memory_get_context` | Three-tier context (reflections + observations + recent messages).
+| `memory_search_messages` | Search messages within a conversation.
+| `memory_search_entities` | Search the knowledge graph for entities.
+| `memory_get_entity` | Fetch one entity (with relationships) by id.
+| `memory_add_entity` | Manually create an entity.
+| `memory_get_entity_history` | All conversations that mentioned this entity.
+| `memory_record_step` | Log a reasoning step under a conversation.
+| `memory_record_tool_call` | Log a tool invocation tied to a reasoning step.
+| `memory_get_trace` | Full reasoning trace for a conversation.
+| `memory_explain_decision` | Detailed explanation of one reasoning step.
+|===
+
+== Wiring into your stack
+
+[tabs]
+======
+Claude Desktop / Cursor / Windsurf::
++
+Point your MCP config at `https://memory.neo4jlabs.com/mcp` over Streamable
+HTTP transport with your `nams_*` token. No SDK install required.
+
+TypeScript MCP server::
++
+[source,ts]
+----
+import { createMemoryTools, handleMemoryToolCall } from "@neo4j-labs/agent-memory/mcp";
+import { MemoryClient } from "@neo4j-labs/agent-memory";
+
+const client = new MemoryClient({ endpoint: "...", apiKey: "..." });
+const tools = createMemoryTools();   // 12 standard tools
+
+// Wire each tool to the dispatcher in your MCP framework
+for (const t of tools) {
+  myMcpServer.registerTool(t, async (args) => handleMemoryToolCall(client, t.name, args));
+}
+----
+
+Go HTTP handler::
++
+[source,go]
+----
+client, _ := memory.New(memory.WithEndpoint("..."), memory.WithAPIKey("..."))
+http.Handle("/mcp/", client.MCPHandler())   // Exposes /tools/list and /tools/call
+http.ListenAndServe(":8080", nil)
+----
+
+C# (any HTTP framework)::
++
+[source,csharp]
+----
+using var client = new MemoryClient(...);
+var tools = Neo4j.AgentMemory.Mcp.McpHandler.Tools();
+var result = await Neo4j.AgentMemory.Mcp.McpHandler.DispatchAsync(client, name, args);
+----
+
+R (plumber)::
++
+[source,r]
+----
+client <- MemoryClient$new(endpoint = "...", api_key = "...")
+tools <- mcp_tools()
+# Plug into your plumber routes:
+# pr$handle("POST", "/tools/call", function(req, res) mcp_dispatch(client, name, args))
+----
+======
+
+== Backwards compatibility (TS)
+
+Older `memory.<verb>` tool names from `@neo4j-labs/agent-memory` v0.1 are
+honored as deprecated aliases. They emit a console warning and forward to the
+new tool. Aliases will be removed in v0.3.
+
+|===
+| Old name | New name
+
+| `memory.addMessage` | `memory_add_messages`
+| `memory.getConversation` | `memory_get_context`
+| `memory.searchMessages` | `memory_search_messages`
+| `memory.addEntity` | `memory_add_entity`
+| `memory.searchEntities` | `memory_search_entities`
+|===

@@ -1,0 +1,33 @@
+[project]
+name = "neo4j-agent-memory-client"
+version = "0.1.0"
+description = "Python client for the Neo4j Agent Memory Service. Speaks both the TCK bridge protocol and the hosted REST API at memory.neo4jlabs.com/v1."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Neo4j Labs", email = "labs@neo4j.com" }]
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+langgraph = ["langgraph>=0.2.0"]
+pydantic-ai = ["pydantic-ai>=0.0.10"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+    "python-dotenv>=1.0",
+    "ruff>=0.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/neo4j-labs/agent-memory-tck"
+Repository = "https://github.com/neo4j-labs/agent-memory-tck"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["neo4j_agent_memory_client"]

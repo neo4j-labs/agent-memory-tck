@@ -34,8 +34,14 @@ func main() {
 		port = "8003"
 	}
 
+	apiKey := os.Getenv("MEMORY_API_KEY")
+	opts := []memory.Option{memory.WithEndpoint(endpoint)}
+	if apiKey != "" {
+		opts = append(opts, memory.WithAPIKey(apiKey))
+	}
+
 	var err error
-	client, err = memory.New(memory.WithEndpoint(endpoint))
+	client, err = memory.New(opts...)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}

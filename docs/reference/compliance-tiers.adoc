@@ -2,7 +2,7 @@
 :toc:
 :toclevels: 2
 
-The TCK defines three compliance tiers. Each is a strict superset of the tier below it.
+The TCK defines four compliance tiers. Each is a strict superset of the tier below it. Bronze, Silver, and Gold are required for full TCK certification; Platinum is opt-in and validates the hosted-service operations defined in SPEC.md Volume 5.
 
 == Bronze -- Core Schema + Short-Term Memory
 
@@ -125,3 +125,37 @@ Gold adds cross-memory integration, entity relationship management, and multi-ag
 *100%* Bronze + *100%* Silver + *80%* Gold scenarios must pass.
 
 NOTE: Gold allows 80% because some scenarios test optional `SHOULD` behaviors. Implementations that raise `NotImplementedError` for Gold methods will have those tests skipped (not failed).
+
+== Platinum -- Hosted-Service Operations (Volume 5)
+
+*11 test scenarios — opt-in*
+
+Platinum verifies that an implementation correctly handles the hosted-service-only operations defined in SPEC.md Volume 5. These mirror the REST API at `https://memory.neo4jlabs.com/v1` and are exposed by every language client through the same `MemoryClient` API.
+
+=== Required Behaviors (in addition to Gold)
+
+[cols="1,3"]
+|===
+|Area |Requirements
+
+|Conversation Lifecycle
+|`create_conversation`, `list_conversations`, `delete_conversation` (idempotent), `bulk_add_messages` (cap 100, preserves insertion order). UUID `id` plus `user_id` / `workspace_id` echo. SPEC-5.1.x.
+
+|Three-Tier Context
+|`get_context(conversation_id)` returns `{reflections, observations, recent_messages}`. Observations may be empty for new conversations (generated asynchronously). SPEC-5.2.x.
+
+|Entity Feedback & Graph
+|`set_entity_feedback(user_score 0-1, confirmed)` returns `{id, updated}`. `get_entity_history` returns cross-conversation mentions. `merge_entities` leaves a `SAME_AS` provenance link. `get_entity_graph` returns nodes + edges suitable for visualization. SPEC-5.3.x.
+
+|Reasoning Provenance
+|`record_step` persists steps under conversations. `explain_step` returns tool calls + influenced entities. `get_trace_by_conversation` returns the flat trace. `get_entity_provenance` returns the reasoning chain that influenced an entity. SPEC-5.4.x.
+
+|Cypher Console
+|`cypher_query` executes read-only Cypher. Write operations rejected. SPEC-5.5.1.
+|===
+
+=== Pass Requirement
+
+Platinum is **optional**. Implementations that don't expose Volume 5 leave the new BaseAdapter methods at their `NotImplementedError` defaults; Platinum tests skip with a friendly message.
+
+For implementations targeting the hosted service, *100%* of Platinum scenarios should pass to qualify for the Platinum certification badge.

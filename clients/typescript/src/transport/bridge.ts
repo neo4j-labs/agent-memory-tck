@@ -1,19 +1,26 @@
 /**
- * HTTP transport for the NAMS service.
+ * BridgeTransport — TCK bridge protocol transport.
  *
- * Uses only the standard fetch() API — compatible with Node.js 20+,
- * Bun, Deno, Cloudflare Workers, and Vercel Edge Runtime.
- * No node:-prefixed imports are used.
+ * Speaks the bridge wire format (POST {endpoint}/{snake_case_method}) used by
+ * conformance servers and the local reference adapter. Compatible with every
+ * fetch-capable runtime (Node 20+, Bun, Deno, Workers, Edge).
  */
 
 import { AuthenticationError, ConnectionError, TransportError } from "../errors.js";
 import type { Transport } from "./index.js";
 
-export interface HttpTransportOptions {
-  /** Base URL of the service endpoint. */
+/** Strip trailing `/` from a URL without using a polynomial regex. */
+function trimTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
+export interface BridgeTransportOptions {
+  /** Base URL of the bridge endpoint (no trailing /v1). */
   endpoint: string;
 
-  /** API key for authentication. */
+  /** API key for Bearer auth. Optional for local bridge servers. */
   apiKey?: string;
 
   /** Request timeout in milliseconds. Default: 30000. */
@@ -23,22 +30,20 @@ export interface HttpTransportOptions {
   headers?: Record<string, string>;
 }
 
-export class HttpTransport implements Transport {
+export class BridgeTransport implements Transport {
   private readonly endpoint: string;
   private readonly apiKey?: string;
   private readonly timeout: number;
   private readonly headers: Record<string, string>;
 
-  constructor(options: HttpTransportOptions) {
-    this.endpoint = options.endpoint.replace(/\/+$/, "");
+  constructor(options: BridgeTransportOptions) {
+    this.endpoint = trimTrailingSlashes(options.endpoint);
     this.apiKey = options.apiKey;
     this.timeout = options.timeout ?? 30_000;
     this.headers = options.headers ?? {};
   }
 
   async connect(): Promise<void> {
-    // HTTP is stateless — no persistent connection to establish.
-    // We do a lightweight health check to validate the endpoint.
     try {
       const response = await fetch(`${this.endpoint}/setup`, {
         method: "POST",
@@ -58,7 +63,6 @@ export class HttpTransport implements Transport {
           { cause: error },
         );
       }
-      // AbortSignal.timeout throws a DOMException with name "TimeoutError"
       if (error instanceof DOMException && error.name === "TimeoutError") {
         throw new ConnectionError(
           `Connection to ${this.endpoint} timed out after ${this.timeout}ms`,
@@ -69,14 +73,11 @@ export class HttpTransport implements Transport {
     }
   }
 
-  async close(): Promise<void> {
-    // HTTP is stateless — nothing to close.
-  }
+  async close(): Promise<void> {}
 
   async request<T>(method: string, params: Record<string, unknown>): Promise<T> {
     const url = `${this.endpoint}/${method}`;
 
-    // Strip undefined/null values from params
     const body: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== null) {
@@ -125,17 +126,10 @@ export class HttpTransport implements Transport {
         typeof errorBody === "object" && errorBody !== null && "error" in errorBody
           ? String((errorBody as Record<string, unknown>)["error"])
           : `HTTP ${response.status}`;
-      throw new TransportError(
-        `${method} failed: ${errorMessage}`,
-        response.status,
-        errorBody,
-      );
+      throw new TransportError(`${method} failed: ${errorMessage}`, response.status, errorBody);
     }
 
-    if (!text) {
-      return undefined as T;
-    }
-
+    if (!text) return undefined as T;
     return JSON.parse(text) as T;
   }
 

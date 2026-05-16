@@ -13,7 +13,7 @@ A simple chat application where the AI assistant remembers conversation history 
 
 * Node.js 20+ or Bun
 * An OpenAI API key
-* Access to a neo4j-agent-memory service endpoint (or local Neo4j instance)
+* Either a `nams_*` API key for `https://memory.neo4jlabs.com/v1` (recommended) or a local Neo4j + bridge server
 
 == Step 1: Create the Project
 
@@ -31,8 +31,10 @@ npm install @neo4j-labs/agent-memory ai @ai-sdk/openai
 // index.ts
 import { MemoryClient } from "@neo4j-labs/agent-memory";
 
+// Auto-selects RestTransport when endpoint contains /v1.
 const client = new MemoryClient({
-  endpoint: process.env.MEMORY_ENDPOINT ?? "http://localhost:3001",
+  endpoint: process.env.MEMORY_ENDPOINT ?? "https://memory.neo4jlabs.com/v1",
+  apiKey: process.env.MEMORY_API_KEY,
 });
 
 await client.connect();
@@ -120,7 +122,7 @@ await client.reasoning.completeTrace(trace.id, {
 
 == Step 6: Add Vercel AI SDK Middleware
 
-The middleware auto-injects conversation history and persists assistant responses:
+The middleware injects three-tier conversational context (reflections + observations + recent messages, when available from the hosted service) and persists assistant responses:
 
 [source,typescript]
 ----
@@ -128,9 +130,15 @@ import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { agentMemoryMiddleware } from "@neo4j-labs/agent-memory/middleware/vercel-ai";
 
+// On REST transports, pass conversationId (UUID from createConversation).
+// On bridge transports, pass sessionId (any free-form string).
+const conv = await client.shortTerm.createConversation({ userId: "alice@example.com" });
+
 const middleware = agentMemoryMiddleware(client, {
-  sessionId: "session-1",
-  includeHistory: 20,  // inject last 20 messages as context
+  conversationId: conv.id,
+  userId: "alice@example.com",
+  includeContext: true,     // 3-tier context on REST; flat history on bridge
+  persistResponses: true,
 });
 
 const result = await generateText({
@@ -140,8 +148,9 @@ const result = await generateText({
 });
 
 console.log(result.text);
-// The assistant sees the full conversation history and can reference
-// that Alice works at Acme Corp as a software engineer.
+// The assistant sees the full conversation history (plus any reflections
+// and observations the service has generated) and can reference that
+// Alice works at Acme Corp as a software engineer.
 ----
 
 == Step 7: Clean Up
@@ -153,6 +162,9 @@ await client.close();
 
 == Next Steps
 
-* link:../reference/base-adapter.html[BaseAdapter Interface Reference] — all available memory operations
-* link:../explanation/memory-model.html[The Agent Memory Model] — understanding short-term, long-term, and reasoning memory
+* link:../how-to/framework-integrations.html[Framework Integrations] — LangChain JS, Mastra, MCP, and more
+* link:../how-to/authenticate.html[Authenticate] — API key rotation, OAuth refresh, scope management
+* link:../reference/rest-api.html[REST API Reference] — every hosted endpoint mapped to a client method
+* link:../reference/mcp-tools.html[MCP Tool Reference] — wire the same surface into Claude Desktop, Cursor, or Windsurf
+* link:../explanation/memory-model.html[The Agent Memory Model] — short-term, long-term, reasoning, plus observations and reflections
 * link:../explanation/multi-agent-sharing.html[Cross-Agent Memory Sharing] — how multiple agents share one graph

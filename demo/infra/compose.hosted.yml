@@ -1,0 +1,40 @@
+# Hosted-mode overlay for the demo stack.
+#
+# Drops the local Neo4j and points every agent at the hosted Neo4j Agent
+# Memory Service at https://memory.neo4jlabs.com/v1. Requires MEMORY_API_KEY
+# to be set in the environment.
+#
+# Usage:
+#   MEMORY_API_KEY=nams_... docker compose \
+#       -f docker-compose.yml -f compose.hosted.yml up
+#
+# The `neo4j` service is removed and the `depends_on` constraints on each
+# agent are relaxed so they start immediately.
+
+services:
+  neo4j:
+    profiles:
+      - never  # exclude the local Neo4j in hosted mode
+    deploy:
+      replicas: 0
+
+  forge:
+    environment:
+      MEMORY_ENDPOINT: https://memory.neo4jlabs.com/v1
+      MEMORY_API_KEY: ${MEMORY_API_KEY:?set MEMORY_API_KEY before docker compose up}
+      MEMORY_MODE: hosted
+    depends_on: []
+
+  sage:
+    environment:
+      MEMORY_ENDPOINT: https://memory.neo4jlabs.com/v1
+      MEMORY_API_KEY: ${MEMORY_API_KEY:?set MEMORY_API_KEY before docker compose up}
+      MEMORY_MODE: hosted
+    depends_on: []
+
+  rune:
+    environment:
+      MEMORY_ENDPOINT: https://memory.neo4jlabs.com/v1
+      MEMORY_API_KEY: ${MEMORY_API_KEY:?set MEMORY_API_KEY before docker compose up}
+      MEMORY_MODE: hosted
+    depends_on: []

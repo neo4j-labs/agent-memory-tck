@@ -44,6 +44,7 @@ markers = [
     "bronze: Bronze tier - schema and short-term memory",
     "silver: Silver tier - all three memory types",
     "gold: Gold tier - SHOULD clauses and cross-memory integration",
+    "platinum: Platinum tier - Volume 5 hosted-service operations",
 ]
 
 [build-system]

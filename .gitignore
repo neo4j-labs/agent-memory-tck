@@ -49,3 +49,8 @@ uv.lock
 compliance-report.*
 results.json
 *-results.json
+
+# Local secrets — used by client e2e tests
+.env
+.env.local
+.env.*.local

@@ -1,6 +1,6 @@
 {
   "name": "@neo4j-labs/agent-memory",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TypeScript client for neo4j-agent-memory — shared memory layer for AI agents backed by Neo4j",
   "type": "module",
   "license": "Apache-2.0",
@@ -22,6 +22,14 @@
     "./mcp": {
       "import": "./dist/mcp/index.js",
       "types": "./dist/mcp/index.d.ts"
+    },
+    "./integrations/langchain": {
+      "import": "./dist/integrations/langchain.js",
+      "types": "./dist/integrations/langchain.d.ts"
+    },
+    "./integrations/mastra": {
+      "import": "./dist/integrations/mastra.js",
+      "types": "./dist/integrations/mastra.d.ts"
     }
   },
   "main": "./dist/index.js",
@@ -34,21 +42,26 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest run",
+    "test": "vitest run test/unit test/integration",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
+    "test:e2e": "vitest run test/e2e",
+    "test:all": "vitest run",
     "test:watch": "vitest",
-    "test:tck": "vitest run --project tck",
-    "tck:bronze": "vitest run --project tck -- --grep Bronze",
+    "test:tck": "RUN_TCK_BRIDGE=1 vitest run test/tck",
+    "tck:bronze": "RUN_TCK_BRIDGE=1 vitest run test/tck --grep Bronze",
     "lint": "tsc --noEmit && eslint src/",
     "conformance:server": "tsx conformance/server.ts",
     "prepublishOnly": "npm run build"
   },
-  "dependencies": {},
   "devDependencies": {
-    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0",
+    "dotenv": "^17.4.2",
+    "msw": "^2.14.3",
     "tsup": "^8.0.0",
-    "vitest": "^2.0.0",
     "tsx": "^4.0.0",
-    "@types/node": "^20.0.0"
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
   },
   "peerDependencies": {
     "neo4j-driver": "^5.20.0"

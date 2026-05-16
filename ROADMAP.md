@@ -1,7 +1,7 @@
 # neo4j-agent-memory TCK — Project Roadmap
 
-**Last updated:** April 15, 2026
-**TCK Version:** 1.0.0 (Release Candidate)
+**Last updated:** May 7, 2026
+**TCK Version:** 1.0.0 + Volume 5 (Platinum tier added)
 
 This document summarizes the implementation progress across all six phases, identifies gaps between the current state and the PRD requirements, and outlines the future roadmap for the project.
 
@@ -19,17 +19,22 @@ The repository began with a single commit containing:
 - Compliance report generator (HTML + JSON)
 - Empty certification registry
 
-### Current State (March 29, 2026)
+### Current State (May 7, 2026)
 
 | Metric | Before | After | Change |
 |--------|--------|-------|--------|
-| SPEC clauses | ~40 | 146 | +265% |
-| Test scenarios | ~40 | 178 | +345% |
+| SPEC clauses | ~40 | 161 | +303% |
+| Test scenarios | ~40 | 189 | +373% |
 | Bronze tests | ~27 | 93 | +244% |
 | Silver tests | ~26 | 67 | +158% |
 | Gold tests | ~6 | 18 | +200% |
-| Source files | ~15 | 107 | +613% |
-| Languages | 1 (Python) | 6 (Python, TypeScript, Go, C#, R) | +5 |
+| **Platinum tests** | 0 | 11 | new |
+| Bridge methods | 24 | 47 | +96% (Volume 5) |
+| Source files | ~15 | 130+ | +800% |
+| Language clients | 1 (Python) | **5** (TS, Go, C#, R, Python) | +4 |
+| Hosted-service support | 0 | All 5 clients (dual transport) | new |
+| MCP tool surface | 7-8 (TS/Go) | 12 (parity, all 5 clients) | new |
+| Framework integrations | 1 (Vercel AI) | 7 (+ LangChain JS, Mastra, LangGraph, PydanticAI, Semantic Kernel, ellmer) | +6 |
 
 ---
 
@@ -189,6 +194,40 @@ These items were specified in the PRD but were intentionally deferred or are bey
 
 ## Future Roadmap
 
+## Phase 7: Hosted Service Alignment (M7) — Complete
+
+**Goal:** Make every TCK client a first-class citizen of the hosted Neo4j Agent Memory Service at `https://memory.neo4jlabs.com/v1`.
+
+### Delivered (May 2026)
+
+- **Dual-transport architecture** in all 5 clients (TS, Go, C#, R, Python):
+  - `BridgeTransport` — existing TCK protocol (`POST {endpoint}/{snake_case}`, snake_case JSON)
+  - `RestTransport` — hosted REST API (camelCase, REST topology, snake↔camel translation on the wire)
+  - Auto-selection based on endpoint shape; explicit override via `transport: "rest" | "bridge"`
+  - Bearer-token auth + `tokenProvider` callback for OAuth refresh-token rotation
+- **New Python client** — `neo4j-agent-memory-client` package (httpx + asyncio). Distinct from the existing `neo4j-agent-memory` reference adapter on PyPI. Lenny + Atlas demos can drop their raw-httpx code.
+- **SPEC.md Volume 5** — 15 new SPEC clauses (`SPEC-5.1.1`…`SPEC-5.5.1`) covering hosted-service operations
+- **Platinum tier** — 11 new test scenarios (`SCN-P-001`…`SCN-P-011`); skips gracefully on adapters that don't implement Volume 5
+- **23 new BaseAdapter methods + bridge routes** — `create_conversation`, `list_conversations`, `get_conversation_metadata`, `delete_conversation`, `get_context`, `bulk_add_messages`, `get_observations`, `get_reflections`, `list_entities`, `get_entity`, `update_entity`, `delete_entity`, `set_entity_feedback`, `get_entity_history`, `merge_entities`, `get_entity_graph`, `record_step`, `list_steps`, `explain_step`, `get_trace_by_conversation`, `get_entity_provenance`, `cypher_query` plus the 5 `auth` operations
+- **MCP standardization** — 12-tool surface matching `memory.neo4jlabs.com/mcp` exposed by TS/Go/C#/R clients with deprecated v0.1 alias warnings
+- **Framework integrations:**
+  - Rewritten Vercel AI middleware around `getContext()` (3-tier reflections + observations + recent messages)
+  - New LangChain JS adapter (`Neo4jChatMessageHistory`, `Neo4jEntityRetriever`)
+  - New Mastra adapter (`Neo4jMastraMemory`)
+  - New LangGraph checkpoint saver (Python)
+  - New PydanticAI helper (`MemoryToolset`, `inject_memory_context`)
+  - New Semantic Kernel connector (C#)
+  - New ellmer wrapper (R) — `register_memory_tools()`
+- **Documentation refresh** — 5 new docs pages: hosted-quickstart, authenticate, rest-api, mcp-tools, framework-integrations. CLAUDE.md and README updated.
+- **Demo + infra** — `MEMORY_API_KEY` / `MEMORY_MODE` env vars wired into every agent; `compose.hosted.yml` overlay drops local Neo4j and points everything at the hosted service.
+- **CI:** new `python-client-build` job; new `hosted-smoke` job gated on the `MEMORY_API_KEY` repo secret.
+
+### Notable Design Decisions
+
+- **Dual-transport over fork:** Each client speaks both protocols from a single API surface. This keeps TCK conformance servers working unchanged while production users get hosted-service support, and avoids fragmenting the SDK ecosystem into `*-bridge` and `*-rest` packages.
+- **Platinum is opt-in, not a hard requirement:** Implementations that target only the bridge protocol can leave the 23 new BaseAdapter methods at their `NotImplementedError` defaults; the Platinum tests skip rather than fail. This mirrors how Gold optional methods already worked.
+- **Hosted REST has no `clear_all_data` equivalent:** RestTransport's `clear_all_data` is a no-op. The TCK's `_check_adapter_and_clean` autouse fixture still runs, but tests against the hosted service are expected to use scoped workspaces / unique conversation IDs for isolation rather than global wipes.
+
 ## Phase 6: C# Client, R Client + Sage/Rune Agents — Complete
 
 **Goal:** Add C# and R client libraries and two more demo agents (Sage using Semantic Kernel, Rune using ellmer).
@@ -237,47 +276,52 @@ Close the gaps identified above to achieve full milestone acceptance:
 
 ### v1.1.0 — Service API & Error Handling (Weeks 23-26)
 
-Extend the TCK to cover the hosted NAMS service:
+Hosted REST coverage (the dual transport in every client + Platinum tier) has been delivered ahead of schedule (Phase 7). What remains for v1.1.0:
 
-1. **Service API scenarios** (`tck/service/endpoints/`) — HTTP request/response contracts for all operations
-2. **Authentication scenarios** (`tck/service/auth/`) — API key validation, token scopes, rate limiting
+1. **Service API contract tests** (`tck/service/endpoints/`) — populate the previously-empty directory with REST-specific tests (status codes, error envelopes, rate-limit headers, pagination edge cases)
+2. **Authentication scenarios** (`tck/service/auth/`) — `nams_*` key prefix validation, OAuth PKCE round-trip, scope enforcement
 3. **Error handling scenarios** (`tck/error-handling/`) — Error codes, retry semantics, partial failure modes
 4. **OpenAPI specification** (`tck/bridge/openapi.yaml`) — Machine-readable bridge protocol for code generation
 5. **Neo4j direct transports** — `transport/neo4j.ts` (TypeScript) and `neo4j_transport.go` (Go) for local development
 
 ### v1.2.0 — Observational Memory (Weeks 27-32)
 
-Add Gold+ tier for observational memory capabilities:
+The hosted service exposes `observations` and `reflections` already (Volume 5 / Platinum). What's left for v1.2.0:
 
-1. **Observational memory scenarios** (`tck/observational/`) — Observer/Reflector pipeline, token threshold triggering, graph-connected observations
+1. **Deep observational memory scenarios** (`tck/observational/`) — Observer/Reflector pipeline, token threshold triggering, graph-connected observations beyond the Platinum smoke tests
 2. **Cross-session observation scenarios** — Observations linked across conversations via entity graph
-3. **BaseAdapter extensions** — New abstract methods for observation operations
-4. **Client updates** — Add `client.observations` to TypeScript and Go clients
+3. **Reflection regeneration scenarios** — Verify reflections supersede prior versions correctly
+4. **Reference adapter parity** — Wire the reference adapter to the upstream `neo4j-agent-memory` Python package's observation API once it lands
 
 ### v1.3.0 — MCP Full Surface (Weeks 33-36)
 
-Complete MCP protocol coverage:
+The 12-tool MCP surface is in place (Phase 7). What's still pending:
 
-1. **MCP scenarios** (`tck/service/mcp/`) — Full MCP tool surface, prompts, resources
-2. **MCP resource definitions** — Memory state as MCP resources
-3. **MCP prompt templates** — Pre-built prompts for common memory operations
-4. **TypeScript MCP server** — Full `@modelcontextprotocol/sdk` integration
+1. **MCP scenarios** (`tck/service/mcp/`) — TCK tests that hit the 12 standard tools through Streamable HTTP transport
+2. **MCP resource definitions** — Memory state (entities, conversations, traces) exposed as MCP resources
+3. **MCP prompt templates** — Pre-built prompts for common memory operations (e.g. "summarize this conversation", "what do we know about X")
+4. **TypeScript MCP server** — Full `@modelcontextprotocol/sdk` integration alongside the existing tool-definition module
 
 ### v2.0.0 — Ecosystem Maturity
 
 Long-term goals for ecosystem growth:
 
-1. **Framework integrations:**
-   - LangChain.js `BaseChatMessageHistory` implementation
-   - OpenAI Node SDK tool result capture hooks
-   - Anthropic TypeScript SDK message history management
-   - LangChainGo memory interface
-   - Google Genkit Go plugin
+1. **Framework integrations** (in progress — see Phase 7):
+   - ~~LangChain.js~~ — Complete (`Neo4jChatMessageHistory`, `Neo4jEntityRetriever`)
+   - ~~Mastra~~ — Complete (`Neo4jMastraMemory`)
+   - ~~LangGraph~~ — Complete (`MemoryCheckpointSaver`)
+   - ~~PydanticAI~~ — Complete (`MemoryToolset`, `inject_memory_context`)
+   - ~~Semantic Kernel~~ — Complete (`MemoryConnector`)
+   - ~~ellmer~~ — Complete (`register_memory_tools`)
+   - OpenAI Node SDK tool result capture hooks (still pending)
+   - Anthropic TypeScript SDK message history management (still pending)
+   - LangChainGo memory interface (still pending)
+   - Google Genkit Go plugin (still pending)
 2. **Automatic test generation** — Generate test scenarios from SPEC clauses (PRD v2 goal)
 3. **Public compatibility registry** — Web page at `neo4j.com/labs/agent-memory/compatibility`
 4. **Cloud Run deployment** — `cloudbuild.yaml` and Terraform configs for demo
 5. ~~**NVL integration**~~ — Complete: `@neo4j-nvl/react` `InteractiveNvlWrapper` integrated in dashboard
-6. **Third-party certification automation** — Run TCK against publicly accessible service endpoints
+6. **Third-party certification automation** — Run TCK against publicly accessible service endpoints (the new `hosted-smoke` CI job is the seed)
 
 ---
 
@@ -288,11 +332,13 @@ Long-term goals for ecosystem growth:
 | Bronze scenarios | 80-120 | 93 | Met |
 | Silver scenarios | 180-240 cumulative | 67 | Partial (Silver standalone; PRD counted cumulative) |
 | Gold scenarios | 120-160 additional | 18 | In progress |
-| Total scenarios | 380-520 | 178 | Phase 1 of multi-phase expansion |
+| Platinum scenarios (Volume 5) | new | 11 | Seed delivered; expansion planned in v1.1.0/v1.2.0 |
+| Total scenarios | 380-520 | 189 | Phase 1 of multi-phase expansion |
 | Python Bronze pass rate | 100% | 93/93 (local run confirmed) | Met |
 | TypeScript Bronze pass rate | 100% | Tests scaffolded | Pending |
 | Go Bronze pass rate | 100% | Tests not written | Pending |
-| Multi-agent demo | Live URL | Docker Compose only | Pending deployment |
+| Hosted-service support | new | 5/5 clients (dual transport) | Met |
+| Multi-agent demo | Live URL | Docker Compose + hosted-mode overlay | Pending deployment |
 | Third-party registry entries | 3+ within 90 days | 0 | Not yet launched |
 
-> **Note:** The PRD's scenario count targets (380-520) span all planned phases including Service API, Observational Memory, and MCP scenarios. The current 178 scenarios represent the core behavioral specification. Service API and observational memory scenarios are planned for v1.1.0 and v1.2.0 respectively.
+> **Note:** The PRD's scenario count targets (380-520) span all planned phases including Service API, Observational Memory, and MCP scenarios. The current 189 scenarios represent the core behavioral specification plus the Volume 5 seed. Service API contract tests, deep observational scenarios, and MCP integration tests are planned for v1.1.0 / v1.2.0 / v1.3.0 respectively.

@@ -1,6 +1,6 @@
 Package: neo4j.memory
 Title: Neo4j Agent Memory Client for R
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: person("Neo4j Labs", email = "labs@neo4j.com", role = c("aut", "cre"))
 Description: R client for neo4j-agent-memory, providing short-term, long-term,
     and reasoning memory operations via an HTTP transport layer. Built on R6

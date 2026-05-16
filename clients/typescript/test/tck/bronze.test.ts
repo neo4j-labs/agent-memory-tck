@@ -28,8 +28,11 @@ import {
 } from "./testdata.js";
 
 const ENDPOINT = process.env["MEMORY_ENDPOINT"] ?? "http://localhost:3001";
+const RUN_TCK = process.env["RUN_TCK_BRIDGE"] === "1";
 
-describe("Bronze Tier", () => {
+const describeOrSkip = RUN_TCK ? describe : describe.skip;
+
+describeOrSkip("Bronze Tier", () => {
   let client: MemoryClient;
 
   beforeAll(async () => {

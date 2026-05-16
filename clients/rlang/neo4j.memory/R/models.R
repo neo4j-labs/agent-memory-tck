@@ -9,9 +9,10 @@ parse_message <- function(data) {
     id = data$id,
     role = data$role,
     content = data$content,
-    timestamp = data$timestamp,
+    timestamp = data$timestamp %||% data$created_at,
     embedding = data$embedding,
-    metadata = if (is.null(data$metadata)) list() else data$metadata
+    metadata = if (is.null(data$metadata)) list() else data$metadata,
+    conversation_id = data$conversation_id
   )
 }
 
@@ -21,11 +22,14 @@ parse_conversation <- function(data) {
   msgs <- if (is.null(data$messages)) list() else lapply(data$messages, parse_message)
   list(
     id = data$id,
-    session_id = data$session_id,
+    session_id = data$session_id %||% data$id,
     messages = msgs,
     title = data$title,
     created_at = data$created_at,
-    updated_at = data$updated_at
+    updated_at = data$updated_at,
+    workspace_id = data$workspace_id,
+    user_id = data$user_id,
+    metadata = data$metadata
   )
 }
 
@@ -41,6 +45,40 @@ parse_session_info <- function(data) {
 }
 
 #' @export
+parse_observation <- function(data) {
+  if (is.null(data)) return(NULL)
+  list(
+    id = data$id,
+    conversation_id = data$conversation_id,
+    content = data$content,
+    window_start = data$window_start,
+    window_end = data$window_end,
+    created_at = data$created_at
+  )
+}
+
+#' @export
+parse_reflection <- function(data) {
+  if (is.null(data)) return(NULL)
+  list(
+    id = data$id,
+    conversation_id = data$conversation_id,
+    content = data$content,
+    created_at = data$created_at
+  )
+}
+
+#' @export
+parse_context <- function(data) {
+  if (is.null(data)) return(list(reflections = list(), observations = list(), recent_messages = list()))
+  list(
+    reflections = if (is.null(data$reflections)) list() else lapply(data$reflections, parse_reflection),
+    observations = if (is.null(data$observations)) list() else lapply(data$observations, parse_observation),
+    recent_messages = if (is.null(data$recent_messages)) list() else lapply(data$recent_messages, parse_message)
+  )
+}
+
+#' @export
 parse_entity <- function(data) {
   if (is.null(data)) return(NULL)
   list(
@@ -51,7 +89,20 @@ parse_entity <- function(data) {
     description = data$description,
     embedding = data$embedding,
     canonical_name = data$canonical_name,
-    created_at = data$created_at
+    created_at = data$created_at,
+    updated_at = data$updated_at,
+    confidence = data$confidence,
+    source_stage = data$source_stage,
+    relationships = data$relationships
+  )
+}
+
+#' @export
+parse_entity_history <- function(data) {
+  if (is.null(data)) return(NULL)
+  list(
+    entity_id = data$entity_id,
+    mentions = if (is.null(data$mentions)) list() else data$mentions
   )
 }
 
@@ -120,6 +171,28 @@ parse_step <- function(data) {
     observation = data$observation,
     tool_calls = tool_calls
   )
+}
+
+#' @export
+parse_agent_step <- function(data) {
+  if (is.null(data)) return(NULL)
+  list(
+    id = data$id,
+    conversation_id = data$conversation_id,
+    reasoning = data$reasoning,
+    action_taken = data$action_taken,
+    result = data$result,
+    created_at = data$created_at
+  )
+}
+
+#' @export
+parse_agent_step_explanation <- function(data) {
+  if (is.null(data)) return(NULL)
+  base <- parse_agent_step(data)
+  base$tool_calls <- if (is.null(data$tool_calls)) list() else lapply(data$tool_calls, parse_tool_call)
+  base$influenced_entities <- if (is.null(data$influenced_entities)) list() else lapply(data$influenced_entities, parse_entity)
+  base
 }
 
 #' @export

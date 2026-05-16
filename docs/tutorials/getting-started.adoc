@@ -5,11 +5,13 @@
 
 This tutorial walks you through installing the TCK, writing a minimal adapter, and running the test suite for the first time.
 
+TIP: If you only want to use the hosted service from your application (not run the conformance suite against your own backend), start with the link:hosted-quickstart.html[Hosted-Service Quickstart] instead.
+
 == Prerequisites
 
 * Python 3.10 or later
 * https://docs.astral.sh/uv/[uv] package manager (recommended) or pip
-* A running Neo4j instance (local or Aura) _or_ access to the hosted NAMS service
+* A running Neo4j instance (local or Aura) _or_ a `nams_*` API key for the hosted service at `https://memory.neo4jlabs.com/v1`
 
 == Step 1: Install the TCK
 
@@ -83,11 +85,14 @@ async def adapter():
 
 [source,bash]
 ----
-# Run Bronze tier tests (schema + short-term memory)
+# Run Bronze tier tests (schema + short-term memory) — 93 scenarios
 uv run pytest -m bronze -v
 
-# Run all tiers
-uv run pytest -v
+# Run the required tiers (Bronze + Silver + Gold) — 178 scenarios
+uv run pytest -m "bronze or silver or gold" -v
+
+# Run Platinum (hosted-service operations) — 11 scenarios, opt-in
+uv run pytest -m platinum -v
 
 # See what tests would run without executing
 uv run pytest --collect-only -m bronze -q

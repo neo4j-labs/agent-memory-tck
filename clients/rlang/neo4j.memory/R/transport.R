@@ -1,15 +1,24 @@
-#' @title HTTP Transport for Neo4j Agent Memory
-#' @description Sends JSON-over-HTTP requests to a memory service endpoint.
+#' @title BridgeTransport — TCK bridge protocol HTTP transport
+#'
+#' @description
+#' Sends bridge-style requests (`POST {endpoint}/{snake_case_method}`) with
+#' snake_case JSON bodies. Used for the TCK conformance server and the local
+#' reference adapter.
+#'
 #' @export
-HttpTransport <- R6::R6Class("HttpTransport",
+BridgeTransport <- R6::R6Class("BridgeTransport",
   public = list(
-    initialize = function(endpoint, timeout = 30) {
+    initialize = function(endpoint, api_key = NULL, timeout = 30, headers = NULL) {
       private$endpoint <- sub("/+$", "", endpoint)
+      private$api_key <- api_key
       private$timeout <- timeout
+      private$headers <- if (is.null(headers)) list() else headers
     },
 
     connect = function() {
-      self$request("setup")
+      tryCatch(self$request("setup"),
+        error = function(e) NULL
+      )
       invisible(self)
     },
 
@@ -26,10 +35,18 @@ HttpTransport <- R6::R6Class("HttpTransport",
         httr2::req_headers("Content-Type" = "application/json") |>
         httr2::req_timeout(private$timeout)
 
-      if (length(params) > 0) {
-        req <- req |> httr2::req_body_json(params, auto_unbox = TRUE)
+      for (name in names(private$headers)) {
+        req <- httr2::req_headers(req, !!name := private$headers[[name]])
+      }
+      if (!is.null(private$api_key) && nzchar(private$api_key)) {
+        req <- httr2::req_headers(req,
+          Authorization = paste("Bearer", private$api_key))
+      }
+
+      req <- if (length(params) > 0) {
+        httr2::req_body_json(req, params, auto_unbox = TRUE)
       } else {
-        req <- req |> httr2::req_body_json(list(), auto_unbox = TRUE)
+        httr2::req_body_json(req, list(), auto_unbox = TRUE)
       }
 
       resp <- req |>
@@ -38,37 +55,30 @@ HttpTransport <- R6::R6Class("HttpTransport",
 
       status <- httr2::resp_status(resp)
 
-      if (status == 204L) {
-        return(invisible(NULL))
+      if (status == 204L) return(invisible(NULL))
+      if (status == 401L || status == 403L) {
+        stop(sprintf("Authentication failed: %d", status), call. = FALSE)
       }
-
       if (status >= 400L) {
-        body <- tryCatch(
-          httr2::resp_body_string(resp),
-          error = function(e) ""
-        )
+        body <- tryCatch(httr2::resp_body_string(resp), error = function(e) "")
         stop(sprintf("HTTP %d: %s", status, body), call. = FALSE)
       }
 
-      body_str <- tryCatch(
-        httr2::resp_body_string(resp),
-        error = function(e) ""
-      )
-
-      if (nchar(body_str) == 0 || body_str == "") {
-        return(NULL)
-      }
-
-      if (body_str == "null") {
-        return(NULL)
-      }
-
+      body_str <- tryCatch(httr2::resp_body_string(resp), error = function(e) "")
+      if (nchar(body_str) == 0 || body_str == "null") return(NULL)
       httr2::resp_body_json(resp)
     }
   ),
 
   private = list(
     endpoint = NULL,
-    timeout = 30
+    api_key = NULL,
+    timeout = 30,
+    headers = list()
   )
 )
+
+#' @title HttpTransport (deprecated alias for BridgeTransport)
+#' @description Kept for v0.1 backwards compatibility — prefer `BridgeTransport`.
+#' @export
+HttpTransport <- BridgeTransport

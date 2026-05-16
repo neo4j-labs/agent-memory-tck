@@ -4,13 +4,13 @@ import "context"
 
 // ReasoningMemory provides trace, step, and tool call operations.
 type ReasoningMemory struct {
-	transport *transport
+	transport Transport
 }
 
 // StartTrace begins a new reasoning trace for a task.
 func (r *ReasoningMemory) StartTrace(ctx context.Context, sessionID, task string) (*ReasoningTrace, error) {
 	var result ReasoningTrace
-	if err := r.transport.call(ctx, "start_trace", map[string]interface{}{
+	if err := r.transport.Call(ctx, "start_trace", map[string]interface{}{
 		"session_id": sessionID,
 		"task":       task,
 	}, &result); err != nil {
@@ -38,7 +38,7 @@ func (r *ReasoningMemory) AddStep(ctx context.Context, traceID string, opts ...f
 		params["observation"] = p.observation
 	}
 	var result ReasoningStep
-	if err := r.transport.call(ctx, "add_step", params, &result); err != nil {
+	if err := r.transport.Call(ctx, "add_step", params, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -87,7 +87,7 @@ func (r *ReasoningMemory) RecordToolCall(ctx context.Context, stepID, toolName s
 		params["error"] = p.errMsg
 	}
 	var result ToolCall
-	if err := r.transport.call(ctx, "record_tool_call", params, &result); err != nil {
+	if err := r.transport.Call(ctx, "record_tool_call", params, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -136,7 +136,7 @@ func (r *ReasoningMemory) CompleteTrace(ctx context.Context, traceID string, opt
 		params["success"] = *p.success
 	}
 	var result ReasoningTrace
-	if err := r.transport.call(ctx, "complete_trace", params, &result); err != nil {
+	if err := r.transport.Call(ctx, "complete_trace", params, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -160,7 +160,7 @@ func WithSuccess(s bool) func(*CompleteTraceParams) {
 // GetTraceWithSteps retrieves a full trace including steps and tool calls.
 func (r *ReasoningMemory) GetTraceWithSteps(ctx context.Context, traceID string) (*ReasoningTrace, error) {
 	var result *ReasoningTrace
-	if err := r.transport.call(ctx, "get_trace_with_steps", map[string]interface{}{
+	if err := r.transport.Call(ctx, "get_trace_with_steps", map[string]interface{}{
 		"trace_id": traceID,
 	}, &result); err != nil {
 		return nil, err
@@ -181,7 +181,7 @@ func (r *ReasoningMemory) ListTraces(ctx context.Context, opts ...func(*ListTrac
 		params["session_id"] = p.sessionID
 	}
 	var result []ReasoningTrace
-	if err := r.transport.call(ctx, "list_traces", params, &result); err != nil {
+	if err := r.transport.Call(ctx, "list_traces", params, &result); err != nil {
 		return nil, err
 	}
 	if result == nil {
@@ -212,11 +212,112 @@ func (r *ReasoningMemory) GetToolStats(ctx context.Context, toolName string) ([]
 		params["tool_name"] = toolName
 	}
 	var result []ToolStats
-	if err := r.transport.call(ctx, "get_tool_stats", params, &result); err != nil {
+	if err := r.transport.Call(ctx, "get_tool_stats", params, &result); err != nil {
 		return nil, err
 	}
 	if result == nil {
 		return []ToolStats{}, nil
 	}
 	return result, nil
+}
+
+// GetSimilarTraces returns reasoning traces similar to the given task.
+func (r *ReasoningMemory) GetSimilarTraces(ctx context.Context, task string, limit int, successOnly bool) ([]ReasoningTrace, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	var result []ReasoningTrace
+	if err := r.transport.Call(ctx, "get_similar_traces", map[string]interface{}{
+		"task":         task,
+		"limit":        limit,
+		"success_only": successOnly,
+	}, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ============================================================================
+// Volume 5 / hosted-native methods
+// ============================================================================
+
+// RecordStepInput is the input to RecordStep.
+type RecordStepInput struct {
+	ConversationID string `json:"conversation_id"`
+	Reasoning      string `json:"reasoning"`
+	ActionTaken    string `json:"action_taken"`
+	Result         string `json:"result,omitempty"`
+}
+
+// RecordStep records one reasoning step under a conversation (hosted REACT model).
+func (r *ReasoningMemory) RecordStep(ctx context.Context, in RecordStepInput) (*AgentStep, error) {
+	params := map[string]interface{}{
+		"conversation_id": in.ConversationID,
+		"reasoning":       in.Reasoning,
+		"action_taken":    in.ActionTaken,
+	}
+	if in.Result != "" {
+		params["result"] = in.Result
+	}
+	var result AgentStep
+	if err := r.transport.Call(ctx, "record_step", params, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ListSteps lists all reasoning steps for one conversation.
+func (r *ReasoningMemory) ListSteps(ctx context.Context, conversationID string) ([]AgentStep, error) {
+	var result []AgentStep
+	if err := r.transport.Call(ctx, "list_steps", map[string]interface{}{
+		"conversation_id": conversationID,
+	}, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ExplainStep returns a detailed explanation of one reasoning step.
+func (r *ReasoningMemory) ExplainStep(ctx context.Context, stepID string) (*AgentStepExplanation, error) {
+	var result AgentStepExplanation
+	if err := r.transport.Call(ctx, "explain_step", map[string]interface{}{
+		"step_id": stepID,
+	}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetTraceByConversation returns the full reasoning trace for a conversation.
+func (r *ReasoningMemory) GetTraceByConversation(ctx context.Context, conversationID string) (*ConversationTrace, error) {
+	var result ConversationTrace
+	if err := r.transport.Call(ctx, "get_trace_by_conversation", map[string]interface{}{
+		"conversation_id": conversationID,
+	}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetEntityProvenance returns the reasoning chain that influenced an entity.
+//
+// The hosted REST API returns the chain under the `provenance` key while
+// the bridge protocol uses `steps`. Decode into a permissive intermediate
+// struct and accept either.
+func (r *ReasoningMemory) GetEntityProvenance(ctx context.Context, entityID string) (*EntityProvenance, error) {
+	var raw struct {
+		EntityID   string      `json:"entity_id"`
+		Steps      []AgentStep `json:"steps"`
+		Provenance []AgentStep `json:"provenance"`
+	}
+	if err := r.transport.Call(ctx, "get_entity_provenance", map[string]interface{}{
+		"entity_id": entityID,
+	}, &raw); err != nil {
+		return nil, err
+	}
+	steps := raw.Steps
+	if len(steps) == 0 && len(raw.Provenance) > 0 {
+		steps = raw.Provenance
+	}
+	return &EntityProvenance{EntityID: raw.EntityID, Steps: steps}, nil
 }

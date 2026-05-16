@@ -1,24 +1,30 @@
 /**
  * MCP (Model Context Protocol) tool definitions for neo4j-agent-memory.
  *
- * These tool definitions can be registered with any MCP host (Claude Desktop,
- * MCP-enabled IDEs, etc.) to provide memory operations as tool calls.
+ * Mirrors the 12 tools exposed by the hosted MCP server at
+ * `https://memory.neo4jlabs.com/mcp`. Use this to either:
+ *
+ *   - Register the same tool surface against your own MCP server, or
+ *   - Programmatically dispatch tool calls to a `MemoryClient`.
+ *
+ * The 12 standard tools — `memory_create_conversation`, `memory_add_messages`,
+ * `memory_get_context`, `memory_search_messages`, `memory_search_entities`,
+ * `memory_get_entity`, `memory_add_entity`, `memory_get_entity_history`,
+ * `memory_record_step`, `memory_record_tool_call`, `memory_get_trace`,
+ * `memory_explain_decision`.
  *
  * @example
  * ```ts
  * import { MemoryClient } from "@neo4j-labs/agent-memory";
  * import { createMemoryTools, handleMemoryToolCall } from "@neo4j-labs/agent-memory/mcp";
  *
- * const client = new MemoryClient({ endpoint: "..." });
- * const tools = createMemoryTools();
+ * const client = new MemoryClient({
+ *   endpoint: "https://memory.neo4jlabs.com/v1",
+ *   apiKey: process.env.MEMORY_API_KEY!,
+ * });
  *
- * // Register tools with your MCP server
- * for (const tool of tools) {
- *   server.registerTool(tool);
- * }
- *
- * // Handle tool calls
- * const result = await handleMemoryToolCall(client, toolName, args);
+ * const tools = createMemoryTools();           // 12 standard tools
+ * await handleMemoryToolCall(client, "memory_get_context", { conversation_id });
  * ```
  */
 
@@ -34,181 +40,289 @@ export interface McpToolDefinition {
   };
 }
 
-/**
- * Create MCP tool definitions for all memory operations.
- */
+/** Build the 12-tool MCP surface that matches memory.neo4jlabs.com/mcp. */
 export function createMemoryTools(): McpToolDefinition[] {
   return [
+    // ---- Short-Term -----------------------------------------------------
     {
-      name: "memory.addMessage",
-      description: "Add a message to a conversation session.",
+      name: "memory_create_conversation",
+      description: "Create a new conversation session for a user.",
       inputSchema: {
         type: "object",
         properties: {
-          sessionId: { type: "string", description: "Session identifier" },
-          role: { type: "string", enum: ["user", "assistant", "system"] },
-          content: { type: "string", description: "Message content" },
-          metadata: {
-            type: "object",
-            description: "Optional metadata",
-            additionalProperties: true,
+          user_id: { type: "string", description: "User identifier" },
+          metadata: { type: "object", additionalProperties: true },
+        },
+        required: ["user_id"],
+      },
+    },
+    {
+      name: "memory_add_messages",
+      description: "Append one or more messages to a conversation.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          conversation_id: { type: "string" },
+          messages: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                role: { type: "string", enum: ["user", "assistant", "system"] },
+                content: { type: "string" },
+                metadata: { type: "object", additionalProperties: true },
+              },
+              required: ["role", "content"],
+            },
           },
         },
-        required: ["sessionId", "role", "content"],
+        required: ["conversation_id", "messages"],
       },
     },
     {
-      name: "memory.getConversation",
-      description: "Retrieve conversation messages by session ID.",
+      name: "memory_get_context",
+      description:
+        "Three-tier context (reflections + observations + recent messages) for a conversation.",
       inputSchema: {
         type: "object",
         properties: {
-          sessionId: { type: "string", description: "Session identifier" },
-          limit: { type: "number", description: "Maximum messages to return" },
+          conversation_id: { type: "string" },
         },
-        required: ["sessionId"],
+        required: ["conversation_id"],
       },
     },
     {
-      name: "memory.searchMessages",
-      description: "Search messages by semantic similarity.",
+      name: "memory_search_messages",
+      description: "Search messages within a conversation by similarity or keywords.",
       inputSchema: {
         type: "object",
         properties: {
-          query: { type: "string", description: "Search query" },
-          sessionId: { type: "string", description: "Optional session filter" },
-          limit: { type: "number", description: "Maximum results" },
+          conversation_id: { type: "string" },
+          query: { type: "string" },
+          limit: { type: "number" },
+        },
+        required: ["conversation_id", "query"],
+      },
+    },
+    // ---- Long-Term ------------------------------------------------------
+    {
+      name: "memory_search_entities",
+      description: "Search the knowledge graph for entities by name or concept.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          type: { type: "string" },
+          limit: { type: "number" },
         },
         required: ["query"],
       },
     },
     {
-      name: "memory.addEntity",
-      description: "Create or update an entity in the knowledge graph.",
+      name: "memory_get_entity",
+      description: "Fetch one entity (with its relationships) by id.",
       inputSchema: {
         type: "object",
-        properties: {
-          name: { type: "string", description: "Entity name" },
-          entityType: {
-            type: "string",
-            enum: ["PERSON", "ORGANIZATION", "LOCATION", "EVENT", "OBJECT"],
-          },
-          description: { type: "string", description: "Entity description" },
-        },
-        required: ["name", "entityType"],
+        properties: { entity_id: { type: "string" } },
+        required: ["entity_id"],
       },
     },
     {
-      name: "memory.searchEntities",
-      description: "Search entities by semantic similarity.",
+      name: "memory_add_entity",
+      description: "Manually create an entity.",
       inputSchema: {
         type: "object",
         properties: {
-          query: { type: "string", description: "Search query" },
-          limit: { type: "number", description: "Maximum results" },
+          name: { type: "string" },
+          type: { type: "string" },
+          description: { type: "string" },
         },
-        required: ["query"],
+        required: ["name", "type"],
       },
     },
     {
-      name: "memory.addFact",
-      description: "Store a subject-predicate-object fact triple.",
+      name: "memory_get_entity_history",
+      description: "All conversations that mentioned this entity.",
+      inputSchema: {
+        type: "object",
+        properties: { entity_id: { type: "string" } },
+        required: ["entity_id"],
+      },
+    },
+    // ---- Reasoning ------------------------------------------------------
+    {
+      name: "memory_record_step",
+      description: "Log a reasoning step under a conversation.",
       inputSchema: {
         type: "object",
         properties: {
-          subject: { type: "string" },
-          predicate: { type: "string" },
-          object: { type: "string" },
+          conversation_id: { type: "string" },
+          reasoning: { type: "string" },
+          action_taken: { type: "string" },
+          result: { type: "string" },
         },
-        required: ["subject", "predicate", "object"],
+        required: ["conversation_id", "reasoning", "action_taken"],
       },
     },
     {
-      name: "memory.addPreference",
-      description: "Store a user preference.",
+      name: "memory_record_tool_call",
+      description: "Log a tool invocation tied to a reasoning step.",
       inputSchema: {
         type: "object",
         properties: {
-          category: { type: "string", description: "Preference category" },
-          preference: { type: "string", description: "Preference statement" },
-          context: { type: "string", description: "Contextual information" },
+          step_id: { type: "string" },
+          tool_name: { type: "string" },
+          input: { type: "string" },
+          output: { type: "string" },
+          status: { type: "string", enum: ["success", "error", "timeout"] },
+          duration_ms: { type: "number" },
         },
-        required: ["category", "preference"],
+        required: ["tool_name", "status"],
       },
     },
     {
-      name: "memory.listSessions",
-      description: "List all conversation sessions.",
+      name: "memory_get_trace",
+      description: "Full reasoning trace for a conversation (steps + tool calls).",
       inputSchema: {
         type: "object",
-        properties: {
-          limit: { type: "number", description: "Maximum sessions to return" },
-        },
+        properties: { conversation_id: { type: "string" } },
+        required: ["conversation_id"],
+      },
+    },
+    {
+      name: "memory_explain_decision",
+      description:
+        "Detailed explanation of one reasoning step — tool calls + entities it influenced.",
+      inputSchema: {
+        type: "object",
+        properties: { step_id: { type: "string" } },
+        required: ["step_id"],
       },
     },
   ];
 }
 
 /**
- * Handle an MCP tool call by dispatching to the appropriate MemoryClient method.
+ * Dispatch one of the 12 standard MCP tool calls to a `MemoryClient`.
+ *
+ * Old `memory.<verb>` names from v0.1 are kept as deprecated aliases for one
+ * minor version; they emit a console warning and forward to the new tool.
  */
 export async function handleMemoryToolCall(
   client: MemoryClient,
   toolName: string,
   args: Record<string, unknown>,
 ): Promise<unknown> {
+  const aliased = LEGACY_ALIASES[toolName];
+  if (aliased) {
+    if (typeof console !== "undefined") {
+      console.warn(
+        `[neo4j-agent-memory] MCP tool '${toolName}' is deprecated; use '${aliased}'.`,
+      );
+    }
+    toolName = aliased;
+  }
+
   switch (toolName) {
-    case "memory.addMessage":
-      return client.shortTerm.addMessage(
-        args["sessionId"] as string,
-        args["role"] as "user" | "assistant" | "system",
-        args["content"] as string,
-        { metadata: args["metadata"] as Record<string, unknown> | undefined },
-      );
-
-    case "memory.getConversation":
-      return client.shortTerm.getConversation(args["sessionId"] as string, {
-        limit: args["limit"] as number | undefined,
+    case "memory_create_conversation":
+      return client.shortTerm.createConversation({
+        userId: args["user_id"] as string,
+        metadata: args["metadata"] as Record<string, unknown> | undefined,
       });
 
-    case "memory.searchMessages":
+    case "memory_add_messages": {
+      const conversationId = args["conversation_id"] as string;
+      const msgs = args["messages"] as
+        | Array<{ role: string; content: string; metadata?: Record<string, unknown> }>
+        | undefined;
+      if (!msgs || msgs.length === 0) return [];
+      if (msgs.length === 1) {
+        const m = msgs[0]!;
+        return [
+          await client.shortTerm.addMessage(
+            conversationId,
+            m.role as "user" | "assistant" | "system",
+            m.content,
+            { metadata: m.metadata },
+          ),
+        ];
+      }
+      return client.shortTerm.bulkAddMessages(
+        conversationId,
+        msgs.map((m) => ({
+          role: m.role as "user" | "assistant" | "system",
+          content: m.content,
+          metadata: m.metadata,
+        })),
+      );
+    }
+
+    case "memory_get_context":
+      return client.shortTerm.getContext(args["conversation_id"] as string);
+
+    case "memory_search_messages":
       return client.shortTerm.searchMessages(args["query"] as string, {
-        sessionId: args["sessionId"] as string | undefined,
+        sessionId: args["conversation_id"] as string,
         limit: args["limit"] as number | undefined,
       });
 
-    case "memory.addEntity":
-      return client.longTerm.addEntity(
-        args["name"] as string,
-        args["entityType"] as string,
-        { description: args["description"] as string | undefined },
-      );
-
-    case "memory.searchEntities":
+    case "memory_search_entities":
       return client.longTerm.searchEntities(args["query"] as string, {
+        type: args["type"] as string | undefined,
         limit: args["limit"] as number | undefined,
       });
 
-    case "memory.addFact":
-      return client.longTerm.addFact(
-        args["subject"] as string,
-        args["predicate"] as string,
-        args["object"] as string,
-      );
+    case "memory_get_entity":
+      return client.longTerm.getEntity(args["entity_id"] as string);
 
-    case "memory.addPreference":
-      return client.longTerm.addPreference(
-        args["category"] as string,
-        args["preference"] as string,
-        { context: args["context"] as string | undefined },
-      );
-
-    case "memory.listSessions":
-      return client.shortTerm.listSessions({
-        limit: args["limit"] as number | undefined,
+    case "memory_add_entity":
+      return client.longTerm.addEntity(args["name"] as string, args["type"] as string, {
+        description: args["description"] as string | undefined,
       });
+
+    case "memory_get_entity_history":
+      return client.longTerm.getEntityHistory(args["entity_id"] as string);
+
+    case "memory_record_step":
+      return client.reasoning.recordStep({
+        conversationId: args["conversation_id"] as string,
+        reasoning: args["reasoning"] as string,
+        actionTaken: args["action_taken"] as string,
+        result: args["result"] as string | undefined,
+      });
+
+    case "memory_record_tool_call":
+      return client.reasoning.recordToolCall(
+        (args["step_id"] as string) ?? "",
+        args["tool_name"] as string,
+        typeof args["input"] === "object" && args["input"] !== null
+          ? (args["input"] as Record<string, unknown>)
+          : { input: args["input"] },
+        {
+          result: args["output"],
+          status: (args["status"] as "success" | "error" | "timeout") ?? "success",
+          durationMs: args["duration_ms"] as number | undefined,
+        },
+      );
+
+    case "memory_get_trace":
+      return client.reasoning.getTraceByConversation(args["conversation_id"] as string);
+
+    case "memory_explain_decision":
+      return client.reasoning.explainStep(args["step_id"] as string);
 
     default:
       throw new Error(`Unknown memory tool: ${toolName}`);
   }
 }
+
+/**
+ * v0.1 → v0.2 deprecated tool aliases. Will be removed in v0.3.
+ */
+const LEGACY_ALIASES: Record<string, string> = {
+  "memory.addMessage": "memory_add_messages",
+  "memory.getConversation": "memory_get_context",
+  "memory.searchMessages": "memory_search_messages",
+  "memory.addEntity": "memory_add_entity",
+  "memory.searchEntities": "memory_search_entities",
+};

@@ -38,6 +38,8 @@ services:
       - "8003:8003"
     environment:
       MEMORY_ENDPOINT: ${MEMORY_ENDPOINT:-http://host.docker.internal:3001}
+      MEMORY_API_KEY: ${MEMORY_API_KEY:-}
+      MEMORY_MODE: ${MEMORY_MODE:-bridge}
       PORT: "8003"
     depends_on:
       neo4j:
@@ -53,6 +55,8 @@ services:
       - "8005:8005"
     environment:
       MEMORY_ENDPOINT: ${MEMORY_ENDPOINT:-http://host.docker.internal:3001}
+      MEMORY_API_KEY: ${MEMORY_API_KEY:-}
+      MEMORY_MODE: ${MEMORY_MODE:-bridge}
       PORT: "8005"
     depends_on:
       neo4j:
@@ -68,6 +72,8 @@ services:
       - "8006:8006"
     environment:
       MEMORY_ENDPOINT: ${MEMORY_ENDPOINT:-http://host.docker.internal:3001}
+      MEMORY_API_KEY: ${MEMORY_API_KEY:-}
+      MEMORY_MODE: ${MEMORY_MODE:-bridge}
       PORT: "8006"
     depends_on:
       neo4j:

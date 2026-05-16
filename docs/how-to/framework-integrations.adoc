@@ -1,0 +1,136 @@
+= Framework Integrations
+:description: Memory-augmented LLM applications with Vercel AI SDK, LangChain JS, Mastra, LangGraph, PydanticAI, Semantic Kernel, ellmer.
+
+Each first-class agent framework ships a thin wrapper around `MemoryClient`.
+Pick yours below.
+
+== Vercel AI SDK (TypeScript)
+
+The `agentMemoryMiddleware` injects three-tier context (reflections +
+observations + recent messages) into every model call and persists the
+assistant's response.
+
+[source,ts]
+----
+import { generateText } from "ai";
+import { MemoryClient } from "@neo4j-labs/agent-memory";
+import { agentMemoryMiddleware } from "@neo4j-labs/agent-memory/middleware/vercel-ai";
+
+const client = new MemoryClient({ endpoint: "https://memory.neo4jlabs.com/v1", apiKey });
+
+const result = await generateText({
+  model: openai("gpt-4o"),
+  experimental_middleware: agentMemoryMiddleware(client, {
+    conversationId: "conv-uuid",
+    userId: "alice@example.com",
+    includeContext: true,
+    persistResponses: true,
+  }),
+  messages: [{ role: "user", content: "What did we decide?" }],
+});
+----
+
+== LangChain JS (TypeScript)
+
+`Neo4jChatMessageHistory` is a drop-in `ChatMessageHistory` backed by memory;
+`Neo4jEntityRetriever` returns memory entities as LangChain `Document`s.
+
+[source,ts]
+----
+import {
+  Neo4jChatMessageHistory,
+  Neo4jEntityRetriever,
+} from "@neo4j-labs/agent-memory/integrations/langchain";
+
+const history = new Neo4jChatMessageHistory(client, "conv-uuid");
+await history.addUserMessage("hello");
+
+const retriever = new Neo4jEntityRetriever(client, { topK: 4 });
+const docs = await retriever.invoke("Find entities about Acme Corp");
+----
+
+== Mastra (TypeScript)
+
+`Neo4jMastraMemory` wraps `MemoryClient` as a Mastra `Memory` provider.
+
+[source,ts]
+----
+import { Neo4jMastraMemory } from "@neo4j-labs/agent-memory/integrations/mastra";
+import { Agent } from "@mastra/core/agent";
+
+const memory = new Neo4jMastraMemory(client);
+const agent = new Agent({ name: "scout", memory });
+----
+
+== LangGraph (Python)
+
+`MemoryCheckpointSaver` persists LangGraph state under a memory conversation.
+
+[source,python]
+----
+from neo4j_agent_memory_client import MemoryClient
+from neo4j_agent_memory_client.integrations.langgraph import MemoryCheckpointSaver
+
+client = MemoryClient(endpoint="https://memory.neo4jlabs.com/v1", api_key=...)
+saver = MemoryCheckpointSaver(client)
+
+graph = StateGraph(MyState)
+graph.compile(checkpointer=saver)
+----
+
+== PydanticAI (Python)
+
+`inject_memory_context` returns a system-prompt prefix; `MemoryToolset`
+exposes the 12 memory tools as PydanticAI tools.
+
+[source,python]
+----
+from pydantic_ai import Agent
+from neo4j_agent_memory_client import MemoryClient
+from neo4j_agent_memory_client.integrations.pydantic_ai import (
+    MemoryToolset, inject_memory_context,
+)
+
+client = MemoryClient(endpoint=..., api_key=...)
+toolset = MemoryToolset(client)
+
+@agent.system_prompt
+async def memory_context() -> str:
+    return await inject_memory_context(client, conversation_id="...")
+
+agent = Agent(model="openai:gpt-4o", tools=[*toolset.tools()])
+----
+
+== Semantic Kernel (C#)
+
+`MemoryConnector` provides save/search and a `GetContextPrefixAsync` helper
+suitable for SK kernel functions.
+
+[source,csharp]
+----
+using Neo4j.AgentMemory.Integrations.SemanticKernel;
+
+var client = new MemoryClient(...);
+var connector = new MemoryConnector(client);
+
+await connector.SaveAsync(collection: "concept", id: "ddd", text: "Domain-Driven Design");
+var hits = await connector.SearchAsync("microservice patterns", limit: 5);
+var contextPrefix = await connector.GetContextPrefixAsync(conversationId);
+----
+
+== ellmer (R)
+
+`register_memory_tools(client)` returns a list of ellmer `tool()`
+definitions wrapping all 12 memory tools.
+
+[source,r]
+----
+library(neo4j.memory)
+library(ellmer)
+
+client <- MemoryClient$new(endpoint = "...", api_key = ...)
+tools <- register_memory_tools(client)
+
+chat <- chat_openai(model = "gpt-4o")
+for (t in tools) chat$register_tool(t$name, t$description, t$handler)
+----

@@ -577,3 +577,65 @@ Silver + all SPEC-5.x (Cross-Memory) clauses pass. SHOULD clauses satisfied.
 | SPEC-4.6.x | `test_reasoning::TestListTraces::test_*` |
 | SPEC-4.7.x | `test_reasoning::TestGetToolStats::test_*` |
 | SPEC-5.x | `test_cross_memory::Test*` |
+
+---
+
+# Volume 5 — Hosted-Service Operations (Platinum Tier)
+
+**Status:** Optional. Implementations that target the hosted Neo4j Agent
+Memory Service at `https://memory.neo4jlabs.com/v1` SHOULD implement these
+operations. The TCK Platinum tier validates them; implementations that omit
+them remain Bronze/Silver/Gold compliant.
+
+## 5.1 — Conversation Lifecycle
+
+- **SPEC-5.1.1** `create_conversation(user_id, metadata?)` MUST return a
+  Conversation with a fresh UUID `id`, the supplied `user_id`, and a
+  `workspace_id` scoped to the API key.
+- **SPEC-5.1.2** `list_conversations(limit?)` MUST return Conversations
+  the API key has access to, newest-first.
+- **SPEC-5.1.3** `delete_conversation(id)` MUST be idempotent.
+- **SPEC-5.1.4** `bulk_add_messages(conversation_id, messages)` MUST cap
+  input at 100 messages and return them in insertion order.
+
+## 5.2 — Three-Tier Context
+
+- **SPEC-5.2.1** `get_context(conversation_id)` MUST return three lists:
+  `reflections`, `observations`, `recent_messages`.
+- **SPEC-5.2.2** Observations and reflections are generated asynchronously;
+  they MAY be empty for newly-created conversations.
+
+## 5.3 — Entity Feedback, History, and Graph
+
+- **SPEC-5.3.1** `set_entity_feedback(entity_id, user_score, confirmed)`
+  MUST return `{id, updated: bool}`. `user_score` is in [0, 1].
+- **SPEC-5.3.2** `get_entity_history(entity_id)` MUST return every
+  cross-conversation mention of the entity.
+- **SPEC-5.3.3** `merge_entities(source_id, target_id)` MUST leave a
+  `SAME_AS` provenance link from the source to the target.
+- **SPEC-5.3.4** `get_entity_graph()` MUST return a node-and-edge view
+  suitable for visualization.
+
+## 5.4 — Reasoning Provenance
+
+- **SPEC-5.4.1** `record_step(conversation_id, reasoning, action_taken,
+  result?)` MUST persist the step under the conversation.
+- **SPEC-5.4.2** `explain_step(step_id)` MUST return the step's tool calls
+  and the entities it influenced.
+- **SPEC-5.4.3** `get_trace_by_conversation(conversation_id)` MUST return
+  all steps and tool calls for the conversation.
+- **SPEC-5.4.4** `get_entity_provenance(entity_id)` MUST return the
+  reasoning chain that influenced the entity's creation.
+
+## 5.5 — Cypher Console
+
+- **SPEC-5.5.1** `cypher_query(cypher, params?)` MUST execute read-only
+  queries. Write operations MUST be rejected.
+
+| Spec ID | Test Reference |
+|---------|----------------|
+| SPEC-5.1.x | `test_platinum::TestConversationLifecycle::test_*` |
+| SPEC-5.2.x | `test_platinum::TestContext::test_*` |
+| SPEC-5.3.x | `test_platinum::TestEntityFeedbackAndGraph::test_*` |
+| SPEC-5.4.x | `test_platinum::TestReasoningProvenance::test_*` |
+| SPEC-5.5.x | `test_platinum::TestCypherConsole::test_*` |

@@ -106,6 +106,30 @@ Reasoning memory stores **decision traces** — a record of how the agent though
 
 *Analogies:* This is the agent's "journal" — a detailed log of its reasoning process that enables introspection and learning.
 
+== Three-Tier Context (Hosted Service)
+
+The hosted service composes the three memory types into a single read-optimized view called the **conversation context**, returned by `getContext(conversationId)`:
+
+[cols="1,3"]
+|===
+|Tier |Purpose
+
+|**Reflections**
+|Higher-level insights the service has derived from observations. Replaces prior reflections as the conversation evolves.
+
+|**Observations**
+|Auto-generated summaries of fixed-size message windows. Compress long conversations into searchable, embedding-backed chunks.
+
+|**Recent Messages**
+|The N most recent raw messages, for fine-grained recall.
+|===
+
+This is the canonical input for "feed an agent everything it needs to keep going" — every language client exposes it as `client.shortTerm.getContext(conversationId)` (or the language-idiomatic equivalent). Observations and reflections are generated asynchronously on the hosted service; for newly-created conversations they may be empty.
+
+== Reasoning Provenance
+
+Beyond traces, the hosted service tracks **provenance** — the reasoning chain that influenced any given entity's creation. Pair `recordStep()` and `recordToolCall()` with `getEntityProvenance(entityId)` to answer "why does this entity exist?" with a precise causal chain. `explainStep(stepId)` returns the tool calls plus the entities a single step influenced.
+
 == How They Work Together
 
 In practice, the three memory types form a feedback loop:

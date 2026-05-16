@@ -1,0 +1,192 @@
+= Hosted-Service Quickstart
+:description: Five-minute quickstart for the hosted Neo4j Agent Memory Service.
+
+This tutorial walks you from zero to a working agent against the hosted
+service at `https://memory.neo4jlabs.com/v1`, using whichever language client
+fits your stack.
+
+== Prerequisites
+
+* An API key (`nams_*`) from the link:https://memory.neo4jlabs.com/dashboard[NAMS dashboard].
+  Static keys expire after 90 days.
+* A bash shell with `curl` for the warm-up checks.
+
+== Step 1 — Sanity-check the service
+
+[source,bash]
+----
+curl -H "Authorization: Bearer $MEMORY_API_KEY" \
+  https://memory.neo4jlabs.com/v1/conversations
+----
+
+If you see a JSON `{"conversations": [...]}` response, your token is valid.
+
+== Step 2 — Install a client
+
+[tabs]
+======
+TypeScript::
++
+[source,bash]
+----
+npm install @neo4j-labs/agent-memory
+----
+
+Python::
++
+[source,bash]
+----
+uv add neo4j-agent-memory-client
+# or: pip install neo4j-agent-memory-client
+----
+
+Go::
++
+[source,bash]
+----
+go get github.com/neo4j-labs/agent-memory-tck/clients/go
+----
+
+C#::
++
+[source,bash]
+----
+dotnet add package Neo4j.AgentMemory
+----
+
+R::
++
+[source,r]
+----
+install.packages("neo4j.memory")
+# or: devtools::install_github("neo4j-labs/agent-memory-tck", subdir = "clients/rlang/neo4j.memory")
+----
+======
+
+== Step 3 — Create a conversation and add messages
+
+[tabs]
+======
+TypeScript::
++
+[source,ts]
+----
+import { MemoryClient } from "@neo4j-labs/agent-memory";
+
+const client = new MemoryClient({
+  endpoint: "https://memory.neo4jlabs.com/v1",
+  apiKey: process.env.MEMORY_API_KEY!,
+});
+await client.connect();
+
+const conv = await client.shortTerm.createConversation({ userId: "alice" });
+await client.shortTerm.addMessage(conv.id, "user", "John works at Acme.");
+const ctx = await client.shortTerm.getContext(conv.id);
+console.log(ctx);
+----
+
+Python::
++
+[source,python]
+----
+import asyncio
+from neo4j_agent_memory_client import MemoryClient
+
+async def main():
+    async with MemoryClient(
+        endpoint="https://memory.neo4jlabs.com/v1",
+        api_key=os.environ["MEMORY_API_KEY"],
+    ) as client:
+        conv = await client.short_term.create_conversation(user_id="alice")
+        await client.short_term.add_message(conv.id, "user", "John works at Acme.")
+        ctx = await client.short_term.get_context(conv.id)
+        print(ctx)
+
+asyncio.run(main())
+----
+
+Go::
++
+[source,go]
+----
+client, _ := memory.New(
+    memory.WithEndpoint("https://memory.neo4jlabs.com/v1"),
+    memory.WithAPIKey(os.Getenv("MEMORY_API_KEY")),
+)
+ctx := context.Background()
+
+conv, _ := client.ShortTerm.CreateConversation(ctx, memory.CreateConversationParams{
+    UserID: "alice",
+})
+_, _ = client.ShortTerm.AddMessage(ctx, conv.ID, memory.RoleUser, "John works at Acme.")
+context, _ := client.ShortTerm.GetContext(ctx, conv.ID)
+fmt.Println(context)
+----
+
+C#::
++
+[source,csharp]
+----
+using var client = new MemoryClient(new MemoryClientOptions {
+    Endpoint = "https://memory.neo4jlabs.com/v1",
+    ApiKey = Environment.GetEnvironmentVariable("MEMORY_API_KEY"),
+});
+await client.ConnectAsync();
+
+var conv = await client.ShortTerm.CreateConversationAsync("alice");
+await client.ShortTerm.AddMessageAsync(conv.Id, MessageRole.User, "John works at Acme.");
+var ctx = await client.ShortTerm.GetContextAsync(conv.Id);
+----
+
+R::
++
+[source,r]
+----
+library(neo4j.memory)
+
+client <- MemoryClient$new(
+  endpoint = "https://memory.neo4jlabs.com/v1",
+  api_key = Sys.getenv("MEMORY_API_KEY")
+)
+client$connect()
+
+conv <- client$short_term$create_conversation(user_id = "alice")
+client$short_term$add_message(conv$id, "user", "John works at Acme.")
+ctx <- client$short_term$get_context(conv$id)
+----
+======
+
+== Step 4 — Inspect the entity graph
+
+The service automatically extracts entities (`John`, `Acme`) from the message
+content. Pull the full graph view with one call:
+
+[source,ts]
+----
+const graph = await client.longTerm.getEntityGraph();
+console.log(graph.nodes, graph.edges);
+----
+
+== Step 5 — Reasoning provenance
+
+Record reasoning steps under a conversation, then ask why an entity exists:
+
+[source,ts]
+----
+await client.reasoning.recordStep({
+  conversationId: conv.id,
+  reasoning: "User mentioned John works at Acme.",
+  actionTaken: "extract_entities",
+  result: "John (person), Acme (organization)",
+});
+
+const provenance = await client.reasoning.getEntityProvenance(entityId);
+console.log(provenance.steps);
+----
+
+== Next steps
+
+* link:authenticate.html[How-To: Authenticate] — API key rotation, OAuth, scopes.
+* link:../reference/rest-api.html[Reference: REST API endpoints].
+* link:../reference/mcp-tools.html[Reference: MCP Tools] — wire the same
+  surface into Claude Desktop / Cursor / Windsurf.
