@@ -1,6 +1,6 @@
 {
   "name": "@neo4j-labs/agent-memory",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Neo4j Labs: TypeScript client for the Neo4j Agent Memory Service (NAMS)",
   "type": "module",
   "license": "Apache-2.0",
@@ -46,7 +46,8 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "npm run check:version && tsup",
+    "check:version": "node ./scripts/check-version-sync.mjs",
     "dev": "tsup --watch",
     "test": "vitest run test/unit test/integration",
     "test:unit": "vitest run test/unit",

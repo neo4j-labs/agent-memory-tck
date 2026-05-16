@@ -16,7 +16,12 @@ import {
   NotSupportedError,
   TransportError,
 } from "../errors.js";
-import { defaultUserAgent, extractRequestId, type Logger } from "../observability.js";
+import {
+  defaultUserAgent,
+  extractRequestId,
+  supportsUserAgentHeader,
+  type Logger,
+} from "../observability.js";
 import { camelToSnake, snakeToCamel } from "./casing.js";
 import type { Transport } from "./index.js";
 
@@ -594,7 +599,15 @@ export class RestTransport implements Transport {
   }
 
   private async buildHeaders(includeContentType = false): Promise<Record<string, string>> {
-    const headers: Record<string, string> = { "User-Agent": defaultUserAgent(), ...this.headers };
+    const headers: Record<string, string> = {};
+    const canSendUserAgent = supportsUserAgentHeader();
+    for (const [key, value] of Object.entries(this.headers)) {
+      if (key.toLowerCase() === "user-agent" && !canSendUserAgent) continue;
+      headers[key] = value;
+    }
+    if (canSendUserAgent && !Object.keys(headers).some((key) => key.toLowerCase() === "user-agent")) {
+      headers["User-Agent"] = defaultUserAgent();
+    }
     if (includeContentType) headers["Content-Type"] = "application/json";
     const token = this.tokenProvider ? await this.tokenProvider() : this.apiKey;
     if (token) headers["Authorization"] = `Bearer ${token}`;

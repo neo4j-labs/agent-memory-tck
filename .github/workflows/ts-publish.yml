@@ -37,6 +37,9 @@ jobs:
             exit 1
           fi
 
+      - name: Verify package version sync
+        run: npm run check:version
+
       - name: Type check
         run: npx tsc --noEmit
 

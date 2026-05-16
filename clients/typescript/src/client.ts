@@ -101,13 +101,13 @@ function resolveApiKey(option: string | undefined): string | undefined {
 }
 
 function createTransport(options: MemoryClientOptions): Transport {
-  const endpoint = options.endpoint ?? DEFAULT_ENDPOINT;
+  const endpoint = options.endpoint;
   const apiKey = resolveApiKey(options.apiKey);
 
-  const choice = pickTransport(endpoint, options.transport);
+  const choice = pickTransport(endpoint ?? DEFAULT_ENDPOINT, options.transport);
   if (choice === "rest") {
     return new RestTransport({
-      endpoint,
+      endpoint: endpoint ?? DEFAULT_ENDPOINT,
       apiKey,
       tokenProvider: options.tokenProvider,
       timeout: options.timeout,

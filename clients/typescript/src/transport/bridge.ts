@@ -7,7 +7,12 @@
  */
 
 import { AuthenticationError, ConnectionError, TransportError } from "../errors.js";
-import { defaultUserAgent, extractRequestId, type Logger } from "../observability.js";
+import {
+  defaultUserAgent,
+  extractRequestId,
+  supportsUserAgentHeader,
+  type Logger,
+} from "../observability.js";
 import type { Transport } from "./index.js";
 
 /** Strip trailing `/` from a URL without using a polynomial regex. */
@@ -222,11 +227,15 @@ export class BridgeTransport implements Transport {
   }
 
   private buildHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      "User-Agent": defaultUserAgent(),
-      "Content-Type": "application/json",
-      ...this.headers,
-    };
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const canSendUserAgent = supportsUserAgentHeader();
+    for (const [key, value] of Object.entries(this.headers)) {
+      if (key.toLowerCase() === "user-agent" && !canSendUserAgent) continue;
+      headers[key] = value;
+    }
+    if (canSendUserAgent && !Object.keys(headers).some((key) => key.toLowerCase() === "user-agent")) {
+      headers["User-Agent"] = defaultUserAgent();
+    }
     if (this.apiKey) {
       headers["Authorization"] = `Bearer ${this.apiKey}`;
     }

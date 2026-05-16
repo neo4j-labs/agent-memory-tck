@@ -7,9 +7,9 @@ and this project follows [Semantic Versioning](https://semver.org).
 This is a Neo4j Labs project under Beta status — breaking changes may
 appear in minor versions with a callout in this file.
 
-## 0.1.0 — Initial Beta Release
+## 0.3.0 — Beta launch
 
-Initial public release.
+Beta launch release for the hosted-service-first TypeScript client.
 
 ### Added
 
@@ -40,3 +40,9 @@ Initial public release.
 - Edge runtime support: Cloudflare Workers, Vercel Edge (with explicit
   `apiKey` pattern)
 - TCK Bronze conformance via the polyglot test suite
+
+### Breaking
+
+- `BridgeTransport` is no longer exported from the package root. Import it
+  from `@neo4j-labs/agent-memory/testing` instead.
+- Deprecated `HttpTransport` / `HttpTransportOptions` aliases were removed.

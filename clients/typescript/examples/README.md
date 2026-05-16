@@ -35,6 +35,6 @@ Each example's own README has the full step-by-step.
 - These examples use `"file:.."` to depend on the local client package
   during development. When using the examples as a template for your own
   project, replace that with a pinned version like
-  `"@neo4j-labs/agent-memory": "^0.1.0"`.
+  `"@neo4j-labs/agent-memory": "^0.3.0"`.
 - Examples are **not** exercised by CI — they're documentation. If you
   find one broken, please open an issue.

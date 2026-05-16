@@ -51,9 +51,9 @@ likely coming from a different dependency. Run with
 
 == TypeScript: `Cannot find module '@neo4j-labs/agent-memory/middleware/vercel-ai'`
 
-Make sure `tsconfig.json` has `"moduleResolution": "bundler"` or
-`"NodeNext"`. The package uses subpath exports, which require modern
-module resolution.
+Make sure `tsconfig.json` has `"moduleResolution": "bundler"`, or use
+`"Node16"` / `"NodeNext"` together with ESM output. The package uses
+ESM-only subpath exports, which require modern module resolution.
 
 == Hook timeout in Vitest e2e tests
 

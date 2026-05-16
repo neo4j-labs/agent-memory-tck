@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import { MemoryClient } from "../../src/client.js";
+import { ValidationError } from "../../src/errors.js";
 import { RestTransport } from "../../src/transport/index.js";
 import { BridgeTransport } from "../../src/transport/bridge.js";
 
@@ -64,5 +65,9 @@ describe("transport auto-selection", () => {
     };
     const c = new MemoryClient(fake);
     expect(getInternalTransport(c)).toBe(fake);
+  });
+
+  it("requires an explicit endpoint for bridge transport", () => {
+    expect(() => new MemoryClient({ transport: "bridge" })).toThrowError(ValidationError);
   });
 });

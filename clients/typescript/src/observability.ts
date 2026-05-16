@@ -19,6 +19,10 @@ export function defaultUserAgent(): string {
     : `@neo4j-labs/agent-memory/${VERSION}`;
 }
 
+export function supportsUserAgentHeader(): boolean {
+  return detectRuntime() !== null;
+}
+
 function detectRuntime(): string | null {
   // Deno
   const denoObj = (globalThis as { Deno?: { version?: { deno?: string } } }).Deno;
