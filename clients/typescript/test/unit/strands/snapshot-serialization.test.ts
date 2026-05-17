@@ -236,7 +236,7 @@ describe("Neo4jSessionStorage — message extraction", () => {
     expect((blob.snapshot.data as Record<string, unknown>).messages).toBeUndefined();
   });
 
-  it("each save writes a new synthetic state message in order", async () => {
+  it("each distinct snapshotId writes a synthetic state message in order", async () => {
     const { client, getMessages } = makeFakeClient();
     const storage = new Neo4jSessionStorage(client);
 
@@ -261,6 +261,28 @@ describe("Neo4jSessionStorage — message extraction", () => {
     expect(decodeStateContent(states[0]!).isLatest).toBe(false);
     expect(decodeStateContent(states[1]!).snapshotId).toBe("s2");
     expect(decodeStateContent(states[1]!).isLatest).toBe(true);
+  });
+
+  it("re-saving the same snapshotId with the same state is a no-op for synthetic markers", async () => {
+    const { client, getMessages } = makeFakeClient();
+    const storage = new Neo4jSessionStorage(client);
+    const snapshot = snapshotWith({ messages: [{ role: "user", content: [{ text: "hi" }] }] });
+
+    await storage.saveSnapshot({
+      location: LOCATION,
+      snapshotId: "s1",
+      isLatest: true,
+      snapshot,
+    });
+    await storage.saveSnapshot({
+      location: LOCATION,
+      snapshotId: "s1",
+      isLatest: true,
+      snapshot,
+    });
+
+    const states = getMessages().filter((m) => m.content.startsWith("__strands_state__:"));
+    expect(states).toHaveLength(1);
   });
 });
 
@@ -310,6 +332,32 @@ describe("Neo4jSessionStorage — load + list + delete", () => {
     const storage = new Neo4jSessionStorage(client);
     const snap = await storage.loadSnapshot({ location: LOCATION });
     expect(snap).toBeNull();
+  });
+
+  it("loadSnapshot prefers the latest stored blob for an explicit snapshotId", async () => {
+    const baseSnapshot: Snapshot = {
+      scope: "agent",
+      schemaVersion: "1.0",
+      createdAt: "x",
+      data: {} as Snapshot["data"],
+      appData: {} as Snapshot["appData"],
+    };
+    const { client } = makeFakeClient({
+      initialMessages: [
+        seedConversationWithSnapshot("s1", false, {
+          ...baseSnapshot,
+          data: { version: 1 } as Snapshot["data"],
+        }),
+        seedConversationWithSnapshot("s1", true, {
+          ...baseSnapshot,
+          data: { version: 2 } as Snapshot["data"],
+        }),
+      ],
+    });
+    const storage = new Neo4jSessionStorage(client);
+
+    const snap = await storage.loadSnapshot({ location: LOCATION, snapshotId: "s1" });
+    expect((snap!.data as Record<string, unknown>).version).toBe(2);
   });
 
   it("listSnapshotIds respects limit + startAfter", async () => {

@@ -124,7 +124,7 @@ function encodeBlobContent(prefix: string, blob: unknown): string {
 }
 
 describe("Neo4jSessionStorage — synthetic-message storage", () => {
-  it("saveSnapshot writes one synthetic user message per save + the real conversation messages", async () => {
+  it("saveSnapshot writes one synthetic user message for a distinct snapshot + the real conversation messages", async () => {
     const state: ServerState = { messages: [] };
     mountConversationHandlers(state);
     const storage = newStorage();
@@ -286,7 +286,7 @@ describe("Neo4jSessionStorage — synthetic-message storage", () => {
 });
 
 describe("Neo4jSessionStorage — idempotency + error surface", () => {
-  it("re-saving the same snapshotId does not duplicate real messages", async () => {
+  it("re-saving the same snapshotId does not duplicate real messages or synthetic markers", async () => {
     const state: ServerState = { messages: [] };
     mountConversationHandlers(state);
     const storage = newStorage();
@@ -315,10 +315,43 @@ describe("Neo4jSessionStorage — idempotency + error surface", () => {
     );
     // The user message is added only once (dedupe by role+content).
     expect(real).toHaveLength(1);
-    // Synthetic state messages: one per save. Both list as the same
-    // snapshotId; listSnapshotIds dedupes.
-    const ids = await storage.listSnapshotIds({ location: LOCATION });
-    expect(ids).toEqual(["s1"]);
+    const synthetic = state.messages.filter((m) =>
+      m.content.startsWith("__strands_state__:"),
+    );
+    expect(synthetic).toHaveLength(1);
+    expect(await storage.listSnapshotIds({ location: LOCATION })).toEqual(["s1"]);
+  });
+
+  it("loadSnapshot prefers the latest stored blob for an explicit snapshotId", async () => {
+    const state: ServerState = {
+      messages: [
+        {
+          id: "m1",
+          role: "user",
+          content: encodeBlobContent("__strands_state__:", {
+            snapshotId: "s1",
+            isLatest: false,
+            snapshot: snap({ agentState: { version: 1 } }),
+            savedAt: "2026-05-16T00:00:00Z",
+          }),
+        },
+        {
+          id: "m2",
+          role: "user",
+          content: encodeBlobContent("__strands_state__:", {
+            snapshotId: "s1",
+            isLatest: true,
+            snapshot: snap({ agentState: { version: 2 } }),
+            savedAt: "2026-05-16T00:01:00Z",
+          }),
+        },
+      ],
+    };
+    mountConversationHandlers(state);
+    const storage = newStorage();
+
+    const loaded = await storage.loadSnapshot({ location: LOCATION, snapshotId: "s1" });
+    expect((loaded!.data as Record<string, unknown>).version).toBe(2);
   });
 
   it("auth failure on read propagates AuthenticationError with requestId", async () => {

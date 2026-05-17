@@ -13,7 +13,7 @@ import {
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "tool";
   content: string;
 }
 
@@ -77,8 +77,18 @@ export function Chat({ conversationId, onConversationId, onTurnComplete }: ChatP
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantId ? { ...m, content: m.content + chunk } : m,
-              ),
+                ),
             );
+          } else if (event.type === "toolCall") {
+            const toolCall = event.data as ToolCallEvent;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `t-${Date.now()}-${prev.length}`,
+                role: "tool",
+                content: formatToolCall(toolCall),
+              },
+            ]);
           } else if (event.type === "done") {
             onTurnComplete();
           } else if (event.type === "error") {
@@ -146,7 +156,22 @@ export function Chat({ conversationId, onConversationId, onTurnComplete }: ChatP
   );
 }
 
-function Bubble({ role, children }: { role: "user" | "assistant"; children: React.ReactNode }) {
+function formatToolCall(toolCall: ToolCallEvent): string {
+  const input =
+    toolCall.input && Object.keys(toolCall.input).length > 0
+      ? ` ${JSON.stringify(toolCall.input)}`
+      : "";
+  const result = toolCall.result ? `\n→ ${toolCall.result}` : "";
+  return `🔧 ${toolCall.name}${input}${result}`;
+}
+
+function Bubble({
+  role,
+  children,
+}: {
+  role: "user" | "assistant" | "tool";
+  children: React.ReactNode;
+}) {
   return (
     <Flex justify={role === "user" ? "flex-end" : "flex-start"}>
       <Box
@@ -154,8 +179,10 @@ function Bubble({ role, children }: { role: "user" | "assistant"; children: Reac
         px={3}
         py={2}
         borderRadius="md"
-        bg={role === "user" ? "labs.500" : "gray.100"}
-        color={role === "user" ? "white" : "gray.800"}
+        bg={role === "user" ? "labs.500" : role === "tool" ? "orange.50" : "gray.100"}
+        color={role === "user" ? "white" : role === "tool" ? "orange.700" : "gray.800"}
+        borderWidth={role === "tool" ? "1px" : undefined}
+        borderColor={role === "tool" ? "orange.200" : undefined}
       >
         <Text whiteSpace="pre-wrap" fontSize="sm">
           {children}

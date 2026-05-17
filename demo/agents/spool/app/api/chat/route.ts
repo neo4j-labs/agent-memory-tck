@@ -110,7 +110,6 @@ async function* liveStream(
   // Dynamic imports keep Strands out of stub-mode cold start.
   const { Agent, FunctionTool } = await import("@strands-agents/sdk");
   const { OpenAIModel } = await import("@strands-agents/sdk/models/openai");
-  const { z } = await import("zod");
   const { connectMemoryToAgent } = await import(
     "@neo4j-labs/agent-memory/integrations/strands"
   );
@@ -133,18 +132,18 @@ async function* liveStream(
       return `Fact about ${topic}: graphs model relationships natively.`;
     },
   });
-  void z;
 
   const { sessionManager, conversationManager } = await connectMemoryToAgent(memory, {
     conversationId,
   });
+  type AgentConfig = NonNullable<ConstructorParameters<typeof Agent>[0]>;
 
   const agent = new Agent({
     systemPrompt: "You are spool, a helpful demo agent. Be concise and curious.",
     model: new OpenAIModel({ modelId: "gpt-4o-mini" }),
     tools: [lookupTool],
-    sessionManager,
-    conversationManager,
+    sessionManager: sessionManager as unknown as AgentConfig["sessionManager"],
+    conversationManager: conversationManager as unknown as AgentConfig["conversationManager"],
   });
 
   // Persist the user message ourselves so it shows up in the conversation

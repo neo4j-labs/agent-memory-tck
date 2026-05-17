@@ -105,6 +105,8 @@ describe("Neo4jConversationManager — three-tier injection", () => {
     const texts = msgs.map((m) =>
       ((m.content as Array<{ text?: string }>)[0]?.text ?? "") as string,
     );
+    expect(msgs[0]?.role).toBe("system");
+    expect(msgs[1]?.role).toBe("system");
     expect(texts).toEqual([
       "[reflection] user prefers concise",
       "[observation] asks about graphs",

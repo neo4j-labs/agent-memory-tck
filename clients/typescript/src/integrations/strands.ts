@@ -142,7 +142,7 @@ export interface ReasoningHooksOptions {
  * `role: "user"` is universally preserved, and stuffing the blob inline
  * in `content` removes the dependency on metadata round-tripping.
  *
- * Each save writes ONE synthetic message:
+ * Each distinct snapshot state writes ONE synthetic message:
  *
  *   { role: "user", content: "__strands_state__:{base64(JSON.stringify(blob))}" }
  *
@@ -153,8 +153,9 @@ export interface ReasoningHooksOptions {
  * before returning the reconstructed Snapshot.
  *
  * Per-snapshot synthetic messages mean `listSnapshotIds` is O(n) over
- * the message list, but in practice snapshots are small JSON deltas
- * and the conversation's message count is bounded — fine for v0.x.
+ * the message list, but repeated idempotent saves short-circuit when the
+ * latest stored blob already matches. In practice snapshots are small
+ * JSON deltas and the conversation's message count is bounded — fine for v0.x.
  */
 const STATE_PREFIX = "__strands_state__:";
 const MANIFEST_PREFIX = "__strands_manifest__:";
@@ -290,20 +291,26 @@ export class Neo4jSessionStorage implements SnapshotStorage {
   }): Promise<void> {
     const { location, snapshotId, isLatest, snapshot } = params;
     const conversationId = location.sessionId;
+    const existingConversation = await this.memory.shortTerm.getConversation(conversationId);
 
     // 1. Extract conversation messages out of snapshot.data.messages and
     //    persist any new ones as real Message nodes. Dedupe by role+content
     //    so re-saving the same snapshot doesn't grow the message list.
-    await this.extractAndPersistMessages(conversationId, snapshot);
+    await this.extractAndPersistMessages(conversationId, snapshot, existingConversation.messages);
 
     // 2. Write a synthetic user message whose content carries the full
     //    state blob (base64-encoded JSON after the marker prefix).
+    const strippedSnapshot = stripMessagesFromSnapshot(snapshot);
     const blob: StrandsStateBlob = {
       snapshotId,
       isLatest,
-      snapshot: stripMessagesFromSnapshot(snapshot),
+      snapshot: strippedSnapshot,
       savedAt: new Date().toISOString(),
     };
+    const previous = [...this.readStateBlobs(existingConversation.messages)]
+      .reverse()
+      .find((candidate) => candidate.snapshotId === snapshotId);
+    if (previous && sameStateBlob(previous, blob)) return;
     await this.memory.shortTerm.addMessage(
       conversationId,
       SYNTHETIC_ROLE,
@@ -326,7 +333,7 @@ export class Neo4jSessionStorage implements SnapshotStorage {
     // or the latest save overall if none asserted "latest".
     let blob: StrandsStateBlob | undefined;
     if (params.snapshotId) {
-      blob = stateBlobs.find((b) => b.snapshotId === params.snapshotId);
+      blob = [...stateBlobs].reverse().find((b) => b.snapshotId === params.snapshotId);
     } else {
       blob = [...stateBlobs].reverse().find((b) => b.isLatest) ??
         stateBlobs[stateBlobs.length - 1];
@@ -434,13 +441,14 @@ export class Neo4jSessionStorage implements SnapshotStorage {
   private async extractAndPersistMessages(
     conversationId: string,
     snapshot: Snapshot,
+    existingMessages?: Array<{ role: string; content: string }>,
   ): Promise<number> {
     const messages = pickStrandsMessages(snapshot);
     if (messages.length === 0) return 0;
 
-    const existing = await this.memory.shortTerm.getConversation(conversationId);
     const seen = new Set(
-      existing.messages
+      (existingMessages ??
+        (await this.memory.shortTerm.getConversation(conversationId)).messages)
         .filter((m) => !isSyntheticStrandsMessage(m))
         .map((m) => `${m.role}::${m.content}`),
     );
@@ -538,12 +546,12 @@ export class Neo4jConversationManager {
 
       if (includeReflections && ctx.reflections.length > 0) {
         for (const r of ctx.reflections) {
-          prepend.push(systemTextMessage(`[reflection] ${r.content}`));
+          prepend.push(contextInjectionMessage(`[reflection] ${r.content}`));
         }
       }
       if (includeObservations && ctx.observations.length > 0) {
         for (const o of ctx.observations) {
-          prepend.push(systemTextMessage(`[observation] ${o.content}`));
+          prepend.push(contextInjectionMessage(`[observation] ${o.content}`));
         }
       }
 
@@ -793,9 +801,21 @@ function toStrandsMessage(m: { role: string; content: string }): StrandsMessage 
   } as StrandsMessage;
 }
 
-function systemTextMessage(text: string): StrandsMessage {
+function contextInjectionMessage(text: string): StrandsMessage {
   return {
-    role: "user" as StrandsMessage["role"],
+    role: "system" as StrandsMessage["role"],
     content: [{ text }] as unknown as StrandsMessage["content"],
   } as StrandsMessage;
+}
+
+function sameStateBlob(a: StrandsStateBlob, b: StrandsStateBlob): boolean {
+  return JSON.stringify({
+    snapshotId: a.snapshotId,
+    isLatest: a.isLatest,
+    snapshot: a.snapshot,
+  }) === JSON.stringify({
+    snapshotId: b.snapshotId,
+    isLatest: b.isLatest,
+    snapshot: b.snapshot,
+  });
 }

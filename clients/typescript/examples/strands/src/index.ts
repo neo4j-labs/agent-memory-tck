@@ -11,7 +11,6 @@
 
 import { Agent, FunctionTool } from "@strands-agents/sdk";
 import { OpenAIModel } from "@strands-agents/sdk/models/openai";
-import { z } from "zod";
 import { MemoryClient } from "@neo4j-labs/agent-memory";
 import { connectMemoryToAgent } from "@neo4j-labs/agent-memory/integrations/strands";
 
@@ -28,22 +27,32 @@ async function main() {
   const { sessionManager, conversationManager } = await connectMemoryToAgent(memory, {
     conversationId: conv.id,
   });
+  type AgentConfig = NonNullable<ConstructorParameters<typeof Agent>[0]>;
 
   // 3. Build the agent. A toy tool is included so the reasoning trace has
   //    something interesting to record.
   const lookupTool = new FunctionTool({
     name: "lookup_fact",
     description: "Look up a fact about a topic.",
-    schema: z.object({ topic: z.string() }),
-    handler: async ({ topic }) => `Fact about ${topic}: graphs model relationships natively.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        topic: { type: "string", description: "Topic to look up" },
+      },
+      required: ["topic"],
+    },
+    callback: async (input: unknown) => {
+      const topic = (input as { topic?: string })?.topic ?? "unknown";
+      return `Fact about ${topic}: graphs model relationships natively.`;
+    },
   });
 
   const agent = new Agent({
     systemPrompt: "You are a helpful assistant who explains things concisely.",
     model: new OpenAIModel({ modelId: "gpt-4o-mini" }),
     tools: [lookupTool],
-    sessionManager,
-    conversationManager,
+    sessionManager: sessionManager as unknown as AgentConfig["sessionManager"],
+    conversationManager: conversationManager as unknown as AgentConfig["conversationManager"],
   });
 
   // 4. Drive a three-turn dialogue.
@@ -55,7 +64,12 @@ async function main() {
   for (const userMessage of turns) {
     process.stdout.write(`\n[user] ${userMessage}\n[assistant] `);
     const result = await agent.invoke(userMessage);
-    process.stdout.write(`${result.text ?? ""}\n`);
+    const text =
+      result.lastMessage.content
+        .map((block) => ("text" in block && typeof block.text === "string" ? block.text : ""))
+        .filter((chunk) => chunk.length > 0)
+        .join("") || "(no text response)";
+    process.stdout.write(`${text}\n`);
   }
 
   process.stdout.write(
