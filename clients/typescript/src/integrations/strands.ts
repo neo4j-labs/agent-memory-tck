@@ -129,28 +129,85 @@ export interface ReasoningHooksOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Strands snapshot state is persisted as synthetic `role: "system"`
+ * Strands snapshot state is persisted as synthetic `role: "user"`
  * messages on the NAMS conversation. NAMS exposes no conversation-
- * metadata-update endpoint, so we use the only write surface that does
- * exist: per-message metadata on `POST /conversations/{id}/messages`.
+ * metadata-update endpoint, so we use the only write surface that
+ * works robustly: a message whose `content` carries both the marker
+ * prefix AND the JSON-serialized blob, base64-encoded for safety.
  *
- * Each save writes ONE synthetic message. Its `content` carries a
- * recognizable prefix (`__strands_state__:` for snapshots,
- * `__strands_manifest__:` for manifests) so callers walking the message
- * list can filter them out cheaply. The full JSON-serialized state rides
- * as a single string under `metadata.strands_state` on the message, where
- * the REST transport's snake_case ↔ camelCase casing layer can't reach
- * inside (string values are opaque to it).
+ * The historical choice of `role: "system"` + per-message metadata was
+ * abandoned after live-service testing showed that NAMS' GET
+ * /conversations/{id}/messages either filters out `system`-role
+ * messages or doesn't surface per-message metadata on read (or both).
+ * `role: "user"` is universally preserved, and stuffing the blob inline
+ * in `content` removes the dependency on metadata round-tripping.
  *
- * Per-snapshot synthetic messages mean `listSnapshotIds` is O(n) over the
- * message list, but in practice snapshots are small JSON deltas and the
- * conversation's message count is bounded — fine for v0.x preview.
+ * Each save writes ONE synthetic message:
+ *
+ *   { role: "user", content: "__strands_state__:{base64(JSON.stringify(blob))}" }
+ *
+ * Manifests use a parallel prefix `__strands_manifest__:`. Consumers
+ * walking the message list MUST filter these out — see
+ * {@link isSyntheticStrandsMessage}. Strands' agent loop never sees
+ * them because {@link Neo4jSessionStorage.loadSnapshot} strips them
+ * before returning the reconstructed Snapshot.
+ *
+ * Per-snapshot synthetic messages mean `listSnapshotIds` is O(n) over
+ * the message list, but in practice snapshots are small JSON deltas
+ * and the conversation's message count is bounded — fine for v0.x.
  */
 const STATE_PREFIX = "__strands_state__:";
 const MANIFEST_PREFIX = "__strands_manifest__:";
 
-/** Per-message metadata field that carries the JSON-stringified blob. */
-const META_FIELD = "strands_state";
+/** Role used for synthetic state messages. */
+const SYNTHETIC_ROLE: MessageRole = "user";
+
+function encodeBlob(blob: unknown): string {
+  return base64Encode(JSON.stringify(blob));
+}
+
+function decodeBlob<T>(content: string, prefix: string): T | null {
+  if (!content.startsWith(prefix)) return null;
+  const payload = content.slice(prefix.length);
+  try {
+    return JSON.parse(base64Decode(payload)) as T;
+  } catch {
+    return null;
+  }
+}
+
+function base64Encode(s: string): string {
+  // Use Buffer when available (Node, Bun, edge runtimes with shims),
+  // else fall back to a btoa-on-UTF8 path for purer browser-like runtimes.
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(s, "utf8").toString("base64");
+  }
+  // eslint-disable-next-line no-restricted-globals
+  const g = globalThis as { btoa?: (s: string) => string };
+  if (typeof g.btoa === "function") {
+    // btoa requires Latin-1; wrap UTF-8 bytes first.
+    const bytes = new TextEncoder().encode(s);
+    let bin = "";
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return g.btoa(bin);
+  }
+  throw new Error("No base64 encoder available in this runtime");
+}
+
+function base64Decode(b64: string): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(b64, "base64").toString("utf8");
+  }
+  // eslint-disable-next-line no-restricted-globals
+  const g = globalThis as { atob?: (s: string) => string };
+  if (typeof g.atob === "function") {
+    const bin = g.atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+  throw new Error("No base64 decoder available in this runtime");
+}
 
 interface StrandsStateBlob {
   /** snapshotId associated with this synthetic message. */
@@ -175,11 +232,14 @@ interface StrandsManifestBlob {
  * markers. Exported so consumers walking the conversation can filter
  * them out of UI rendering. See `SYNTHETIC_MESSAGE_PREFIXES` for the
  * canonical prefix list.
+ *
+ * Recognizes ANY role — the storage role used by the integration is
+ * `"user"`, but older saves may have used `"system"`. We match on the
+ * content prefix alone for resilience.
  */
 export function isSyntheticStrandsMessage(
   message: { role: string; content: string },
 ): boolean {
-  if (message.role !== "system") return false;
   return (
     message.content.startsWith(STATE_PREFIX) ||
     message.content.startsWith(MANIFEST_PREFIX)
@@ -203,15 +263,17 @@ export const SYNTHETIC_MESSAGE_PREFIXES = [STATE_PREFIX, MANIFEST_PREFIX] as con
  *   `Message` graph nodes via `addMessage` (so entity extraction, search,
  *   and the graph view all work on them).
  * - Non-message snapshot state (Strands' `data` minus `messages`, plus
- *   `appData`, plus the manifest) is persisted as synthetic
- *   `role: "system"` messages whose content carries a recognizable
- *   marker prefix and whose per-message `metadata.strands_state` carries
- *   the JSON-serialized blob. NAMS exposes per-message metadata writes
- *   via `POST /conversations/{id}/messages`, so this works against the
- *   documented API today (no conversation-metadata-update endpoint).
+ *   `appData`, plus the manifest) is persisted as synthetic `role: "user"`
+ *   messages whose content carries both a marker prefix and a
+ *   base64-encoded JSON blob. NAMS exposes `POST /conversations/{id}/messages`
+ *   as the only documented conversation-scoped write, so this approach
+ *   stays within the documented API surface.
  *
- * Consumers walking the message list (chat UIs, Cypher queries) should
+ * Consumers walking the message list (chat UIs, Cypher queries) MUST
  * filter synthetic messages with {@link isSyntheticStrandsMessage}.
+ * Strands itself never sees them: {@link Neo4jSessionStorage.loadSnapshot}
+ * strips them from the reconstructed Snapshot before handing back to
+ * `SessionManager`.
  *
  * Auth errors propagate — Strands needs to know if the backing store is
  * unreachable. Transient errors propagate too; Strands' own retry
@@ -234,10 +296,8 @@ export class Neo4jSessionStorage implements SnapshotStorage {
     //    so re-saving the same snapshot doesn't grow the message list.
     await this.extractAndPersistMessages(conversationId, snapshot);
 
-    // 2. Write a synthetic system message that carries the rest of the
-    //    snapshot's state (data minus messages, plus appData). The
-    //    JSON blob rides as an opaque string in the message's per-message
-    //    metadata so the REST transport's casing layer leaves it alone.
+    // 2. Write a synthetic user message whose content carries the full
+    //    state blob (base64-encoded JSON after the marker prefix).
     const blob: StrandsStateBlob = {
       snapshotId,
       isLatest,
@@ -246,9 +306,8 @@ export class Neo4jSessionStorage implements SnapshotStorage {
     };
     await this.memory.shortTerm.addMessage(
       conversationId,
-      "system",
-      `${STATE_PREFIX}${snapshotId}`,
-      { metadata: { [META_FIELD]: JSON.stringify(blob) } },
+      SYNTHETIC_ROLE,
+      `${STATE_PREFIX}${encodeBlob(blob)}`,
     );
   }
 
@@ -331,9 +390,8 @@ export class Neo4jSessionStorage implements SnapshotStorage {
     };
     await this.memory.shortTerm.addMessage(
       params.location.sessionId,
-      "system",
-      `${MANIFEST_PREFIX}${params.location.scopeId}`,
-      { metadata: { [META_FIELD]: JSON.stringify(blob) } },
+      SYNTHETIC_ROLE,
+      `${MANIFEST_PREFIX}${encodeBlob(blob)}`,
     );
   }
 
@@ -341,16 +399,15 @@ export class Neo4jSessionStorage implements SnapshotStorage {
 
   /**
    * Scan a conversation's message list and parse any state markers into
-   * blobs, in original order.
+   * blobs, in original order. Matches on the content prefix alone for
+   * resilience against role normalization on the service side.
    */
   private readStateBlobs(
-    messages: Array<{ role: string; content: string; metadata?: Record<string, unknown> }>,
+    messages: Array<{ role: string; content: string }>,
   ): StrandsStateBlob[] {
     const blobs: StrandsStateBlob[] = [];
     for (const msg of messages) {
-      if (msg.role !== "system") continue;
-      if (!msg.content.startsWith(STATE_PREFIX)) continue;
-      const blob = parseBlob<StrandsStateBlob>(msg.metadata);
+      const blob = decodeBlob<StrandsStateBlob>(msg.content, STATE_PREFIX);
       if (blob) blobs.push(blob);
     }
     return blobs;
@@ -358,13 +415,11 @@ export class Neo4jSessionStorage implements SnapshotStorage {
 
   /** Same idea, for manifest markers. */
   private readManifestBlobs(
-    messages: Array<{ role: string; content: string; metadata?: Record<string, unknown> }>,
+    messages: Array<{ role: string; content: string }>,
   ): StrandsManifestBlob[] {
     const blobs: StrandsManifestBlob[] = [];
     for (const msg of messages) {
-      if (msg.role !== "system") continue;
-      if (!msg.content.startsWith(MANIFEST_PREFIX)) continue;
-      const blob = parseBlob<StrandsManifestBlob>(msg.metadata);
+      const blob = decodeBlob<StrandsManifestBlob>(msg.content, MANIFEST_PREFIX);
       if (blob) blobs.push(blob);
     }
     return blobs;
@@ -400,17 +455,6 @@ export class Neo4jSessionStorage implements SnapshotStorage {
       writes++;
     }
     return writes;
-  }
-}
-
-function parseBlob<T>(metadata: Record<string, unknown> | undefined): T | null {
-  if (!metadata) return null;
-  const raw = metadata[META_FIELD];
-  if (typeof raw !== "string") return null;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
   }
 }
 

@@ -79,16 +79,27 @@ function snapshotWith(opts: {
 
 const LOCATION = { sessionId: "conv-1", scope: "agent" as const, scopeId: "agent-1" };
 
-/** Parse the per-message metadata blob a saveSnapshot call wrote. */
-function decodeStateMeta(msg: StoredMessage): {
+/**
+ * Decode the JSON blob from a synthetic state message's content.
+ * Mirrors the integration's `decodeBlob` for prefix `__strands_state__:`.
+ */
+function decodeStateContent(msg: StoredMessage): {
   snapshotId: string;
   isLatest: boolean;
   snapshot: Snapshot;
   savedAt: string;
 } {
-  const raw = msg.metadata?.strands_state;
-  if (typeof raw !== "string") throw new Error("expected strands_state blob");
-  return JSON.parse(raw);
+  const prefix = "__strands_state__:";
+  if (!msg.content.startsWith(prefix)) {
+    throw new Error("expected __strands_state__ content prefix");
+  }
+  const b64 = msg.content.slice(prefix.length);
+  return JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+}
+
+/** Encode a state blob into the synthetic content format the integration uses. */
+function encodeStateContent(blob: object): string {
+  return `__strands_state__:${Buffer.from(JSON.stringify(blob), "utf8").toString("base64")}`;
 }
 
 describe("Neo4jSessionStorage — message extraction", () => {
@@ -111,7 +122,10 @@ describe("Neo4jSessionStorage — message extraction", () => {
 
     // Two real messages + one synthetic state message.
     const realAddCalls = addCalls.filter(
-      (c) => c.role === "user" || c.role === "assistant",
+      (c) =>
+        (c.role === "user" || c.role === "assistant") &&
+        !c.content.startsWith("__strands_state__:") &&
+        !c.content.startsWith("__strands_manifest__:"),
     );
     expect(realAddCalls).toHaveLength(2);
     expect(realAddCalls[0]).toMatchObject({ role: "user", content: "hello" });
@@ -125,7 +139,7 @@ describe("Neo4jSessionStorage — message extraction", () => {
         // A prior state marker should NOT count as a real message for dedup.
         {
           id: "m-state",
-          role: "system",
+          role: "user",
           content: "__strands_state__:prior",
           metadata: { strands_state: "{}" },
         },
@@ -147,7 +161,10 @@ describe("Neo4jSessionStorage — message extraction", () => {
     });
 
     const realAddCalls = addCalls.filter(
-      (c) => c.role === "user" || c.role === "assistant",
+      (c) =>
+        (c.role === "user" || c.role === "assistant") &&
+        !c.content.startsWith("__strands_state__:") &&
+        !c.content.startsWith("__strands_manifest__:"),
     );
     expect(realAddCalls).toHaveLength(1);
     expect(realAddCalls[0]).toMatchObject({ role: "assistant", content: "new" });
@@ -162,11 +179,11 @@ describe("Neo4jSessionStorage — message extraction", () => {
       isLatest: true,
       snapshot: snapshotWith({ messages: [] }),
     });
-    const real = addCalls.filter((c) => c.role !== "system");
+    const real = addCalls.filter((c) => c.role !== "user" && c.content.startsWith("__strands_state__:") === false);
     expect(real).toHaveLength(0);
     // The synthetic state marker still got written.
     const synthetic = addCalls.filter(
-      (c) => c.role === "system" && c.content.startsWith("__strands_state__:"),
+      (c) => c.content.startsWith("__strands_state__:"),
     );
     expect(synthetic).toHaveLength(1);
   });
@@ -207,10 +224,10 @@ describe("Neo4jSessionStorage — message extraction", () => {
     });
 
     const synthetic = getMessages().find(
-      (m) => m.role === "system" && m.content.startsWith("__strands_state__:"),
+      (m) => m.content.startsWith("__strands_state__:"),
     );
     expect(synthetic).toBeDefined();
-    const blob = decodeStateMeta(synthetic!);
+    const blob = decodeStateContent(synthetic!);
     expect(blob.snapshotId).toBe("s1");
     expect(blob.isLatest).toBe(true);
     expect(blob.snapshot.appData).toMatchObject({ userCounter: 42 });
@@ -237,13 +254,13 @@ describe("Neo4jSessionStorage — message extraction", () => {
     });
 
     const states = getMessages().filter(
-      (m) => m.role === "system" && m.content.startsWith("__strands_state__:"),
+      (m) => m.content.startsWith("__strands_state__:"),
     );
     expect(states).toHaveLength(2);
-    expect(decodeStateMeta(states[0]!).snapshotId).toBe("s1");
-    expect(decodeStateMeta(states[0]!).isLatest).toBe(false);
-    expect(decodeStateMeta(states[1]!).snapshotId).toBe("s2");
-    expect(decodeStateMeta(states[1]!).isLatest).toBe(true);
+    expect(decodeStateContent(states[0]!).snapshotId).toBe("s1");
+    expect(decodeStateContent(states[0]!).isLatest).toBe(false);
+    expect(decodeStateContent(states[1]!).snapshotId).toBe("s2");
+    expect(decodeStateContent(states[1]!).isLatest).toBe(true);
   });
 });
 
@@ -255,16 +272,13 @@ describe("Neo4jSessionStorage — load + list + delete", () => {
   ): StoredMessage {
     return {
       id: `state-${snapshotId}`,
-      role: "system",
-      content: `__strands_state__:${snapshotId}`,
-      metadata: {
-        strands_state: JSON.stringify({
-          snapshotId,
-          isLatest,
-          snapshot,
-          savedAt: new Date().toISOString(),
-        }),
-      },
+      role: "user",
+      content: encodeStateContent({
+        snapshotId,
+        isLatest,
+        snapshot,
+        savedAt: new Date().toISOString(),
+      }),
     };
   }
 
@@ -401,24 +415,34 @@ describe("Neo4jSessionStorage — unicode + long content", () => {
       isLatest: true,
       snapshot: snapshotWith({ messages: big }),
     });
-    const real = addCalls.filter((c) => c.role === "user" || c.role === "assistant");
+    const real = addCalls.filter(
+      (c) =>
+        (c.role === "user" || c.role === "assistant") &&
+        !c.content.startsWith("__strands_state__:") &&
+        !c.content.startsWith("__strands_manifest__:"),
+    );
     expect(real).toHaveLength(1000);
   });
 });
 
 describe("isSyntheticStrandsMessage", () => {
-  it("recognizes state and manifest markers", () => {
+  it("recognizes state and manifest markers on any role", () => {
+    // The integration writes role=user; we match on content prefix alone
+    // for resilience against role normalization on the service side.
+    expect(
+      isSyntheticStrandsMessage({ role: "user", content: "__strands_state__:s1" }),
+    ).toBe(true);
     expect(
       isSyntheticStrandsMessage({ role: "system", content: "__strands_state__:s1" }),
     ).toBe(true);
     expect(
-      isSyntheticStrandsMessage({ role: "system", content: "__strands_manifest__:agent-1" }),
+      isSyntheticStrandsMessage({ role: "user", content: "__strands_manifest__:agent-1" }),
     ).toBe(true);
   });
 
-  it("rejects non-system messages and non-prefix system messages", () => {
+  it("rejects messages without the prefix", () => {
     expect(
-      isSyntheticStrandsMessage({ role: "user", content: "__strands_state__:trick" }),
+      isSyntheticStrandsMessage({ role: "user", content: "real user message" }),
     ).toBe(false);
     expect(
       isSyntheticStrandsMessage({ role: "system", content: "real system message" }),

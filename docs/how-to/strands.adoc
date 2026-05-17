@@ -8,8 +8,8 @@ all three of Strands' orthogonal extension surfaces:
 * **`SnapshotStorage`** — session state persists to a NAMS conversation
   automatically. Real conversation messages land as `Message` graph
   nodes; non-message snapshot state (Strands' `data` minus messages,
-  plus `appData`, plus manifests) rides on synthetic `role: "system"`
-  marker messages whose per-message metadata carries the JSON blob.
+  plus `appData`, plus manifests) rides on synthetic `role: "user"`
+  marker messages whose content is `__strands_state__:{base64-JSON}`.
 * **`ConversationManager`** — three-tier context (reflections + observations
   from `getContext()`) is prepended to every model invocation, *on top of*
   a configurable inner manager (defaults to `SlidingWindowConversationManager`).
@@ -96,26 +96,28 @@ await registerReasoningHooks(memory, agent, { conversationId: conv.id });
 |===
 | Strands construct | Where it lands in NAMS
 | Conversation messages | `Message` nodes attached to the Conversation
-| Agent state (`Snapshot.data`, non-message fields) | synthetic `role: "system"` message with content `__strands_state__:{snapshotId}`, JSON in `message.metadata.strands_state`
-| Application state (`Snapshot.appData`) | inside the same synthetic message's metadata blob
+| Agent state (`Snapshot.data`, non-message fields) | synthetic `role: "user"` message with content `__strands_state__:{base64-JSON-blob}`
+| Application state (`Snapshot.appData`) | inside the same synthetic message's content blob
 | Tool calls | `ToolCall` nodes attached to a `ReasoningStep`
 | Per-turn reasoning | `ReasoningStep` nodes attached to the Conversation
-| Manifests (snapshot metadata) | synthetic `role: "system"` message with content `__strands_manifest__:{scopeId}`
+| Manifests (snapshot metadata) | synthetic `role: "user"` message with content `__strands_manifest__:{base64-JSON-blob}`
 |===
 
 NAMS exposes no endpoint to update a Conversation's `metadata` after
-creation, so per-snapshot state lives in synthetic messages whose
-per-message metadata carries the JSON blob. Each call to `saveSnapshot`
-writes one synthetic message. `listSnapshotIds` walks the message list,
-filters by the `__strands_state__:` content prefix, and dedupes by
-`snapshotId` (the last-write-wins for the `isLatest` flag).
+creation, and we observed that per-message metadata doesn't reliably
+round-trip via `GET /conversations/{id}/messages` either. So the
+integration stuffs the serialized blob directly into the message's
+`content` field, base64-encoded after a recognizable prefix. Each
+`saveSnapshot` writes one synthetic message; `listSnapshotIds` walks
+the message list, filters by the `__strands_state__:` content prefix,
+and dedupes by `snapshotId` (last-write-wins for the `isLatest` flag).
 
-Synthetic markers are filtered out before being handed back to Strands
-on `loadSnapshot`, so the framework never replays them. Consumers
-walking the raw message list themselves (chat UIs, Cypher queries,
-custom analytics) should filter on the prefixes too — the integration
-exports `isSyntheticStrandsMessage` and `SYNTHETIC_MESSAGE_PREFIXES` for
-convenience:
+Synthetic markers are filtered out before the Snapshot is handed back
+to Strands on `loadSnapshot`, so the agent never sees them in its
+prompt. Consumers walking the raw message list themselves (chat UIs,
+Cypher queries, custom analytics) should filter on the prefixes too —
+the integration exports `isSyntheticStrandsMessage` and
+`SYNTHETIC_MESSAGE_PREFIXES` for convenience:
 
 [source,typescript]
 ----
@@ -125,9 +127,9 @@ const conv = await memory.shortTerm.getConversation(conversationId);
 const realMessages = conv.messages.filter((m) => !isSyntheticStrandsMessage(m));
 ----
 
-The JSON blob value is a single string — the REST transport's
-snake_case ↔ camelCase casing layer only transforms keys, never string
-values, so the blob round-trips losslessly.
+The chat UI in `demo/agents/spool/` doesn't fetch raw conversation
+messages (it streams from `agent.invoke` directly) so it doesn't need
+to filter; consumers that DO fetch raw messages must.
 
 == Behaviour details
 

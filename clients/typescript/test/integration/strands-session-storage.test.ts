@@ -2,10 +2,12 @@
  * Integration tests — Neo4jSessionStorage drives the real RestTransport
  * against an MSW-mocked /v1 server.
  *
- * Storage shape post-pivot: state is carried in synthetic `role: "system"`
- * messages with content prefix `__strands_state__:{snapshotId}` and the
- * JSON blob in per-message metadata. Conversation-level metadata is NOT
- * written (the hosted service has no endpoint for that).
+ * Storage shape post-pivot: state is carried in synthetic `role: "user"`
+ * messages whose content has the form
+ * `__strands_state__:{base64(JSON.stringify(blob))}`. No conversation-
+ * level metadata is written (NAMS doesn't expose that endpoint) and no
+ * per-message metadata is used (the live service doesn't reliably
+ * round-trip it).
  *
  * Exercises:
  *   - Save → read back of synthetic messages
@@ -103,14 +105,26 @@ function mountConversationHandlers(state: ServerState) {
   );
 }
 
-function decodeBlob<T>(msg: ServerMessage): T {
-  const raw = msg.metadata?.strandsState ?? msg.metadata?.strands_state;
-  if (typeof raw !== "string") throw new Error("missing strands_state metadata");
-  return JSON.parse(raw) as T;
+function decodeStateBlob<T>(msg: ServerMessage): T {
+  const prefix = "__strands_state__:";
+  if (!msg.content.startsWith(prefix)) throw new Error("missing state prefix");
+  const b64 = msg.content.slice(prefix.length);
+  return JSON.parse(Buffer.from(b64, "base64").toString("utf8")) as T;
+}
+
+function decodeManifestBlob<T>(msg: ServerMessage): T {
+  const prefix = "__strands_manifest__:";
+  if (!msg.content.startsWith(prefix)) throw new Error("missing manifest prefix");
+  const b64 = msg.content.slice(prefix.length);
+  return JSON.parse(Buffer.from(b64, "base64").toString("utf8")) as T;
+}
+
+function encodeBlobContent(prefix: string, blob: unknown): string {
+  return `${prefix}${Buffer.from(JSON.stringify(blob), "utf8").toString("base64")}`;
 }
 
 describe("Neo4jSessionStorage — synthetic-message storage", () => {
-  it("saveSnapshot writes one synthetic system message per save + the real conversation messages", async () => {
+  it("saveSnapshot writes one synthetic user message per save + the real conversation messages", async () => {
     const state: ServerState = { messages: [] };
     mountConversationHandlers(state);
     const storage = newStorage();
@@ -128,18 +142,22 @@ describe("Neo4jSessionStorage — synthetic-message storage", () => {
       }),
     });
 
-    // Real messages persisted as Message nodes.
-    const real = state.messages.filter((m) => m.role === "user" || m.role === "assistant");
+    // Real messages persisted as Message nodes (synthetic marker filtered out).
+    const real = state.messages.filter(
+      (m) =>
+        (m.role === "user" || m.role === "assistant") &&
+        !m.content.startsWith("__strands_state__:") &&
+        !m.content.startsWith("__strands_manifest__:"),
+    );
     expect(real).toHaveLength(2);
     expect(real[0]).toMatchObject({ role: "user", content: "hello" });
 
     // One synthetic state message with our marker.
-    const synthetic = state.messages.filter(
-      (m) => m.role === "system" && m.content.startsWith("__strands_state__:"),
+    const synthetic = state.messages.filter((m) =>
+      m.content.startsWith("__strands_state__:"),
     );
     expect(synthetic).toHaveLength(1);
-    expect(synthetic[0]!.content).toBe("__strands_state__:s1");
-    const blob = decodeBlob<{
+    const blob = decodeStateBlob<{
       snapshotId: string;
       isLatest: boolean;
       snapshot: Snapshot;
@@ -244,7 +262,7 @@ describe("Neo4jSessionStorage — synthetic-message storage", () => {
     expect(deleted).toBe(true);
   });
 
-  it("manifest round-trip via a synthetic system message", async () => {
+  it("manifest round-trip via a synthetic user message", async () => {
     const state: ServerState = { messages: [] };
     mountConversationHandlers(state);
     const storage = newStorage();
@@ -254,11 +272,16 @@ describe("Neo4jSessionStorage — synthetic-message storage", () => {
     const loaded = await storage.loadManifest({ location: LOCATION });
     expect(loaded).toEqual(manifest);
 
-    const synthetic = state.messages.filter(
-      (m) => m.role === "system" && m.content.startsWith("__strands_manifest__:"),
+    const synthetic = state.messages.filter((m) =>
+      m.content.startsWith("__strands_manifest__:"),
     );
     expect(synthetic).toHaveLength(1);
-    expect(synthetic[0]!.content).toBe("__strands_manifest__:a1");
+    const blob = decodeManifestBlob<{
+      scopeId: string;
+      manifest: { schemaVersion: string; updatedAt: string };
+    }>(synthetic[0]!);
+    expect(blob.scopeId).toBe("a1");
+    expect(blob.manifest).toEqual(manifest);
   });
 });
 
@@ -285,7 +308,10 @@ describe("Neo4jSessionStorage — idempotency + error surface", () => {
     });
 
     const real = state.messages.filter(
-      (m) => m.role === "user" || m.role === "assistant",
+      (m) =>
+        (m.role === "user" || m.role === "assistant") &&
+        !m.content.startsWith("__strands_state__:") &&
+        !m.content.startsWith("__strands_manifest__:"),
     );
     // The user message is added only once (dedupe by role+content).
     expect(real).toHaveLength(1);
@@ -352,34 +378,35 @@ describe("Neo4jSessionStorage — bridge-transport compatibility", () => {
       http.post(`${bridgeRoot}/get_conversation`, async ({ request }) => {
         const body = (await request.json()) as { session_id?: string };
         expect(body.session_id).toBe(SESSION_ID);
+        const emptySnap = {
+          scope: "agent",
+          schemaVersion: "1.0",
+          createdAt: "x",
+          data: {},
+          appData: {},
+        };
         return HttpResponse.json({
           session_id: SESSION_ID,
           messages: [
             {
               id: "m1",
-              role: "system",
-              content: "__strands_state__:x",
-              metadata: {
-                strands_state: JSON.stringify({
-                  snapshotId: "x",
-                  isLatest: true,
-                  snapshot: { scope: "agent", schemaVersion: "1.0", createdAt: "x", data: {}, appData: {} },
-                  savedAt: "x",
-                }),
-              },
+              role: "user",
+              content: encodeBlobContent("__strands_state__:", {
+                snapshotId: "x",
+                isLatest: true,
+                snapshot: emptySnap,
+                savedAt: "x",
+              }),
             },
             {
               id: "m2",
-              role: "system",
-              content: "__strands_state__:y",
-              metadata: {
-                strands_state: JSON.stringify({
-                  snapshotId: "y",
-                  isLatest: false,
-                  snapshot: { scope: "agent", schemaVersion: "1.0", createdAt: "x", data: {}, appData: {} },
-                  savedAt: "x",
-                }),
-              },
+              role: "user",
+              content: encodeBlobContent("__strands_state__:", {
+                snapshotId: "y",
+                isLatest: false,
+                snapshot: emptySnap,
+                savedAt: "x",
+              }),
             },
           ],
         });
