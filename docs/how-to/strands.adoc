@@ -6,8 +6,10 @@ The `@neo4j-labs/agent-memory/integrations/strands` subpath plugs into
 all three of Strands' orthogonal extension surfaces:
 
 * **`SnapshotStorage`** — session state persists to a NAMS conversation
-  automatically. Messages live as real `Message` graph nodes; opaque
-  framework state round-trips through the conversation's metadata.
+  automatically. Real conversation messages land as `Message` graph
+  nodes; non-message snapshot state (Strands' `data` minus messages,
+  plus `appData`, plus manifests) rides on synthetic `role: "system"`
+  marker messages whose per-message metadata carries the JSON blob.
 * **`ConversationManager`** — three-tier context (reflections + observations
   from `getContext()`) is prepended to every model invocation, *on top of*
   a configurable inner manager (defaults to `SlidingWindowConversationManager`).
@@ -94,17 +96,38 @@ await registerReasoningHooks(memory, agent, { conversationId: conv.id });
 |===
 | Strands construct | Where it lands in NAMS
 | Conversation messages | `Message` nodes attached to the Conversation
-| Agent state (`Snapshot.data`, non-message fields) | `Conversation.metadata.strands_state` (JSON-stringified)
-| Application state (`Snapshot.appData`) | inside the same `strands_state` blob
+| Agent state (`Snapshot.data`, non-message fields) | synthetic `role: "system"` message with content `__strands_state__:{snapshotId}`, JSON in `message.metadata.strands_state`
+| Application state (`Snapshot.appData`) | inside the same synthetic message's metadata blob
 | Tool calls | `ToolCall` nodes attached to a `ReasoningStep`
 | Per-turn reasoning | `ReasoningStep` nodes attached to the Conversation
-| Manifests (snapshot metadata) | `strands_state.manifest`
+| Manifests (snapshot metadata) | synthetic `role: "system"` message with content `__strands_manifest__:{scopeId}`
 |===
 
-The non-message snapshot fields are stored as a single JSON-stringified
-blob to stay opaque to the REST transport's casing transform. This means
-the entire `Snapshot` round-trips losslessly: `loadSnapshot` reconstructs
-exactly what `saveSnapshot` was given.
+NAMS exposes no endpoint to update a Conversation's `metadata` after
+creation, so per-snapshot state lives in synthetic messages whose
+per-message metadata carries the JSON blob. Each call to `saveSnapshot`
+writes one synthetic message. `listSnapshotIds` walks the message list,
+filters by the `__strands_state__:` content prefix, and dedupes by
+`snapshotId` (the last-write-wins for the `isLatest` flag).
+
+Synthetic markers are filtered out before being handed back to Strands
+on `loadSnapshot`, so the framework never replays them. Consumers
+walking the raw message list themselves (chat UIs, Cypher queries,
+custom analytics) should filter on the prefixes too — the integration
+exports `isSyntheticStrandsMessage` and `SYNTHETIC_MESSAGE_PREFIXES` for
+convenience:
+
+[source,typescript]
+----
+import { isSyntheticStrandsMessage } from "@neo4j-labs/agent-memory/integrations/strands";
+
+const conv = await memory.shortTerm.getConversation(conversationId);
+const realMessages = conv.messages.filter((m) => !isSyntheticStrandsMessage(m));
+----
+
+The JSON blob value is a single string — the REST transport's
+snake_case ↔ camelCase casing layer only transforms keys, never string
+values, so the blob round-trips losslessly.
 
 == Behaviour details
 

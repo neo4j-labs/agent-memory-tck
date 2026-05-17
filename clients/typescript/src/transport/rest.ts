@@ -201,12 +201,6 @@ const ROUTES: Record<string, RestCall | "noop" | "unsupported"> = {
     path: "/conversations/{conversationId}",
     pathParams: ["conversationId"],
   },
-  update_conversation_metadata: {
-    method: "PUT",
-    path: "/conversations/{conversationId}",
-    pathParams: ["conversationId"],
-    hasBody: true,
-  },
   delete_conversation: {
     method: "DELETE",
     path: "/conversations/{conversationId}",

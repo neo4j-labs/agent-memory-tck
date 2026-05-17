@@ -2,13 +2,19 @@
  * Integration tests — Neo4jSessionStorage drives the real RestTransport
  * against an MSW-mocked /v1 server.
  *
+ * Storage shape post-pivot: state is carried in synthetic `role: "system"`
+ * messages with content prefix `__strands_state__:{snapshotId}` and the
+ * JSON blob in per-message metadata. Conversation-level metadata is NOT
+ * written (the hosted service has no endpoint for that).
+ *
  * Exercises:
- *   - 6-method round-trip across the SnapshotStorage interface
- *   - PUT /conversations/:id for metadata writes (the route we added)
- *   - addMessage fan-out on saveSnapshot
- *   - manifest round-trip
- *   - auth + transport-error propagation
- *   - idempotency (replaying the same snapshotId doesn't duplicate messages)
+ *   - Save → read back of synthetic messages
+ *   - listSnapshotIds order + paging
+ *   - loadSnapshot by explicit id + latest fallback
+ *   - Manifest round-trip
+ *   - Auth + transport error propagation
+ *   - deleteSession via DELETE /conversations/:id
+ *   - Idempotency: re-saving doesn't duplicate real messages
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -18,7 +24,6 @@ import type { Snapshot } from "@strands-agents/sdk";
 import { MemoryClient } from "../../src/client.js";
 import {
   AuthenticationError,
-  NotSupportedError,
   TransportError,
 } from "../../src/errors.js";
 import { Neo4jSessionStorage } from "../../src/integrations/strands.js";
@@ -55,57 +60,40 @@ function snap(opts: {
 
 const LOCATION = { sessionId: SESSION_ID, scope: "agent" as const, scopeId: "a1" };
 
+interface ServerMessage {
+  id: string;
+  role: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+}
+
 interface ServerState {
-  metadata: Record<string, unknown>;
-  messages: Array<{ id: string; role: string; content: string }>;
-}
-
-interface ParsedStrandsState {
-  latestId?: string;
-  history?: string[];
-  blobs?: Record<string, Snapshot>;
-  manifest?: { schemaVersion: string; updatedAt: string };
+  messages: ServerMessage[];
 }
 
 /**
- * Read the Strands state from MSW server state. The casing transform turns
- * our `strands_state` write into `strandsState` on the wire — MSW stores
- * the camelCase form. The GET path runs camelToSnake on the response so
- * the integration code reads snake_case. Either form may appear here
- * depending on which side we're inspecting.
+ * Mount handlers that act like the hosted service's
+ * GET /conversations/:id/messages + POST /conversations/:id/messages,
+ * plus DELETE. No metadata routes — those don't exist on NAMS.
  */
-function parsed(state: ServerState): ParsedStrandsState {
-  const raw = state.metadata.strandsState ?? state.metadata.strands_state;
-  if (typeof raw !== "string") return {};
-  return JSON.parse(raw) as ParsedStrandsState;
-}
-
-/**
- * Seed MSW server state. Uses the snake_case key the GET path returns —
- * which after camelToSnake on the client side becomes `strands_state` for
- * the integration to read.
- */
-function seedState(seed: ParsedStrandsState): Record<string, unknown> {
-  return { strands_state: JSON.stringify(seed) };
-}
-
 function mountConversationHandlers(state: ServerState) {
   server.use(
-    http.get(`${ENDPOINT}/conversations/${SESSION_ID}`, () =>
-      HttpResponse.json({ id: SESSION_ID, userId: "u", metadata: state.metadata }),
-    ),
-    http.put(`${ENDPOINT}/conversations/${SESSION_ID}`, async ({ request }) => {
-      const body = (await request.json()) as { metadata?: Record<string, unknown> };
-      if (body.metadata) state.metadata = body.metadata;
-      return HttpResponse.json({ id: SESSION_ID, userId: "u", metadata: state.metadata });
-    }),
     http.get(`${ENDPOINT}/conversations/${SESSION_ID}/messages`, () =>
-      HttpResponse.json({ messages: state.messages.slice() }),
+      HttpResponse.json({ messages: state.messages.map((m) => ({ ...m })) }),
     ),
     http.post(`${ENDPOINT}/conversations/${SESSION_ID}/messages`, async ({ request }) => {
-      const body = (await request.json()) as { role: string; content: string };
+      const body = (await request.json()) as {
+        role: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      };
       const id = `m${state.messages.length + 1}`;
-      const m = { id, role: body.role, content: body.content };
+      const m: ServerMessage = {
+        id,
+        role: body.role,
+        content: body.content,
+        metadata: body.metadata,
+      };
       state.messages.push(m);
       return HttpResponse.json(m);
     }),
@@ -115,9 +103,15 @@ function mountConversationHandlers(state: ServerState) {
   );
 }
 
-describe("Neo4jSessionStorage — full 6-method round-trip", () => {
-  it("saveSnapshot fans out addMessage + metadata write", async () => {
-    const state: ServerState = { metadata: {}, messages: [] };
+function decodeBlob<T>(msg: ServerMessage): T {
+  const raw = msg.metadata?.strandsState ?? msg.metadata?.strands_state;
+  if (typeof raw !== "string") throw new Error("missing strands_state metadata");
+  return JSON.parse(raw) as T;
+}
+
+describe("Neo4jSessionStorage — synthetic-message storage", () => {
+  it("saveSnapshot writes one synthetic system message per save + the real conversation messages", async () => {
+    const state: ServerState = { messages: [] };
     mountConversationHandlers(state);
     const storage = newStorage();
 
@@ -134,108 +128,104 @@ describe("Neo4jSessionStorage — full 6-method round-trip", () => {
       }),
     });
 
-    expect(state.messages).toHaveLength(2);
-    expect(state.messages[0]).toMatchObject({ role: "user", content: "hello" });
-    const ps = parsed(state);
-    expect(ps.latestId).toBe("s1");
-    expect(ps.history).toEqual(["s1"]);
-    const blobs = ps.blobs!;
-    expect(blobs.s1).toBeDefined();
-    // Messages stripped from the persisted blob (they live in the graph)
-    expect((blobs.s1!.data as Record<string, unknown>).messages).toBeUndefined();
-    // Non-message state preserved. Note: the body's nested keys get
-    // recursively camelCased on the wire by RestTransport, so what arrives
-    // back is the same camelCase shape we sent — but the entire strands_state
-    // value is a JSON string we control, so it round-trips losslessly.
-    expect(blobs.s1!.data).toMatchObject({ fooBar: 1 });
+    // Real messages persisted as Message nodes.
+    const real = state.messages.filter((m) => m.role === "user" || m.role === "assistant");
+    expect(real).toHaveLength(2);
+    expect(real[0]).toMatchObject({ role: "user", content: "hello" });
+
+    // One synthetic state message with our marker.
+    const synthetic = state.messages.filter(
+      (m) => m.role === "system" && m.content.startsWith("__strands_state__:"),
+    );
+    expect(synthetic).toHaveLength(1);
+    expect(synthetic[0]!.content).toBe("__strands_state__:s1");
+    const blob = decodeBlob<{
+      snapshotId: string;
+      isLatest: boolean;
+      snapshot: Snapshot;
+    }>(synthetic[0]!);
+    expect(blob.snapshotId).toBe("s1");
+    expect(blob.isLatest).toBe(true);
+    expect(blob.snapshot.data).toMatchObject({ fooBar: 1 });
+    expect((blob.snapshot.data as Record<string, unknown>).messages).toBeUndefined();
   });
 
-  it("loadSnapshot returns latest by default; reconstructs Snapshot from blob + messages", async () => {
-    const state: ServerState = {
-      metadata: seedState({
-        latestId: "s1",
-        history: ["s1"],
-        blobs: {
-          s1: {
-            scope: "agent",
-            schemaVersion: "1.0",
-            createdAt: "x",
-            data: { agentState: { stored: 1 } } as unknown as Snapshot["data"],
-            appData: { userField: "k" } as unknown as Snapshot["appData"],
-          },
-        },
+  it("loadSnapshot returns the latest blob + real messages (synthetic markers filtered)", async () => {
+    const state: ServerState = { messages: [] };
+    mountConversationHandlers(state);
+    const storage = newStorage();
+
+    await storage.saveSnapshot({
+      location: LOCATION,
+      snapshotId: "s1",
+      isLatest: true,
+      snapshot: snap({
+        messages: [{ role: "user", content: [{ text: "hello" }] }],
+        agentState: { stored: 1 },
       }),
+    });
+
+    const loaded = await storage.loadSnapshot({ location: LOCATION });
+    expect(loaded).not.toBeNull();
+    expect((loaded!.data as Record<string, unknown>).stored).toBe(1);
+    const messages = (loaded!.data as { messages?: unknown[] }).messages;
+    // Should contain the real user message; should NOT contain the synthetic state marker.
+    expect(Array.isArray(messages)).toBe(true);
+    expect(messages).toHaveLength(1);
+  });
+
+  it("loadSnapshot honors an explicit snapshotId", async () => {
+    const state: ServerState = { messages: [] };
+    mountConversationHandlers(state);
+    const storage = newStorage();
+
+    await storage.saveSnapshot({
+      location: LOCATION,
+      snapshotId: "first",
+      isLatest: false,
+      snapshot: snap({ messages: [], agentState: { tag: "first" } }),
+    });
+    await storage.saveSnapshot({
+      location: LOCATION,
+      snapshotId: "second",
+      isLatest: true,
+      snapshot: snap({ messages: [], agentState: { tag: "second" } }),
+    });
+
+    const a = await storage.loadSnapshot({ location: LOCATION, snapshotId: "first" });
+    const b = await storage.loadSnapshot({ location: LOCATION, snapshotId: "second" });
+    expect((a!.data as Record<string, unknown>).tag).toBe("first");
+    expect((b!.data as Record<string, unknown>).tag).toBe("second");
+  });
+
+  it("loadSnapshot returns null when conversation has no synthetic state messages", async () => {
+    const state: ServerState = {
       messages: [
-        { id: "m1", role: "user", content: "hello" },
-        { id: "m2", role: "assistant", content: "hi" },
+        { id: "m1", role: "user", content: "regular message", metadata: undefined },
       ],
     };
     mountConversationHandlers(state);
     const storage = newStorage();
-
-    const snapshot = await storage.loadSnapshot({ location: LOCATION });
-    expect(snapshot).not.toBeNull();
-    expect(snapshot!.appData).toEqual({ userField: "k" });
-    expect((snapshot!.data as Record<string, unknown>).agentState).toEqual({ stored: 1 });
-    const messages = (snapshot!.data as { messages?: unknown[] }).messages;
-    expect(messages).toHaveLength(2);
+    const loaded = await storage.loadSnapshot({ location: LOCATION });
+    expect(loaded).toBeNull();
   });
 
-  it("loadSnapshot honors an explicit snapshotId", async () => {
-    const state: ServerState = {
-      metadata: seedState({
-        latestId: "s2",
-        history: ["s1", "s2"],
-        blobs: {
-          s1: {
-            scope: "agent",
-            schemaVersion: "1.0",
-            createdAt: "x",
-            data: { tag: "first" } as unknown as Snapshot["data"],
-            appData: {} as Snapshot["appData"],
-          },
-          s2: {
-            scope: "agent",
-            schemaVersion: "1.0",
-            createdAt: "x",
-            data: { tag: "second" } as unknown as Snapshot["data"],
-            appData: {} as Snapshot["appData"],
-          },
-        },
-      }),
-      messages: [],
-    };
+  it("listSnapshotIds returns IDs in save order", async () => {
+    const state: ServerState = { messages: [] };
     mountConversationHandlers(state);
     const storage = newStorage();
 
-    const a = await storage.loadSnapshot({ location: LOCATION, snapshotId: "s1" });
-    expect((a!.data as Record<string, unknown>).tag).toBe("first");
-    const b = await storage.loadSnapshot({ location: LOCATION, snapshotId: "s2" });
-    expect((b!.data as Record<string, unknown>).tag).toBe("second");
-  });
+    for (const id of ["a", "b", "c", "d"]) {
+      await storage.saveSnapshot({
+        location: LOCATION,
+        snapshotId: id,
+        isLatest: id === "d",
+        snapshot: snap({ messages: [] }),
+      });
+    }
 
-  it("loadSnapshot returns null when conversation has no snapshots", async () => {
-    const state: ServerState = { metadata: {}, messages: [] };
-    mountConversationHandlers(state);
-    const storage = newStorage();
-    const snapshot = await storage.loadSnapshot({ location: LOCATION });
-    expect(snapshot).toBeNull();
-  });
-
-  it("listSnapshotIds returns IDs in saved order", async () => {
-    const state: ServerState = {
-      metadata: seedState({
-        history: ["a", "b", "c", "d"],
-        blobs: {},
-      }),
-      messages: [],
-    };
-    mountConversationHandlers(state);
-    const storage = newStorage();
     expect(await storage.listSnapshotIds({ location: LOCATION })).toEqual(["a", "b", "c", "d"]);
-    expect(
-      await storage.listSnapshotIds({ location: LOCATION, limit: 2 }),
-    ).toEqual(["a", "b"]);
+    expect(await storage.listSnapshotIds({ location: LOCATION, limit: 2 })).toEqual(["a", "b"]);
     expect(
       await storage.listSnapshotIds({ location: LOCATION, startAfter: "b", limit: 2 }),
     ).toEqual(["c", "d"]);
@@ -254,8 +244,8 @@ describe("Neo4jSessionStorage — full 6-method round-trip", () => {
     expect(deleted).toBe(true);
   });
 
-  it("manifest round-trip via PUT /conversations/:id metadata", async () => {
-    const state: ServerState = { metadata: {}, messages: [] };
+  it("manifest round-trip via a synthetic system message", async () => {
+    const state: ServerState = { messages: [] };
     mountConversationHandlers(state);
     const storage = newStorage();
     const manifest = { schemaVersion: "1.0", updatedAt: "2026-05-16T00:00:00Z" };
@@ -263,12 +253,18 @@ describe("Neo4jSessionStorage — full 6-method round-trip", () => {
     await storage.saveManifest({ location: LOCATION, manifest });
     const loaded = await storage.loadManifest({ location: LOCATION });
     expect(loaded).toEqual(manifest);
+
+    const synthetic = state.messages.filter(
+      (m) => m.role === "system" && m.content.startsWith("__strands_manifest__:"),
+    );
+    expect(synthetic).toHaveLength(1);
+    expect(synthetic[0]!.content).toBe("__strands_manifest__:a1");
   });
 });
 
 describe("Neo4jSessionStorage — idempotency + error surface", () => {
-  it("re-saving the same snapshotId does not duplicate messages", async () => {
-    const state: ServerState = { metadata: {}, messages: [] };
+  it("re-saving the same snapshotId does not duplicate real messages", async () => {
+    const state: ServerState = { messages: [] };
     mountConversationHandlers(state);
     const storage = newStorage();
     const snapshot = snap({
@@ -288,16 +284,24 @@ describe("Neo4jSessionStorage — idempotency + error surface", () => {
       snapshot,
     });
 
-    // Message is added only once (dedupe by role+content).
-    expect(state.messages).toHaveLength(1);
-    // History tracking is also stable.
-    expect(parsed(state).history).toEqual(["s1"]);
+    const real = state.messages.filter(
+      (m) => m.role === "user" || m.role === "assistant",
+    );
+    // The user message is added only once (dedupe by role+content).
+    expect(real).toHaveLength(1);
+    // Synthetic state messages: one per save. Both list as the same
+    // snapshotId; listSnapshotIds dedupes.
+    const ids = await storage.listSnapshotIds({ location: LOCATION });
+    expect(ids).toEqual(["s1"]);
   });
 
-  it("auth failure propagates AuthenticationError with requestId", async () => {
+  it("auth failure on read propagates AuthenticationError with requestId", async () => {
     server.use(
-      http.get(`${ENDPOINT}/conversations/${SESSION_ID}`, () =>
-        new HttpResponse("nope", { status: 401, headers: { "x-request-id": "req-401" } }),
+      http.get(`${ENDPOINT}/conversations/${SESSION_ID}/messages`, () =>
+        new HttpResponse("nope", {
+          status: 401,
+          headers: { "x-request-id": "req-401" },
+        }),
       ),
     );
     const storage = newStorage();
@@ -310,9 +314,14 @@ describe("Neo4jSessionStorage — idempotency + error surface", () => {
     }
   });
 
-  it("5xx from the service surfaces as TransportError with requestId", async () => {
+  it("5xx on save surfaces as TransportError with requestId", async () => {
     server.use(
-      http.get(`${ENDPOINT}/conversations/${SESSION_ID}`, () =>
+      // GET must succeed (the integration reads existing messages before
+      // dedup-and-write) so we can reach the POST that fails.
+      http.get(`${ENDPOINT}/conversations/${SESSION_ID}/messages`, () =>
+        HttpResponse.json({ messages: [] }),
+      ),
+      http.post(`${ENDPOINT}/conversations/${SESSION_ID}/messages`, () =>
         HttpResponse.json(
           { error: "boom" },
           { status: 503, headers: { "x-request-id": "req-503" } },
@@ -321,7 +330,12 @@ describe("Neo4jSessionStorage — idempotency + error surface", () => {
     );
     const storage = newStorage();
     try {
-      await storage.loadSnapshot({ location: LOCATION });
+      await storage.saveSnapshot({
+        location: LOCATION,
+        snapshotId: "s1",
+        isLatest: true,
+        snapshot: snap({ messages: [{ role: "user", content: [{ text: "hi" }] }] }),
+      });
       throw new Error("expected throw");
     } catch (e) {
       expect(e).toBeInstanceOf(TransportError);
@@ -332,17 +346,42 @@ describe("Neo4jSessionStorage — idempotency + error surface", () => {
 });
 
 describe("Neo4jSessionStorage — bridge-transport compatibility", () => {
-  it("listSnapshotIds against bridge transport just reads metadata via the snake_case method", async () => {
-    // Bridge transport routes every request as POST /{method_name}. So
-    // get_conversation_metadata becomes POST /get_conversation_metadata.
+  it("listSnapshotIds reads via the snake_case method on bridge transport", async () => {
     const bridgeRoot = "http://bridge.test";
     server.use(
-      http.post(`${bridgeRoot}/get_conversation_metadata`, async ({ request }) => {
-        const body = (await request.json()) as { conversation_id?: string };
-        expect(body.conversation_id).toBe(SESSION_ID);
+      http.post(`${bridgeRoot}/get_conversation`, async ({ request }) => {
+        const body = (await request.json()) as { session_id?: string };
+        expect(body.session_id).toBe(SESSION_ID);
         return HttpResponse.json({
-          id: SESSION_ID,
-          metadata: seedState({ history: ["x", "y"], blobs: {} }),
+          session_id: SESSION_ID,
+          messages: [
+            {
+              id: "m1",
+              role: "system",
+              content: "__strands_state__:x",
+              metadata: {
+                strands_state: JSON.stringify({
+                  snapshotId: "x",
+                  isLatest: true,
+                  snapshot: { scope: "agent", schemaVersion: "1.0", createdAt: "x", data: {}, appData: {} },
+                  savedAt: "x",
+                }),
+              },
+            },
+            {
+              id: "m2",
+              role: "system",
+              content: "__strands_state__:y",
+              metadata: {
+                strands_state: JSON.stringify({
+                  snapshotId: "y",
+                  isLatest: false,
+                  snapshot: { scope: "agent", schemaVersion: "1.0", createdAt: "x", data: {}, appData: {} },
+                  savedAt: "x",
+                }),
+              },
+            },
+          ],
         });
       }),
     );
@@ -350,24 +389,5 @@ describe("Neo4jSessionStorage — bridge-transport compatibility", () => {
     const storage = new Neo4jSessionStorage(client);
     const ids = await storage.listSnapshotIds({ location: LOCATION });
     expect(ids).toEqual(["x", "y"]);
-  });
-
-  it("loadSnapshot through bridge transport surfaces NotSupportedError gracefully if the bridge lacks update_conversation_metadata", async () => {
-    // The hosted REST transport supports update_conversation_metadata; the
-    // bridge route table doesn't list it explicitly. Confirm bridge users
-    // can still LOAD (read-only) snapshots without writes.
-    const bridgeRoot = "http://bridge.test";
-    server.use(
-      http.post(`${bridgeRoot}/get_conversation_metadata`, () =>
-        HttpResponse.json({ id: SESSION_ID, metadata: {} }),
-      ),
-    );
-    const client = new MemoryClient({ endpoint: bridgeRoot });
-    const storage = new Neo4jSessionStorage(client);
-    // Read-only operations should still work.
-    const ids = await storage.listSnapshotIds({ location: LOCATION });
-    expect(ids).toEqual([]);
-    // NotSupportedError type just needs to be importable.
-    expect(NotSupportedError).toBeDefined();
   });
 });

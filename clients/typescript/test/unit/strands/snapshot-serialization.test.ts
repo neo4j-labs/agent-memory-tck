@@ -1,83 +1,61 @@
 /**
- * Pure-logic tests for Snapshot serialization. We construct synthetic
- * Snapshot objects, feed them through Neo4jSessionStorage with a mocked
- * MemoryClient that records every call, and assert the message extraction
- * + opaque blob behaviour. No HTTP involved.
+ * Pure-logic tests for Snapshot serialization. We feed synthetic Snapshot
+ * objects through Neo4jSessionStorage with a mocked MemoryClient that
+ * records every addMessage call, and assert the message extraction +
+ * synthetic-state-message behaviour. No HTTP involved.
  */
 
 import { describe, it, expect, vi } from "vitest";
 import type { Snapshot } from "@strands-agents/sdk";
-import { Neo4jSessionStorage } from "../../../src/integrations/strands.js";
+import {
+  Neo4jSessionStorage,
+  isSyntheticStrandsMessage,
+} from "../../../src/integrations/strands.js";
 
-type RecordedCall = { method: string; params: Record<string, unknown> };
-
-interface StoredState {
-  latestId?: string;
-  history?: string[];
-  blobs?: Record<string, unknown>;
-  manifest?: unknown;
+interface StoredMessage {
+  id: string;
+  role: string;
+  content: string;
+  metadata?: Record<string, unknown>;
 }
 
 function makeFakeClient(opts: {
-  /** Pre-seed Strands state, as the integration would have written it. */
-  initialState?: StoredState;
-  initialMessages?: Array<{ id: string; role: string; content: string }>;
+  initialMessages?: StoredMessage[];
 } = {}) {
-  const calls: RecordedCall[] = [];
-  let metadata: Record<string, unknown> =
-    opts.initialState !== undefined
-      ? { strands_state: JSON.stringify(opts.initialState) }
-      : {};
-  const messages = (opts.initialMessages ?? []).slice();
-
-  const transport = {
-    async request(method: string, params: Record<string, unknown>) {
-      calls.push({ method, params });
-      if (method === "update_conversation_metadata") {
-        metadata = (params.metadata as Record<string, unknown>) ?? {};
-        return undefined;
-      }
-      return undefined;
-    },
-  };
+  const messages: StoredMessage[] = (opts.initialMessages ?? []).map((m) => ({ ...m }));
+  const addCalls: Array<{
+    convId: string;
+    role: string;
+    content: string;
+    metadata?: Record<string, unknown>;
+  }> = [];
 
   const fake = {
-    transport,
     shortTerm: {
       async getConversation(_id: string) {
         return { id: _id, messages: messages.map((m) => ({ ...m })) };
       },
-      async getConversationMetadata(_id: string) {
-        return { id: _id, metadata };
-      },
-      async addMessage(convId: string, role: string, content: string) {
+      async addMessage(
+        convId: string,
+        role: string,
+        content: string,
+        addOpts?: { metadata?: Record<string, unknown> },
+      ) {
         const id = `m${messages.length + 1}`;
-        const m = { id, role, content };
+        const m: StoredMessage = { id, role, content, metadata: addOpts?.metadata };
         messages.push(m);
-        calls.push({ method: "addMessage", params: { convId, role, content } });
+        addCalls.push({ convId, role, content, metadata: addOpts?.metadata });
         return m;
       },
-      async deleteConversation(convId: string) {
-        calls.push({ method: "deleteConversation", params: { convId } });
+      async deleteConversation(_convId: string) {
         return undefined;
       },
     },
   };
-  function getState(): StoredState {
-    const raw = metadata.strands_state;
-    if (typeof raw !== "string") return {};
-    try {
-      return JSON.parse(raw) as StoredState;
-    } catch {
-      return {};
-    }
-  }
 
   return {
     client: fake as unknown as ConstructorParameters<typeof Neo4jSessionStorage>[0],
-    calls,
-    getMetadata: () => metadata,
-    getState,
+    addCalls,
     getMessages: () => messages,
   };
 }
@@ -101,9 +79,21 @@ function snapshotWith(opts: {
 
 const LOCATION = { sessionId: "conv-1", scope: "agent" as const, scopeId: "agent-1" };
 
+/** Parse the per-message metadata blob a saveSnapshot call wrote. */
+function decodeStateMeta(msg: StoredMessage): {
+  snapshotId: string;
+  isLatest: boolean;
+  snapshot: Snapshot;
+  savedAt: string;
+} {
+  const raw = msg.metadata?.strands_state;
+  if (typeof raw !== "string") throw new Error("expected strands_state blob");
+  return JSON.parse(raw);
+}
+
 describe("Neo4jSessionStorage — message extraction", () => {
   it("extracts text-block messages and persists each via addMessage", async () => {
-    const { client, calls } = makeFakeClient();
+    const { client, addCalls } = makeFakeClient();
     const storage = new Neo4jSessionStorage(client);
     const snap = snapshotWith({
       messages: [
@@ -119,15 +109,27 @@ describe("Neo4jSessionStorage — message extraction", () => {
       snapshot: snap,
     });
 
-    const addCalls = calls.filter((c) => c.method === "addMessage");
-    expect(addCalls).toHaveLength(2);
-    expect(addCalls[0]!.params).toMatchObject({ role: "user", content: "hello" });
-    expect(addCalls[1]!.params).toMatchObject({ role: "assistant", content: "hi there" });
+    // Two real messages + one synthetic state message.
+    const realAddCalls = addCalls.filter(
+      (c) => c.role === "user" || c.role === "assistant",
+    );
+    expect(realAddCalls).toHaveLength(2);
+    expect(realAddCalls[0]).toMatchObject({ role: "user", content: "hello" });
+    expect(realAddCalls[1]).toMatchObject({ role: "assistant", content: "hi there" });
   });
 
-  it("dedupes against existing conversation messages", async () => {
-    const { client, calls } = makeFakeClient({
-      initialMessages: [{ id: "m0", role: "user", content: "hello" }],
+  it("dedupes against existing conversation messages (ignoring synthetic state markers)", async () => {
+    const { client, addCalls } = makeFakeClient({
+      initialMessages: [
+        { id: "m0", role: "user", content: "hello" },
+        // A prior state marker should NOT count as a real message for dedup.
+        {
+          id: "m-state",
+          role: "system",
+          content: "__strands_state__:prior",
+          metadata: { strands_state: "{}" },
+        },
+      ],
     });
     const storage = new Neo4jSessionStorage(client);
     const snap = snapshotWith({
@@ -144,13 +146,15 @@ describe("Neo4jSessionStorage — message extraction", () => {
       snapshot: snap,
     });
 
-    const addCalls = calls.filter((c) => c.method === "addMessage");
-    expect(addCalls).toHaveLength(1);
-    expect(addCalls[0]!.params).toMatchObject({ role: "assistant", content: "new" });
+    const realAddCalls = addCalls.filter(
+      (c) => c.role === "user" || c.role === "assistant",
+    );
+    expect(realAddCalls).toHaveLength(1);
+    expect(realAddCalls[0]).toMatchObject({ role: "assistant", content: "new" });
   });
 
-  it("handles snapshots with zero messages", async () => {
-    const { client, calls } = makeFakeClient();
+  it("handles snapshots with zero messages — still writes a state marker", async () => {
+    const { client, addCalls } = makeFakeClient();
     const storage = new Neo4jSessionStorage(client);
     await storage.saveSnapshot({
       location: LOCATION,
@@ -158,7 +162,13 @@ describe("Neo4jSessionStorage — message extraction", () => {
       isLatest: true,
       snapshot: snapshotWith({ messages: [] }),
     });
-    expect(calls.filter((c) => c.method === "addMessage")).toHaveLength(0);
+    const real = addCalls.filter((c) => c.role !== "system");
+    expect(real).toHaveLength(0);
+    // The synthetic state marker still got written.
+    const synthetic = addCalls.filter(
+      (c) => c.role === "system" && c.content.startsWith("__strands_state__:"),
+    );
+    expect(synthetic).toHaveLength(1);
   });
 
   it("handles malformed snapshots (missing messages field) without throwing", async () => {
@@ -181,8 +191,8 @@ describe("Neo4jSessionStorage — message extraction", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("preserves non-message snapshot state in metadata blob", async () => {
-    const { client, getState } = makeFakeClient();
+  it("preserves non-message snapshot state in the synthetic message metadata", async () => {
+    const { client, getMessages } = makeFakeClient();
     const storage = new Neo4jSessionStorage(client);
 
     await storage.saveSnapshot({
@@ -196,17 +206,21 @@ describe("Neo4jSessionStorage — message extraction", () => {
       }),
     });
 
-    const state = getState();
-    const blobs = state.blobs as Record<string, Snapshot>;
-    expect(blobs["s1"]).toBeDefined();
-    expect(blobs["s1"]!.appData).toMatchObject({ userCounter: 42 });
-    expect(blobs["s1"]!.data).toMatchObject({ agentState: { foo: 1 } });
-    // messages field stripped from the persisted blob
-    expect((blobs["s1"]!.data as Record<string, unknown>).messages).toBeUndefined();
+    const synthetic = getMessages().find(
+      (m) => m.role === "system" && m.content.startsWith("__strands_state__:"),
+    );
+    expect(synthetic).toBeDefined();
+    const blob = decodeStateMeta(synthetic!);
+    expect(blob.snapshotId).toBe("s1");
+    expect(blob.isLatest).toBe(true);
+    expect(blob.snapshot.appData).toMatchObject({ userCounter: 42 });
+    expect(blob.snapshot.data).toMatchObject({ agentState: { foo: 1 } });
+    // messages field stripped from the persisted snapshot
+    expect((blob.snapshot.data as Record<string, unknown>).messages).toBeUndefined();
   });
 
-  it("tracks isLatest separately from the history list", async () => {
-    const { client, getState } = makeFakeClient();
+  it("each save writes a new synthetic state message in order", async () => {
+    const { client, getMessages } = makeFakeClient();
     const storage = new Neo4jSessionStorage(client);
 
     await storage.saveSnapshot({
@@ -222,43 +236,62 @@ describe("Neo4jSessionStorage — message extraction", () => {
       snapshot: snapshotWith({ messages: [] }),
     });
 
-    const state = getState();
-    expect(state.latestId).toBe("s2");
-    expect(state.history).toEqual(["s1", "s2"]);
+    const states = getMessages().filter(
+      (m) => m.role === "system" && m.content.startsWith("__strands_state__:"),
+    );
+    expect(states).toHaveLength(2);
+    expect(decodeStateMeta(states[0]!).snapshotId).toBe("s1");
+    expect(decodeStateMeta(states[0]!).isLatest).toBe(false);
+    expect(decodeStateMeta(states[1]!).snapshotId).toBe("s2");
+    expect(decodeStateMeta(states[1]!).isLatest).toBe(true);
   });
 });
 
 describe("Neo4jSessionStorage — load + list + delete", () => {
-  it("loadSnapshot returns the stashed blob + current messages merged in", async () => {
-    const initial: StoredState = {
-      latestId: "s1",
-      history: ["s1"],
-      blobs: {
-        s1: {
-          scope: "agent",
-          schemaVersion: "1.0",
-          createdAt: "x",
-          data: { agentState: { foo: 1 } },
-          appData: { stored: true },
-        },
+  function seedConversationWithSnapshot(
+    snapshotId: string,
+    isLatest: boolean,
+    snapshot: Snapshot,
+  ): StoredMessage {
+    return {
+      id: `state-${snapshotId}`,
+      role: "system",
+      content: `__strands_state__:${snapshotId}`,
+      metadata: {
+        strands_state: JSON.stringify({
+          snapshotId,
+          isLatest,
+          snapshot,
+          savedAt: new Date().toISOString(),
+        }),
       },
     };
+  }
+
+  it("loadSnapshot returns the stashed blob + current messages merged in", async () => {
+    const seededSnap: Snapshot = {
+      scope: "agent",
+      schemaVersion: "1.0",
+      createdAt: "x",
+      data: { agentState: { foo: 1 } } as unknown as Snapshot["data"],
+      appData: { stored: true } as unknown as Snapshot["appData"],
+    };
     const { client } = makeFakeClient({
-      initialState: initial,
-      initialMessages: [{ id: "m1", role: "user", content: "hi" }],
+      initialMessages: [
+        { id: "m1", role: "user", content: "hi" },
+        seedConversationWithSnapshot("s1", true, seededSnap),
+      ],
     });
     const storage = new Neo4jSessionStorage(client);
     const snap = await storage.loadSnapshot({ location: LOCATION });
     expect(snap).not.toBeNull();
-    expect(snap!.data).toMatchObject({
-      agentState: { foo: 1 },
-    });
+    expect(snap!.data).toMatchObject({ agentState: { foo: 1 } });
     const messages = (snap!.data as { messages?: unknown[] }).messages;
     expect(Array.isArray(messages)).toBe(true);
-    expect(messages).toHaveLength(1);
+    expect(messages).toHaveLength(1); // only the real message; synthetic marker filtered out
   });
 
-  it("loadSnapshot returns null when no snapshot exists", async () => {
+  it("loadSnapshot returns null when no snapshots exist", async () => {
     const { client } = makeFakeClient();
     const storage = new Neo4jSessionStorage(client);
     const snap = await storage.loadSnapshot({ location: LOCATION });
@@ -267,10 +300,15 @@ describe("Neo4jSessionStorage — load + list + delete", () => {
 
   it("listSnapshotIds respects limit + startAfter", async () => {
     const { client } = makeFakeClient({
-      initialState: {
-        history: ["a", "b", "c", "d", "e"],
-        blobs: {},
-      },
+      initialMessages: ["a", "b", "c", "d", "e"].map((id) =>
+        seedConversationWithSnapshot(id, id === "e", {
+          scope: "agent",
+          schemaVersion: "1.0",
+          createdAt: "x",
+          data: {} as Snapshot["data"],
+          appData: {} as Snapshot["appData"],
+        }),
+      ),
     });
     const storage = new Neo4jSessionStorage(client);
     expect(await storage.listSnapshotIds({ location: LOCATION })).toEqual([
@@ -286,15 +324,21 @@ describe("Neo4jSessionStorage — load + list + delete", () => {
   });
 
   it("deleteSession calls deleteConversation", async () => {
-    const { client, calls } = makeFakeClient();
+    const { client } = makeFakeClient();
     const storage = new Neo4jSessionStorage(client);
+    // Wire a spy by re-binding deleteConversation:
+    const calls: string[] = [];
+    (client as unknown as { shortTerm: { deleteConversation: (id: string) => Promise<void> } })
+      .shortTerm.deleteConversation = async (id: string) => {
+      calls.push(id);
+    };
     await storage.deleteSession({ sessionId: "conv-1" });
-    expect(calls.find((c) => c.method === "deleteConversation")).toBeTruthy();
+    expect(calls).toEqual(["conv-1"]);
   });
 });
 
 describe("Neo4jSessionStorage — manifest", () => {
-  it("manifest round-trip", async () => {
+  it("manifest round-trip via a synthetic manifest message", async () => {
     const { client } = makeFakeClient();
     const storage = new Neo4jSessionStorage(client);
     const manifest = { schemaVersion: "1.0", updatedAt: "2026-05-16T00:00:00Z" };
@@ -310,11 +354,26 @@ describe("Neo4jSessionStorage — manifest", () => {
     expect(loaded.schemaVersion).toBe("1.0");
     expect(typeof loaded.updatedAt).toBe("string");
   });
+
+  it("last-write-wins per scopeId", async () => {
+    const { client } = makeFakeClient();
+    const storage = new Neo4jSessionStorage(client);
+    await storage.saveManifest({
+      location: LOCATION,
+      manifest: { schemaVersion: "1.0", updatedAt: "first" },
+    });
+    await storage.saveManifest({
+      location: LOCATION,
+      manifest: { schemaVersion: "1.0", updatedAt: "second" },
+    });
+    const loaded = await storage.loadManifest({ location: LOCATION });
+    expect(loaded.updatedAt).toBe("second");
+  });
 });
 
 describe("Neo4jSessionStorage — unicode + long content", () => {
   it("preserves unicode through extraction + persistence", async () => {
-    const { client, calls } = makeFakeClient();
+    const { client, addCalls } = makeFakeClient();
     const storage = new Neo4jSessionStorage(client);
     const content = "你好 🚀 émoji ñ ç ø";
     await storage.saveSnapshot({
@@ -325,12 +384,12 @@ describe("Neo4jSessionStorage — unicode + long content", () => {
         messages: [{ role: "user", content: [{ text: content }] }],
       }),
     });
-    const addCalls = calls.filter((c) => c.method === "addMessage");
-    expect(addCalls[0]!.params).toMatchObject({ content });
+    const real = addCalls.filter((c) => c.role === "user");
+    expect(real[0]).toMatchObject({ content });
   });
 
   it("preserves a thousand messages without loss", async () => {
-    const { client, calls } = makeFakeClient();
+    const { client, addCalls } = makeFakeClient();
     const storage = new Neo4jSessionStorage(client);
     const big = Array.from({ length: 1000 }, (_, i) => ({
       role: i % 2 === 0 ? "user" : "assistant",
@@ -342,8 +401,28 @@ describe("Neo4jSessionStorage — unicode + long content", () => {
       isLatest: true,
       snapshot: snapshotWith({ messages: big }),
     });
-    const addCalls = calls.filter((c) => c.method === "addMessage");
-    expect(addCalls).toHaveLength(1000);
+    const real = addCalls.filter((c) => c.role === "user" || c.role === "assistant");
+    expect(real).toHaveLength(1000);
+  });
+});
+
+describe("isSyntheticStrandsMessage", () => {
+  it("recognizes state and manifest markers", () => {
+    expect(
+      isSyntheticStrandsMessage({ role: "system", content: "__strands_state__:s1" }),
+    ).toBe(true);
+    expect(
+      isSyntheticStrandsMessage({ role: "system", content: "__strands_manifest__:agent-1" }),
+    ).toBe(true);
+  });
+
+  it("rejects non-system messages and non-prefix system messages", () => {
+    expect(
+      isSyntheticStrandsMessage({ role: "user", content: "__strands_state__:trick" }),
+    ).toBe(false);
+    expect(
+      isSyntheticStrandsMessage({ role: "system", content: "real system message" }),
+    ).toBe(false);
   });
 });
 

@@ -129,64 +129,93 @@ export interface ReasoningHooksOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * All Strands round-trip state stashed in a NAMS conversation lives under
- * this single metadata field. We use one JSON-stringified blob to stay
- * opaque to the snake_case ↔ camelCase casing transform that the REST
- * transport applies to nested object keys.
+ * Strands snapshot state is persisted as synthetic `role: "system"`
+ * messages on the NAMS conversation. NAMS exposes no conversation-
+ * metadata-update endpoint, so we use the only write surface that does
+ * exist: per-message metadata on `POST /conversations/{id}/messages`.
+ *
+ * Each save writes ONE synthetic message. Its `content` carries a
+ * recognizable prefix (`__strands_state__:` for snapshots,
+ * `__strands_manifest__:` for manifests) so callers walking the message
+ * list can filter them out cheaply. The full JSON-serialized state rides
+ * as a single string under `metadata.strands_state` on the message, where
+ * the REST transport's snake_case ↔ camelCase casing layer can't reach
+ * inside (string values are opaque to it).
+ *
+ * Per-snapshot synthetic messages mean `listSnapshotIds` is O(n) over the
+ * message list, but in practice snapshots are small JSON deltas and the
+ * conversation's message count is bounded — fine for v0.x preview.
  */
+const STATE_PREFIX = "__strands_state__:";
+const MANIFEST_PREFIX = "__strands_manifest__:";
+
+/** Per-message metadata field that carries the JSON-stringified blob. */
 const META_FIELD = "strands_state";
 
-interface StrandsMetadata {
-  latestId?: string;
-  history: string[];
-  blobs: Record<string, Snapshot>;
-  manifest?: SnapshotManifest;
+interface StrandsStateBlob {
+  /** snapshotId associated with this synthetic message. */
+  snapshotId: string;
+  /** Whether this save asserted itself as the latest. */
+  isLatest: boolean;
+  /** Snapshot data with messages stripped. */
+  snapshot: Snapshot;
+  /** Wall-clock save time (ISO 8601). Tie-breaker for "latest" elections. */
+  savedAt: string;
 }
 
-function emptyStrandsMetadata(): StrandsMetadata {
-  return { history: [], blobs: {} };
+interface StrandsManifestBlob {
+  /** SnapshotLocation.scopeId so multiple agents per session can co-exist. */
+  scopeId: string;
+  manifest: SnapshotManifest;
+  savedAt: string;
 }
 
-function parseStrandsMetadata(metadata: Record<string, unknown>): StrandsMetadata {
-  const raw = metadata[META_FIELD];
-  if (typeof raw === "string") {
-    try {
-      const parsed = JSON.parse(raw) as Partial<StrandsMetadata>;
-      return {
-        latestId: parsed.latestId,
-        history: Array.isArray(parsed.history) ? parsed.history : [],
-        blobs: (parsed.blobs as Record<string, Snapshot>) ?? {},
-        manifest: parsed.manifest,
-      };
-    } catch {
-      return emptyStrandsMetadata();
-    }
-  }
-  // Backwards-compat fallback: if the field is an object (some bridges may
-  // pass through structured metadata without stringifying), accept it.
-  if (raw && typeof raw === "object") {
-    const obj = raw as Partial<StrandsMetadata>;
-    return {
-      latestId: obj.latestId,
-      history: Array.isArray(obj.history) ? obj.history : [],
-      blobs: (obj.blobs as Record<string, Snapshot>) ?? {},
-      manifest: obj.manifest,
-    };
-  }
-  return emptyStrandsMetadata();
+/**
+ * Returns true if a message is one of our synthetic state/manifest
+ * markers. Exported so consumers walking the conversation can filter
+ * them out of UI rendering. See `SYNTHETIC_MESSAGE_PREFIXES` for the
+ * canonical prefix list.
+ */
+export function isSyntheticStrandsMessage(
+  message: { role: string; content: string },
+): boolean {
+  if (message.role !== "system") return false;
+  return (
+    message.content.startsWith(STATE_PREFIX) ||
+    message.content.startsWith(MANIFEST_PREFIX)
+  );
 }
+
+/**
+ * Canonical content prefixes used for synthetic messages. Consumers
+ * (chat UIs, message-list renderers, Cypher queries) can filter on
+ * these to skip the Strands-internal state messages.
+ */
+export const SYNTHETIC_MESSAGE_PREFIXES = [STATE_PREFIX, MANIFEST_PREFIX] as const;
 
 /**
  * Implements Strands' `SnapshotStorage` against a NAMS `MemoryClient`.
  *
  * One Strands session = one NAMS Conversation (keyed by `location.sessionId`).
- * Snapshots are versions WITHIN that conversation: messages are persisted as
- * real `Message` nodes via `addMessage`, while non-message snapshot state is
- * round-tripped through `Conversation.metadata`.
+ * Snapshots are versions within that conversation:
+ *
+ * - Real conversation messages from `snapshot.data.messages` land as real
+ *   `Message` graph nodes via `addMessage` (so entity extraction, search,
+ *   and the graph view all work on them).
+ * - Non-message snapshot state (Strands' `data` minus `messages`, plus
+ *   `appData`, plus the manifest) is persisted as synthetic
+ *   `role: "system"` messages whose content carries a recognizable
+ *   marker prefix and whose per-message `metadata.strands_state` carries
+ *   the JSON-serialized blob. NAMS exposes per-message metadata writes
+ *   via `POST /conversations/{id}/messages`, so this works against the
+ *   documented API today (no conversation-metadata-update endpoint).
+ *
+ * Consumers walking the message list (chat UIs, Cypher queries) should
+ * filter synthetic messages with {@link isSyntheticStrandsMessage}.
  *
  * Auth errors propagate — Strands needs to know if the backing store is
- * unreachable. Transient errors propagate too; Strands' own retry semantics
- * (in `SessionManager`) apply.
+ * unreachable. Transient errors propagate too; Strands' own retry
+ * semantics (in `SessionManager`) apply.
  */
 export class Neo4jSessionStorage implements SnapshotStorage {
   constructor(private readonly memory: MemoryClient) {}
@@ -200,24 +229,27 @@ export class Neo4jSessionStorage implements SnapshotStorage {
     const { location, snapshotId, isLatest, snapshot } = params;
     const conversationId = location.sessionId;
 
-    // 1. Extract the message list from snapshot.data and persist any new
-    //    messages as Message nodes. We dedupe by content+role to avoid
-    //    re-writing the same message on subsequent saves.
+    // 1. Extract conversation messages out of snapshot.data.messages and
+    //    persist any new ones as real Message nodes. Dedupe by role+content
+    //    so re-saving the same snapshot doesn't grow the message list.
     await this.extractAndPersistMessages(conversationId, snapshot);
 
-    // 2. Stash the non-message snapshot state into the strands_state metadata
-    //    field, keyed by snapshotId. We keep ALL prior snapshot blobs so
-    //    `listSnapshotIds` can enumerate them; in practice this stays small
-    //    (snapshots are small JSON deltas).
-    const state = await this.readState(conversationId);
-
-    // Strip messages from the persisted blob — they live in the graph now.
-    const blob = stripMessagesFromSnapshot(snapshot);
-    state.blobs[snapshotId] = blob;
-    if (!state.history.includes(snapshotId)) state.history.push(snapshotId);
-    if (isLatest) state.latestId = snapshotId;
-
-    await this.writeState(conversationId, state);
+    // 2. Write a synthetic system message that carries the rest of the
+    //    snapshot's state (data minus messages, plus appData). The
+    //    JSON blob rides as an opaque string in the message's per-message
+    //    metadata so the REST transport's casing layer leaves it alone.
+    const blob: StrandsStateBlob = {
+      snapshotId,
+      isLatest,
+      snapshot: stripMessagesFromSnapshot(snapshot),
+      savedAt: new Date().toISOString(),
+    };
+    await this.memory.shortTerm.addMessage(
+      conversationId,
+      "system",
+      `${STATE_PREFIX}${snapshotId}`,
+      { metadata: { [META_FIELD]: JSON.stringify(blob) } },
+    );
   }
 
   async loadSnapshot(params: {
@@ -225,18 +257,30 @@ export class Neo4jSessionStorage implements SnapshotStorage {
     snapshotId?: string;
   }): Promise<Snapshot | null> {
     const conversationId = params.location.sessionId;
-    const state = await this.readState(conversationId);
-    const wantedId = params.snapshotId ?? state.latestId;
-    if (!wantedId) return null;
+    const conv = await this.memory.shortTerm.getConversation(conversationId);
 
-    const blob = state.blobs[wantedId];
+    const stateBlobs = this.readStateBlobs(conv.messages);
+    if (stateBlobs.length === 0) return null;
+
+    // If a snapshotId was requested, find that specific save.
+    // Otherwise fall back to the most recent save where isLatest=true,
+    // or the latest save overall if none asserted "latest".
+    let blob: StrandsStateBlob | undefined;
+    if (params.snapshotId) {
+      blob = stateBlobs.find((b) => b.snapshotId === params.snapshotId);
+    } else {
+      blob = [...stateBlobs].reverse().find((b) => b.isLatest) ??
+        stateBlobs[stateBlobs.length - 1];
+    }
     if (!blob) return null;
 
-    // Re-hydrate the snapshot: combine the opaque blob with messages read
-    // from the conversation graph.
-    const conv = await this.memory.shortTerm.getConversation(conversationId);
-    const messages = conv.messages.map(toStrandsMessage);
-    return mergeMessagesIntoSnapshot(blob, messages);
+    // Re-hydrate the snapshot: combine the stored data/appData with the
+    // current conversation messages (filtered to drop our synthetic
+    // markers so Strands doesn't replay them).
+    const realMessages = conv.messages
+      .filter((m) => !isSyntheticStrandsMessage(m))
+      .map(toStrandsMessage);
+    return mergeMessagesIntoSnapshot(blob.snapshot, realMessages);
   }
 
   async listSnapshotIds(params: {
@@ -244,8 +288,17 @@ export class Neo4jSessionStorage implements SnapshotStorage {
     limit?: number;
     startAfter?: string;
   }): Promise<string[]> {
-    const state = await this.readState(params.location.sessionId);
-    const ids = state.history.slice();
+    const conv = await this.memory.shortTerm.getConversation(params.location.sessionId);
+    const stateBlobs = this.readStateBlobs(conv.messages);
+    // Preserve save order. Dedupe per snapshotId in case a snapshotId is
+    // saved more than once (Strands' contract permits re-saves).
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const blob of stateBlobs) {
+      if (seen.has(blob.snapshotId)) continue;
+      seen.add(blob.snapshotId);
+      ids.push(blob.snapshotId);
+    }
     let start = 0;
     if (params.startAfter) {
       const idx = ids.indexOf(params.startAfter);
@@ -259,50 +312,69 @@ export class Neo4jSessionStorage implements SnapshotStorage {
   }
 
   async loadManifest(params: { location: SnapshotLocation }): Promise<SnapshotManifest> {
-    const state = await this.readState(params.location.sessionId);
-    return state.manifest ?? defaultManifest();
+    const conv = await this.memory.shortTerm.getConversation(params.location.sessionId);
+    const blobs = this.readManifestBlobs(conv.messages);
+    // Last write wins per scopeId — Strands writes manifests rarely so the
+    // O(n) scan is fine.
+    const matching = blobs.filter((b) => b.scopeId === params.location.scopeId);
+    return matching[matching.length - 1]?.manifest ?? defaultManifest();
   }
 
   async saveManifest(params: {
     location: SnapshotLocation;
     manifest: SnapshotManifest;
   }): Promise<void> {
-    const conversationId = params.location.sessionId;
-    const state = await this.readState(conversationId);
-    state.manifest = params.manifest;
-    await this.writeState(conversationId, state);
+    const blob: StrandsManifestBlob = {
+      scopeId: params.location.scopeId,
+      manifest: params.manifest,
+      savedAt: new Date().toISOString(),
+    };
+    await this.memory.shortTerm.addMessage(
+      params.location.sessionId,
+      "system",
+      `${MANIFEST_PREFIX}${params.location.scopeId}`,
+      { metadata: { [META_FIELD]: JSON.stringify(blob) } },
+    );
   }
 
   // --- Internals ------------------------------------------------------------
 
-  private async readState(conversationId: string): Promise<StrandsMetadata> {
-    const conv = await this.memory.shortTerm.getConversationMetadata(conversationId);
-    const metadata = (conv.metadata as Record<string, unknown> | undefined) ?? {};
-    return parseStrandsMetadata(metadata);
+  /**
+   * Scan a conversation's message list and parse any state markers into
+   * blobs, in original order.
+   */
+  private readStateBlobs(
+    messages: Array<{ role: string; content: string; metadata?: Record<string, unknown> }>,
+  ): StrandsStateBlob[] {
+    const blobs: StrandsStateBlob[] = [];
+    for (const msg of messages) {
+      if (msg.role !== "system") continue;
+      if (!msg.content.startsWith(STATE_PREFIX)) continue;
+      const blob = parseBlob<StrandsStateBlob>(msg.metadata);
+      if (blob) blobs.push(blob);
+    }
+    return blobs;
   }
 
-  private async writeState(
-    conversationId: string,
-    state: StrandsMetadata,
-  ): Promise<void> {
-    // Strands state lives under a single JSON-stringified key to stay
-    // opaque to the REST transport's snake_case ↔ camelCase casing
-    // transform, which otherwise would mangle nested keys.
-    await (this.memory as unknown as {
-      transport: { request<T>(method: string, params: Record<string, unknown>): Promise<T> };
-    }).transport.request("update_conversation_metadata", {
-      conversation_id: conversationId,
-      metadata: {
-        [META_FIELD]: JSON.stringify(state),
-      },
-    });
+  /** Same idea, for manifest markers. */
+  private readManifestBlobs(
+    messages: Array<{ role: string; content: string; metadata?: Record<string, unknown> }>,
+  ): StrandsManifestBlob[] {
+    const blobs: StrandsManifestBlob[] = [];
+    for (const msg of messages) {
+      if (msg.role !== "system") continue;
+      if (!msg.content.startsWith(MANIFEST_PREFIX)) continue;
+      const blob = parseBlob<StrandsManifestBlob>(msg.metadata);
+      if (blob) blobs.push(blob);
+    }
+    return blobs;
   }
 
   /**
    * Pull the message list out of `snapshot.data.messages` (the canonical
-   * Strands layout), find ones not yet present on the conversation, and
-   * persist them via `addMessage`. Returns the number of new messages
-   * written.
+   * Strands layout), find ones not yet present on the conversation
+   * (excluding our synthetic markers), and persist them via `addMessage`.
+   * Returns the number of new messages written.
    */
   private async extractAndPersistMessages(
     conversationId: string,
@@ -312,7 +384,11 @@ export class Neo4jSessionStorage implements SnapshotStorage {
     if (messages.length === 0) return 0;
 
     const existing = await this.memory.shortTerm.getConversation(conversationId);
-    const seen = new Set(existing.messages.map((m) => `${m.role}::${m.content}`));
+    const seen = new Set(
+      existing.messages
+        .filter((m) => !isSyntheticStrandsMessage(m))
+        .map((m) => `${m.role}::${m.content}`),
+    );
 
     let writes = 0;
     for (const msg of messages) {
@@ -324,6 +400,17 @@ export class Neo4jSessionStorage implements SnapshotStorage {
       writes++;
     }
     return writes;
+  }
+}
+
+function parseBlob<T>(metadata: Record<string, unknown> | undefined): T | null {
+  if (!metadata) return null;
+  const raw = metadata[META_FIELD];
+  if (typeof raw !== "string") return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
   }
 }
 
