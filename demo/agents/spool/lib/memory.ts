@@ -26,6 +26,4 @@ export function getMemoryClient(): MemoryClient {
 }
 
 /** Whether the API route should use the real Strands agent (vs. the stub). */
-export const hasModelKey =
-  (process.env.OPENAI_API_KEY ?? "").trim().length > 0 ||
-  (process.env.AWS_REGION ?? "").trim().length > 0;
+export const hasModelKey = (process.env.OPENAI_API_KEY ?? "").trim().length > 0;

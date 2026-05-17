@@ -6,8 +6,8 @@
  *      Strands' `SessionManager` persists session state into a NAMS
  *      conversation. Hybrid mapping: messages from each snapshot land as
  *      real `Message` graph nodes via `addMessage`; the rest of the
- *      framework's per-snapshot state is stashed losslessly in the
- *      conversation's `metadata`.
+ *      framework's per-snapshot state is stashed losslessly in synthetic
+ *      Strands marker messages on that same conversation.
  *
  *   2. {@link Neo4jConversationManager} — a `ConversationManager`
  *      subclass that delegates `reduce()` to an inner manager
@@ -39,7 +39,7 @@
  * const conv = await memory.shortTerm.createConversation({ userId: "alice" });
  *
  * const agent = new Agent({
- *   ...connectMemoryToAgent(memory, { conversationId: conv.id }),
+ *   ...await connectMemoryToAgent(memory, { conversationId: conv.id }),
  *   model,
  *   tools: [...],
  * });

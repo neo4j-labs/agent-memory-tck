@@ -25,14 +25,13 @@ export async function GET() {
   }
   try {
     const memory = getMemoryClient();
-    const all = await memory.shortTerm.listConversations({ limit: 50 });
-    const mine = all.filter((c) => c.userId === userId);
+    const mine = await memory.shortTerm.listConversations({ limit: 50, userId });
     return NextResponse.json({
       sessions: mine.map((c) => ({
         id: c.id,
         title: c.title ?? c.id.slice(0, 8),
         updatedAt: c.updatedAt ?? c.createdAt,
-        messageCount: (c as unknown as { messageCount?: number }).messageCount,
+        messageCount: c.messageCount,
       })),
     });
   } catch (err) {

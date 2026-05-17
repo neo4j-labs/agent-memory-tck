@@ -42,6 +42,8 @@ export interface Conversation {
   /** Bridge protocol session identifier (free-form string). */
   sessionId: string;
   messages: Message[];
+  /** Hosted service: message count when returned by list/metadata endpoints. */
+  messageCount?: number;
   title?: string;
   createdAt: string;
   updatedAt?: string;
@@ -404,6 +406,7 @@ export interface CreateConversationOptions {
 
 export interface ListConversationsOptions {
   limit?: number;
+  userId?: string;
 }
 
 export interface BulkMessageInput {

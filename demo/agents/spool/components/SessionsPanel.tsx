@@ -7,7 +7,7 @@ interface SessionRow {
   id: string;
   title: string;
   updatedAt: string;
-  messageCount: number;
+  messageCount?: number;
 }
 
 export function SessionsPanel({
@@ -59,7 +59,7 @@ export function SessionsPanel({
               {s.title}
             </Text>
             <Text fontSize="xs" color="gray.500">
-              {s.messageCount} messages · {new Date(s.updatedAt).toLocaleString()}
+              {formatSessionMeta(s)}
             </Text>
             {s.id !== currentConversationId && (
               <Button
@@ -77,4 +77,11 @@ export function SessionsPanel({
       )}
     </Stack>
   );
+}
+
+function formatSessionMeta(session: SessionRow): string {
+  const updatedAt = new Date(session.updatedAt).toLocaleString();
+  return typeof session.messageCount === "number"
+    ? `${session.messageCount} messages · ${updatedAt}`
+    : updatedAt;
 }

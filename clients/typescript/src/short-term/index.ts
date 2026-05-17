@@ -39,6 +39,7 @@ interface WireConversation {
   id: string;
   session_id?: string;
   messages?: WireMessage[];
+  message_count?: number;
   title?: string;
   created_at?: string;
   updated_at?: string;
@@ -95,6 +96,7 @@ function toConversation(w: WireConversation): Conversation {
     id: w.id,
     sessionId: w.session_id ?? w.id,
     messages: (w.messages ?? []).map(toMessage),
+    messageCount: w.message_count,
     title: w.title,
     createdAt: w.created_at ?? "",
     updatedAt: w.updated_at,
@@ -207,6 +209,7 @@ export class ShortTermMemory {
   async listConversations(options?: ListConversationsOptions): Promise<Conversation[]> {
     const wire = await this.transport.request<WireConversation[]>("list_conversations", {
       limit: options?.limit,
+      userId: options?.userId,
     });
     return wire.map(toConversation);
   }
