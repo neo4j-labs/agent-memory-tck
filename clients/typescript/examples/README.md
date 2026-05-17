@@ -18,6 +18,7 @@ Memory Service.
 | [`mcp/`](./mcp) | Registering the 12 memory tools with an MCP server |
 | [`langchain/`](./langchain) | Chat history + entity retriever shapes for LangChain JS |
 | [`mastra/`](./mastra) | Wrapping the client as a Mastra-compatible memory provider |
+| [`strands/`](./strands) | AWS Strands agent with session persistence, three-tier context, and reasoning capture |
 
 ## Running an example
 

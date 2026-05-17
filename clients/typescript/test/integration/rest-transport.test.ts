@@ -101,6 +101,22 @@ describe("RestTransport — short-term", () => {
     expect(convs[0]!.id).toBe("c1");
     expect(convs[1]!.userId).toBe("bob");
   });
+
+  it("listConversations forwards the optional userId filter as user_id", async () => {
+    let observedUserId: string | null = null;
+    server.use(
+      http.get(`${ENDPOINT}/conversations`, ({ request }) => {
+        observedUserId = new URL(request.url).searchParams.get("user_id");
+        return HttpResponse.json({ conversations: [] });
+      }),
+    );
+
+    const client = newClient();
+    await client.shortTerm.listConversations({ limit: 10, userId: "alice" });
+    await client.close();
+
+    expect(observedUserId).toBe("alice");
+  });
 });
 
 describe("RestTransport — long-term", () => {

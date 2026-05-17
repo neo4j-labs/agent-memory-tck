@@ -25,6 +25,11 @@ Beta launch release for the hosted-service-first TypeScript client.
     `Neo4jChatMessageHistory` and `Neo4jEntityRetriever` (duck-typed)
   - `@neo4j-labs/agent-memory/integrations/mastra` — `Neo4jMastraMemory`
     provider (duck-typed)
+  - `@neo4j-labs/agent-memory/integrations/strands` — AWS Strands Agents
+    integration: `Neo4jSessionStorage` (SnapshotStorage backend),
+    `Neo4jConversationManager` (three-tier context injection layered on
+    top of an inner manager), `registerReasoningHooks` + `connectMemoryToAgent`
+    factory. Compatible with `@strands-agents/sdk@^1.2.0`.
 - `@neo4j-labs/agent-memory/testing` — `BridgeTransport` for TCK
   conformance testing
 - Zero-config construction: defaults endpoint to

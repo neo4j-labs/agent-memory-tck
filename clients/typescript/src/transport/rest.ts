@@ -193,7 +193,7 @@ const ROUTES: Record<string, RestCall | "noop" | "unsupported"> = {
   list_conversations: {
     method: "GET",
     path: "/conversations",
-    queryParams: ["limit"],
+    queryParams: ["limit", "user_id"],
     shape: (raw) => (raw as { conversations?: unknown[] })?.conversations ?? raw,
   },
   get_conversation_metadata: {

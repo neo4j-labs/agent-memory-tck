@@ -31,6 +31,10 @@
       "import": "./dist/integrations/mastra.js",
       "types": "./dist/integrations/mastra.d.ts"
     },
+    "./integrations/strands": {
+      "import": "./dist/integrations/strands.js",
+      "types": "./dist/integrations/strands.d.ts"
+    },
     "./testing": {
       "import": "./dist/testing.js",
       "types": "./dist/testing.d.ts"
@@ -63,6 +67,10 @@
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
+    "@ai-sdk/provider": "^3.0.10",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@strands-agents/sdk": "^1.2.0",
     "@types/node": "^20.0.0",
     "dotenv": "^17.4.2",
     "msw": "^2.14.3",

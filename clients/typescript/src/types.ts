@@ -42,6 +42,8 @@ export interface Conversation {
   /** Bridge protocol session identifier (free-form string). */
   sessionId: string;
   messages: Message[];
+  /** Hosted service: message count when returned by list/metadata endpoints. */
+  messageCount?: number;
   title?: string;
   createdAt: string;
   updatedAt?: string;
@@ -217,6 +219,8 @@ export interface ReasoningStep {
 
 export interface ToolCall {
   id: string;
+  /** Reasoning step this tool call hangs off (hosted service exposes this). */
+  stepId?: string;
   toolName: string;
   arguments: Record<string, unknown>;
   result?: unknown;
@@ -402,6 +406,7 @@ export interface CreateConversationOptions {
 
 export interface ListConversationsOptions {
   limit?: number;
+  userId?: string;
 }
 
 export interface BulkMessageInput {
