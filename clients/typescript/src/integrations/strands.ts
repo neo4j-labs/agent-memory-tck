@@ -307,9 +307,10 @@ export class Neo4jSessionStorage implements SnapshotStorage {
       snapshot: strippedSnapshot,
       savedAt: new Date().toISOString(),
     };
-    const previous = [...this.readStateBlobs(existingConversation.messages)]
-      .reverse()
-      .find((candidate) => candidate.snapshotId === snapshotId);
+    const previous = findLastStateBlobForSnapshotId(
+      this.readStateBlobs(existingConversation.messages),
+      snapshotId,
+    );
     if (previous && sameStateBlob(previous, blob)) return;
     await this.memory.shortTerm.addMessage(
       conversationId,
@@ -333,7 +334,7 @@ export class Neo4jSessionStorage implements SnapshotStorage {
     // or the latest save overall if none asserted "latest".
     let blob: StrandsStateBlob | undefined;
     if (params.snapshotId) {
-      blob = [...stateBlobs].reverse().find((b) => b.snapshotId === params.snapshotId);
+      blob = findLastStateBlobForSnapshotId(stateBlobs, params.snapshotId);
     } else {
       blob = [...stateBlobs].reverse().find((b) => b.isLatest) ??
         stateBlobs[stateBlobs.length - 1];
@@ -809,13 +810,37 @@ function contextInjectionMessage(text: string): StrandsMessage {
 }
 
 function sameStateBlob(a: StrandsStateBlob, b: StrandsStateBlob): boolean {
-  return JSON.stringify({
-    snapshotId: a.snapshotId,
-    isLatest: a.isLatest,
-    snapshot: a.snapshot,
-  }) === JSON.stringify({
-    snapshotId: b.snapshotId,
-    isLatest: b.isLatest,
-    snapshot: b.snapshot,
-  });
+  return (
+    a.snapshotId === b.snapshotId &&
+    a.isLatest === b.isLatest &&
+    jsonLikeEqual(a.snapshot, b.snapshot)
+  );
+}
+
+function findLastStateBlobForSnapshotId(
+  blobs: StrandsStateBlob[],
+  snapshotId: string,
+): StrandsStateBlob | undefined {
+  for (let i = blobs.length - 1; i >= 0; i--) {
+    if (blobs[i]?.snapshotId === snapshotId) return blobs[i];
+  }
+  return undefined;
+}
+
+function jsonLikeEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== typeof b) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((value, index) => jsonLikeEqual(value, b[index]));
+  }
+  if (a && b && typeof a === "object" && typeof b === "object") {
+    const aRecord = a as Record<string, unknown>;
+    const bRecord = b as Record<string, unknown>;
+    const aKeys = Object.keys(aRecord);
+    const bKeys = Object.keys(bRecord);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((key) => key in bRecord && jsonLikeEqual(aRecord[key], bRecord[key]));
+  }
+  return false;
 }

@@ -11,6 +11,7 @@
 
 import { Agent, FunctionTool } from "@strands-agents/sdk";
 import { OpenAIModel } from "@strands-agents/sdk/models/openai";
+import type { ContentBlock } from "@strands-agents/sdk";
 import { MemoryClient } from "@neo4j-labs/agent-memory";
 import { connectMemoryToAgent } from "@neo4j-labs/agent-memory/integrations/strands";
 
@@ -28,6 +29,13 @@ async function main() {
     conversationId: conv.id,
   });
   type AgentConfig = NonNullable<ConstructorParameters<typeof Agent>[0]>;
+  // The local example and the file-linked client each resolve their own
+  // `@strands-agents/sdk` instance during validation, so TypeScript treats
+  // the nominal classes as distinct because they carry private fields.
+  const memoryAgentConfig = {
+    sessionManager: sessionManager as unknown as AgentConfig["sessionManager"],
+    conversationManager: conversationManager as unknown as AgentConfig["conversationManager"],
+  };
 
   // 3. Build the agent. A toy tool is included so the reasoning trace has
   //    something interesting to record.
@@ -51,8 +59,7 @@ async function main() {
     systemPrompt: "You are a helpful assistant who explains things concisely.",
     model: new OpenAIModel({ modelId: "gpt-4o-mini" }),
     tools: [lookupTool],
-    sessionManager: sessionManager as unknown as AgentConfig["sessionManager"],
-    conversationManager: conversationManager as unknown as AgentConfig["conversationManager"],
+    ...memoryAgentConfig,
   });
 
   // 4. Drive a three-turn dialogue.
@@ -64,11 +71,7 @@ async function main() {
   for (const userMessage of turns) {
     process.stdout.write(`\n[user] ${userMessage}\n[assistant] `);
     const result = await agent.invoke(userMessage);
-    const text =
-      result.lastMessage.content
-        .map((block) => ("text" in block && typeof block.text === "string" ? block.text : ""))
-        .filter((chunk) => chunk.length > 0)
-        .join("") || "(no text response)";
+    const text = flattenText(result.lastMessage.content) || "(no text response)";
     process.stdout.write(`${text}\n`);
   }
 
@@ -83,3 +86,10 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+function flattenText(blocks: ContentBlock[]): string {
+  return blocks
+    .map((block) => ("text" in block && typeof block.text === "string" ? block.text : ""))
+    .filter((chunk) => chunk.length > 0)
+    .join("");
+}

@@ -137,13 +137,19 @@ async function* liveStream(
     conversationId,
   });
   type AgentConfig = NonNullable<ConstructorParameters<typeof Agent>[0]>;
+  // The demo and the file-linked local client package are typechecked
+  // against separate `@strands-agents/sdk` installs, so the nominal
+  // classes don't line up despite matching at runtime.
+  const memoryAgentConfig = {
+    sessionManager: sessionManager as unknown as AgentConfig["sessionManager"],
+    conversationManager: conversationManager as unknown as AgentConfig["conversationManager"],
+  };
 
   const agent = new Agent({
     systemPrompt: "You are spool, a helpful demo agent. Be concise and curious.",
     model: new OpenAIModel({ modelId: "gpt-4o-mini" }),
     tools: [lookupTool],
-    sessionManager: sessionManager as unknown as AgentConfig["sessionManager"],
-    conversationManager: conversationManager as unknown as AgentConfig["conversationManager"],
+    ...memoryAgentConfig,
   });
 
   // Persist the user message ourselves so it shows up in the conversation
