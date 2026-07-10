@@ -113,6 +113,8 @@ http.ListenAndServe(":8080", nil)
 | `SearchEntities(ctx, query, limit)` | Search entities |
 | `GetEntityByName(ctx, name)` | Lookup by name |
 | `GetRelatedEntities(ctx, entityID, opts...)` | Traverse relationships |
+| `AddRelationship(ctx, sourceID, targetID, relType, opts...)` | Create typed relationship |
+| `MergeDuplicateEntities(ctx, sourceID, targetID, opts...)` | Merge duplicate entities |
 
 ### Reasoning
 

@@ -9,7 +9,13 @@ from __future__ import annotations
 import pytest
 
 from neo4j_agent_memory_client.errors import NotSupportedError
-from neo4j_agent_memory_client.transport import _ROUTES, _NOOP, _UNSUPPORTED, RestTransport
+from neo4j_agent_memory_client.transport import (
+    _COMPOSITE,
+    _NOOP,
+    _ROUTES,
+    _UNSUPPORTED,
+    RestTransport,
+)
 
 
 @pytest.mark.unit
@@ -50,12 +56,26 @@ class TestRouteTable:
             "delete_message",
             "add_preference",
             "add_fact",
-            "get_entity_by_name",
             "start_trace",
             "complete_trace",
             "list_traces",
         ):
             assert _ROUTES[method] is _UNSUPPORTED
+
+    def test_gold_tier_routes(self):
+        r = _ROUTES["get_entity_by_name"]
+        assert r.method == "GET"
+        assert r.path == "/entities/by-name"
+        assert r.query_params == ("name", "type", "limit")
+        assert r.shape is not None
+
+        r = _ROUTES["add_relationship"]
+        assert r.method == "POST"
+        assert r.path == "/relationships"
+        assert r.has_body is True
+
+        assert _ROUTES["get_related_entities"] is _COMPOSITE
+        assert _ROUTES["merge_duplicate_entities"] is _COMPOSITE
 
     def test_create_conversation_route_shape(self):
         r = _ROUTES["create_conversation"]
@@ -83,6 +103,15 @@ class TestRestTransportConstruction:
         t = RestTransport("https://example/v1", api_key="nams_x")
         with pytest.raises(NotSupportedError, match="no equivalent"):
             await t.request("add_preference", {"category": "x", "preference": "y"})
+        await t.close()
+
+    async def test_get_related_entities_depth_raises_before_network(self):
+        # depth > 1 must fail before any network call — example is never hit.
+        t = RestTransport("https://example/v1", api_key="nams_x")
+        with pytest.raises(NotSupportedError, match="depth"):
+            await t.request(
+                "get_related_entities", {"entity_id": "e1", "depth": 2}
+            )
         await t.close()
 
     async def test_noop_methods_return_none(self):

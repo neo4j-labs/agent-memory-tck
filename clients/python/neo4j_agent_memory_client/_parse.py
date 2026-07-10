@@ -112,10 +112,13 @@ def parse_context(d: dict[str, Any]) -> ConversationContext:
 
 
 def parse_relrefs(items: list[dict[str, Any]] | None) -> list[EntityRelationshipRef]:
+    # Hosted GET /entities/{id} relationship refs carry rel_type/target_id/
+    # target_name/target_type and no edge id; bridge responses carry id/type.
+    # Tolerate both.
     return [
         EntityRelationshipRef(
-            id=x["id"],
-            type=x.get("type", ""),
+            id=x.get("id") or "",
+            type=_g(x, "type", "rel_type", default=""),
             target_id=x.get("target_id", ""),
             target_name=x.get("target_name"),
             properties=x.get("properties"),
