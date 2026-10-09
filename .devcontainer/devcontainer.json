@@ -1,0 +1,31 @@
+{
+    "name": "agent-memory-jdk",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": "."
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/node:2": {},
+        "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+        "ghcr.io/kubamarchwicki/devcontainer-features/codex:1": {},
+        "ghcr.io/kubamarchwicki/devcontainer-features/skills:1": {
+            "sources": "kubamarchwicki/engineering-skills,humanlayer/skills@show-me,https://github.com/cursor/plugins/tree/main/thermos/skills/thermo-nuclear-code-quality-review",
+            "agents": "codex,claude-code"
+        }
+    },
+    "remoteUser": "vscode",
+    "updateRemoteUserUID": true,
+    "init": true,
+    "containerEnv": {
+        "DISABLE_AUTOUPDATER": "1"
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.m2,target=/home/vscode/.m2,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached",
+        "source=mcp-research-codex-home,target=/home/vscode/.codex,type=volume",
+        "source=mcp-research-claude-home,target=/home/vscode/.claude,type=volume"
+    ],
+    "onCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.codex /home/vscode/.claude"
+}
