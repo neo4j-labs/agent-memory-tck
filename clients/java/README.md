@@ -1,38 +1,103 @@
 # Neo4j Agent Memory Java client
 
-This Java 17 client accesses the hosted Neo4j Agent Memory Service. The core artifact is `org.neo4j:agent-memory-client:0.1.0-SNAPSHOT`. It uses the JDK HTTP client by default and can reuse an application's Spring `RestClient` or `WebClient`, its LangChain4j `HttpClient`, or any other client wrapped in a custom transport. The framework dependencies are optional. The client uses whichever Jackson major the application provides at runtime, preferring Jackson 3 when both are usable.
+A non-opinionated Java client for the hosted Neo4j Agent Memory Service. The core artifact is `org.neo4j:agent-memory-client:<version>`. It uses the JDK HTTP client by default and can reuse an application's Spring `RestClient` or `WebClient`, its LangChain4j `HttpClient`, or any other client wrapped in a custom transport. The framework dependencies are optional. The client uses whichever Jackson major the application provides at runtime, preferring Jackson 3 when both are usable.
+
+The minimum version of Java is Java 17 (to align with the minimal requirement for Langchain4j or Spring Framework).
+
+## Installation
+
+The minimum setup to instantiate memory client and connect to `https://memory.neo4jlabs.com/` is:
+
+```java
+import org.neo4j.agentmemory.MemoryClient;
+import org.neo4j.agentmemory.MemoryClientConfiguration;
+
+var client = MemoryClient.create();
+var conversation = client.createConversation(
+        new CreateConversation("<user>", Map.of("title", "Plan my next trip"))
+    );
+```
+
+The required dependencies are `agent-memory-client` itself with a required `jackson` for JSON processing. The `jackson` itself is usually supplied by the agentic framework.
+
+```xml
+<dependency>
+  <groupId>org.neo4j</groupId>
+  <artifactId>agent-memory-client</artifactId>
+  <version>${nams-version}</version>
+</dependency>
+<dependency>
+  <groupId>tools.jackson.core</groupId>
+  <artifactId>jackson-databind</artifactId>
+  <version>3.1.5</version>
+</dependency>
+```
+
+`com.fasterxml.jackson.core:jackson-databind` 2.19.0+ works instead of Jackson 3.
+
+Verified supported application frameworks are:
+
+- Spring AI 2.0+ (Jackson 3.1.4+, Spring Framework 7.0+).
+- LangChain4j 1.0+ (its `langchain4j-core` brings Jackson 2.19+).
+- Standalone applications that declare either major.
 
 ## Public API
 
-`MemoryClient.create()` uses `MemoryClientConfiguration.builder().build()`.
-The builder resolves environment settings and validates them when `build()` is
-called. `NAMS_API_KEY` must contain a nonblank Workspace API key. `NAMS_BASE_URL`
-is optional: an absent or blank value uses `https://memory.neo4jlabs.com/v1`
-and emits a WARN identifying the default URL on each successful build.
+`MemoryClient.create()` uses the default configuration, that resolves environment settings: `NAMS_API_KEY` must contain a nonblank Workspace API key. `NAMS_BASE_URL` is optional: an absent or blank value uses `https://memory.neo4jlabs.com/v1` and emits a WARN identifying the default URL on each successful build. The default JDK http transport is used.
 
-The only other factory is `MemoryClient.create(MemoryClientConfiguration)`.
-Use the fluent builder to override either setting; omitted settings still come
-from the environment:
+The client expects a **Workspace API key** bound to the target workspace. It does not yet support an Admin key combined with an explicitly provided workspace ID.
+
+The only other factory is `MemoryClient.create(MemoryClientConfiguration)`. Use the fluent builder to override either setting; omitted settings still come from the environment:
 
 ```java
 import org.neo4j.agentmemory.MemoryClient;
 import org.neo4j.agentmemory.MemoryClientConfiguration;
 
 var configuration = MemoryClientConfiguration.builder()
-        .apiKey("<workspace-api-key>")
+        .apiKey("<nams-api-key>")
         .baseUrl("https://memory.neo4jlabs.com/v1")
         .build();
 var client = MemoryClient.create(configuration);
 ```
 
 `apiKey(String)` and `baseUrl(String)` override their environment variables.
-Setters reject explicit null values immediately with `NullPointerException`.
-Explicit blank values fail validation in `build()` rather than falling back to
-the environment. Base URLs are trimmed and must be absolute HTTP(S) URLs with a host,
-without user info, a query, or a fragment. Include the service's version path;
-a trailing slash is supported. Invalid environment settings or nonnull overrides throw
-`IllegalArgumentException` from `build()`. The built configuration is immutable and exposes `URI baseUrl()`
-and `String apiKey()`. Reusing a builder does not change earlier configurations.
+
+MemoryClient defines all supported domain operations. Applications can use these operations  directly or through the live Conversation handle. Every returned handle is bound to the client that produced it. Alternate adapters implement MemoryClient and can construct those same handles from domain values.
+
+| Package | Contents |
+| --- | --- |
+| org.neo4j.agentmemory | MemoryClient, MemoryClientConfiguration, default factories, and await helpers |
+| org.neo4j.agentmemory.conversation | Conversation, requests, Messages, and Conversation Context |
+| org.neo4j.agentmemory.reasoning | Reasoning Steps, traces, explanations, and Tool Calls |
+| org.neo4j.agentmemory.entity | Entity values and search inputs |
+| org.neo4j.agentmemory.exception | Client-owned failures |
+| org.neo4j.agentmemory.http | The HTTP transport extension point (`HttpTransport`, `HttpCall`, `HttpResult`) and the internal `HttpMemoryClient` |
+
+```java
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.neo4j.agentmemory.conversation.CreateConversation;
+import org.neo4j.agentmemory.MemoryClient;
+import org.neo4j.agentmemory.conversation.NewMessage;
+
+import static org.neo4j.agentmemory.MemoryClient.await;
+
+// Inside a method that declares throws Exception:
+var client = MemoryClient.create();
+var conversation = await(client.createConversation(
+            new CreateConversation("<user>", Map.of("title", "Plan my next trip"))
+        ));
+conversation.addMessage(NewMessage.user("Find hotels in Catalona"));
+var recent = await(conversation.messages(20)); //get most recent messages
+```
+
+### Supplying and configuring http transport
+
+The library does not enforce a single HTTP client and allows supplying own's configuration (for example with a desired observability or headers set-up). The supplied client is used as configured, including its executor, proxy,  timeouts, and TLS settings. The last HTTP client setter wins. The memory client never closes injected clients or executors; their lifecycle belongs to the application. The client does not perform any automatic write retries.
+
+#### Using a JDK Http Client
 
 Use `jdkHttpClient(HttpClient)` to supply a configured JDK HTTP client:
 
@@ -53,89 +118,9 @@ var client = MemoryClient.create(MemoryClientConfiguration.builder()
         .build());
 ```
 
-The supplied client is used as configured, including its executor, proxy,
-timeouts, and TLS settings. The last HTTP client setter wins. The memory client
-never closes injected clients or executors; their lifecycle belongs to the application.
+#### Using a Spring RestClient
 
-The factories use the configured client or transport, or a new `HttpClient.newHttpClient()`,
-without checking remote reachability or authentication. Initialization logs the configured base URL at
-INFO through `System.Logger`.
-
-Replace calls to the former key-only and endpoint/key factories with a built
-configuration when adopting this version.
-
-The client expects a **Workspace API key** bound to the target workspace. It does
-not yet support an Admin key combined with an explicitly provided workspace ID.
-
-Set `NAMS_API_KEY` before running the examples; optionally set `NAMS_BASE_URL`
-(including the version path) to override the service URL:
-
-```bash
-export NAMS_API_KEY='<workspace-api-key>'
-export NAMS_BASE_URL=https://memory.neo4jlabs.com/v1
-```
-
-Then construct the client with `MemoryClient.create()`.
-
-MemoryClient defines all supported domain operations, including those addressed
-by Conversation and Reasoning Step UUIDs. Applications can use these operations
-directly or through the live Conversation and ReasoningStep handles. Every
-returned handle is bound to the client that produced it. Alternate adapters
-implement MemoryClient and can construct those same handles from domain values.
-
-The method Javadoc on MemoryClient defines the shared operation behavior,
-including result order, immutable collections, validation timing, and failures.
-The handle methods link to those contracts. Successful writes do not establish
-that extraction or enrichment is ready.
-
-| Package | Contents |
-| --- | --- |
-| org.neo4j.agentmemory | MemoryClient, MemoryClientConfiguration, default factories, and await helpers |
-| org.neo4j.agentmemory.conversation | Conversation, requests, Messages, and Conversation Context |
-| org.neo4j.agentmemory.reasoning | Reasoning Steps, traces, explanations, and Tool Calls |
-| org.neo4j.agentmemory.entity | Entity values and search inputs |
-| org.neo4j.agentmemory.exception | Client-owned failures |
-| org.neo4j.agentmemory.http | The HTTP transport extension point (`HttpTransport`, `HttpCall`, `HttpResult`) and the internal `HttpMemoryClient` |
-| org.neo4j.agentmemory.http.internal | Unsupported built-in transports |
-
-Public domain types have moved from the root package to the packages above.
-Update source imports when adopting this version. The artifact coordinates
-remain org.neo4j:agent-memory-client:0.1.0-SNAPSHOT.
-
-`CreateConversation` has `userId` and `Map<String, String> metadata` components, plus no-argument and user-only constructors. A user ID is optional; there is no caller-supplied conversation ID. Null or empty metadata becomes an immutable empty map and is omitted from the create request. The `title` metadata entry is sent as `metadata.title` and can be read from a returned conversation.
-
-`Conversation` exposes its `UUID id()`, `Optional<String> userId()`, direct immutable `Map<String, String> metadata()`, `Optional<String> title()`, `Optional<Instant> createdAt()` and `updatedAt()`, `Optional<String> firstMessageSnippet()`, and `Optional<Long> messageCount()`. Missing count is distinct from zero. The title uses the list response title when supplied, otherwise `metadata.title`; the client generates no title or snippet. These fields describe the response snapshot, so fetch the conversation again to observe later remote changes. `addMessage(NewMessage)`, `addMessages(List<NewMessage>)`, `messages()`, `messages(int)`, `context()`, `recordStep(NewReasoningStep)`, `trace()`, and `delete()` are asynchronous operations on a live conversation.
-
-`Message` has UUID, role, and content. `NewMessage.user(String)` and `NewMessage.assistant(String)` create message input. `ConversationContext` exposes observations, reflections, and recent messages. Entity search types are in `org.neo4j.agentmemory.entity`; reasoning trace types are in `org.neo4j.agentmemory.reasoning`. Public request and value records retain their semantic component types; nullable scalar components use null for absence, with optional views where supplied. Optional collection components normalize missing values to direct immutable maps or lists, never `Optional` containers. Conversation-list and message-read responses require their respective `conversations` and `messages` arrays; missing or null arrays fail with `ResponseDecodingException`, while explicit empty arrays return empty lists. Returned collections are immutable snapshots.
-
-`messages()` sends no limit and uses the hosted default of 50. `messages(int limit)` sends a limit from 1 through 200 and throws `IllegalArgumentException` synchronously outside that range. The client preserves the service's newest-first message order. It does not sort, reverse, deduplicate, paginate, or trim results locally. A caller that needs chronological model input can reverse an application-owned copy:
-
-```java
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.neo4j.agentmemory.conversation.CreateConversation;
-import org.neo4j.agentmemory.MemoryClient;
-import org.neo4j.agentmemory.conversation.NewMessage;
-
-// Inside a method that declares throws Exception:
-var client = MemoryClient.create();
-var conversation = client.createConversation(new CreateConversation(
-        null, Map.of("title", "Find hotels in Zermatt"))).get(20, TimeUnit.SECONDS);
-conversation.addMessage(NewMessage.user("Find hotels in Zermatt")).get(20, TimeUnit.SECONDS);
-var recent = conversation.messages(20).get(20, TimeUnit.SECONDS);
-var chronological = new ArrayList<>(recent);
-Collections.reverse(chronological); // Application-owned conversion for model input.
-var latest = conversation.messages(1).get(20, TimeUnit.SECONDS);
-```
-
-Caller-side timed waits do not establish transport cancellation. The client performs no automatic write retries.
-
-## Using a Spring RestClient
-
-Supply an application-built `RestClient` and an executor for its blocking exchanges.
-For example, in Spring Boot:
+Supply an application-built `RestClient` and an executor for its blocking exchanges. For example, in Spring Boot:
 
 ```java
 @Bean
@@ -146,32 +131,13 @@ MemoryClient memoryClient(RestClient.Builder restClientBuilder, AsyncTaskExecuto
 }
 ```
 
-The client is used as configured. Its interceptors, observation registry,
-request-factory timeouts, TLS settings, default headers, cookies, and
-`defaultRequest` customizations all apply to memory requests. Observations are
-tagged with route templates such as `/v1/conversations/{conversationId}`. The
-memory configuration supplies absolute service URLs, so the RestClient's base
-URL does not apply, and the memory client's `Authorization`, `Accept`, and
-`Content-Type` headers replace same-named headers. Everything else you configure
-is sent to the memory service, including a default API version: a path-segment
-version inserter rewrites memory URLs too. Inject a client meant for the memory
-service rather than one carrying another service's credentials or tenant
-headers. Status handlers do not apply; non-success responses retain their
-headers and are mapped to the memory client's exceptions.
+The client is used as configured. Its interceptors, observation registry, request-factory timeouts, TLS settings, default headers, cookies, and `defaultRequest` customizations all apply to memory requests. Observations are tagged with route templates such as `/v1/conversations/{conversationId}`. The memory configuration supplies absolute service URLs, so the RestClient's base URL does not apply, and the memory client's `Authorization`, `Accept`, and `Content-Type` headers replace same-named headers. Everything else you configure is sent to the memory service, including a default API version: a path-segment version inserter rewrites memory URLs too. Inject a client meant for the memory service rather than one carrying another service's credentials or tenant headers. Status handlers do not apply; non-success responses retain their headers and are mapped to the memory client's exceptions.
 
-Blocking exchanges run on the supplied executor, which holds one thread per
-request in flight; the returned futures still never block the caller. On Java 21
-with `spring.threads.virtual.enabled=true`, Spring Boot's
-`applicationTaskExecutor` runs on virtual threads, which makes those waiting
-threads cheap. The memory client closes neither the RestClient nor the executor,
-and the last HTTP client setter wins.
-Spring Framework 7.0 or later is required (Spring Boot 4, Spring AI 2.x).
-`org.springframework:spring-web` is the application's dependency.
+Blocking exchanges run on the supplied executor, which holds one thread per request in flight; the returned futures still never block the caller. On Java 21 with `spring.threads.virtual.enabled=true`, Spring Boot's `applicationTaskExecutor` runs on virtual threads, which makes those waiting threads cheap. The memory client closes neither the RestClient nor the executor, and the last HTTP client setter wins. 
 
-## Using a Spring WebClient
+#### Using a Spring WebClient
 
-Supply an application-built `WebClient`. Its exchanges do not block, so it needs
-no executor. For example, in a Spring Boot WebFlux application:
+Supply an application-built `WebClient`. Its exchanges do not block, so it needs no executor. For example, in a Spring Boot WebFlux application:
 
 ```java
 @Bean
@@ -182,27 +148,13 @@ MemoryClient memoryClient(WebClient.Builder webClientBuilder) {
 }
 ```
 
-The client is used as configured, as a RestClient is. Its filters, observation
-registry, connector settings, default headers, cookies, and `defaultRequest`
-customizations apply, and observations are tagged with route templates. Its base
-URL and status handlers do not apply, and the memory headers replace same-named
-headers.
+The client is used as configured, as a RestClient is. Its filters, observation registry, connector settings, default headers, cookies, and `defaultRequest` customizations apply, and observations are tagged with route templates. Its base URL and status handlers do not apply, and the memory headers replace same-named headers.
 
-Response bodies are buffered through the client's codecs, so its in-memory
-buffer limit bounds memory responses: 256 KB by default, or
-`spring.codec.max-in-memory-size` in Spring Boot. A larger response, such as a
-long message history, fails with `MemoryClientException` caused by
-`DataBufferLimitException`. Raise the limit if you read large histories.
+Response bodies are buffered through the client's codecs, so its in-memory buffer limit bounds memory responses: 256 KB by default, or `spring.codec.max-in-memory-size` in Spring Boot. A larger response, such as a long message history, fails with `MemoryClientException` caused by `DataBufferLimitException`. Raise the limit if you read large histories.
 
-The memory client never closes the WebClient, and the last HTTP client setter
-wins. Spring Framework 7.0 or later is required.
-`org.springframework:spring-webflux` and a connector such as Reactor Netty are the
-application's dependencies; Spring Boot WebFlux applications already have both.
+#### Using a LangChain4j HttpClient
 
-## Using a LangChain4j HttpClient
-
-Supply an application-built LangChain4j HTTP client and an executor for its
-blocking exchanges:
+Supply an application-built LangChain4j HTTP client and an executor for its blocking exchanges:
 
 ```java
 import dev.langchain4j.http.client.HttpClientBuilderLoader;
@@ -217,36 +169,16 @@ var client = MemoryClient.create(MemoryClientConfiguration.builder()
         .build());
 ```
 
-The client is used as configured, including its logging and network settings.
-LangChain4j 1.0 or later is required; the application supplies
-`dev.langchain4j:langchain4j-http-client` and an implementation such as
-`dev.langchain4j:langchain4j-http-client-jdk`.
-Neither the HTTP client nor the executor is closed, and the last HTTP client
-setter wins.
+The client is used as configured, including its logging and network settings.  LangChain4j 1.0 or later is required; the application supplies `dev.langchain4j:langchain4j-http-client` and an implementation such as `dev.langchain4j:langchain4j-http-client-jdk`.
 
-LangChain4j discards headers on non-2xx responses. Service exceptions retain the
-status and body excerpt but have no response headers or content type, and
-operation events omit `requestId`. Use a Spring client when those diagnostics
-matter.
+LangChain4j discards headers on non-2xx responses. Service exceptions retain the status and body excerpt but have no response headers or content type, and operation events omit `requestId`. Use a Spring client when those diagnostics matter.
 
-## Bringing your own HTTP transport
+#### Bringing your own HTTP transport
 
-To use an HTTP client without a built-in setter, such as OkHttp, Apache
-HttpClient, or Vert.x, wrap it in an implementation of
-`org.neo4j.agentmemory.http.HttpTransport` and pass it to
-`MemoryClientConfiguration.Builder.httpTransport(...)`. The
-`org.neo4j.agentmemory.http` package is the extension point: `HttpTransport`, the
-`HttpCall` it receives, and the `HttpResult` it returns. `HttpMemoryClient`, in
-the same package, is the memory client's implementation and not part of the
-extension point.
+To use an HTTP client without a built-in setter, such as OkHttp, Apache  HttpClient, or Vert.x, wrap it in an implementation of `org.neo4j.agentmemory.http.HttpTransport` and pass it to
+`MemoryClientConfiguration.Builder.httpTransport(...)`. The `org.neo4j.agentmemory.http` package is the extension point: `HttpTransport`, the `HttpCall` it receives, and the `HttpResult` it returns. `HttpMemoryClient`, in the same package, is the memory client's implementation and not part of the extension point.
 
-The memory client keeps routes, authentication, JSON, failure mapping, and
-logging; a transport only moves bytes. Each memory request reaches
-`send(HttpCall)` as a method, an absolute URI, the memory headers, and a body.
-`uri()` gives the expanded URI; `uriTemplate()` and `uriVariables()` give the
-route template for clients that tag requests by route. The transport sends the
-request through the wrapped client and completes the returned future with the
-response's status, headers, and body bytes.
+The memory client keeps routes, authentication, JSON, failure mapping, and logging; a transport only moves bytes. Each memory request reaches `send(HttpCall)` as a method, an absolute URI, the memory headers, and a body. `uri()` gives the expanded URI; `uriTemplate()` and `uriVariables()` give the route template for clients that tag requests by route. The transport sends the request through the wrapped client and completes the returned future with the response's status, headers, and body bytes.
 
 A transport must:
 
@@ -267,23 +199,11 @@ A transport must:
 - report a short, kebab-case `name()`, such as `okhttp`, that does not reuse a
   built-in name. It appears as `transport=` in the `client.initialized` event.
 
-Failures need no translation: an exception thrown by `send` or a failed future
-becomes a `MemoryClientException` that keeps the original exception as its
-cause. To check a transport, run it against a stub server such as WireMock and
-confirm that requests carry the memory headers and that non-success responses
-arrive as `MemoryServiceException`.
+Failures need no translation: an exception thrown by `send` or a failed future becomes a `MemoryClientException` that keeps the original exception as its cause. To check a transport, run it against a stub server such as WireMock and confirm that requests carry the memory headers and that non-success responses arrive as `MemoryServiceException`.
 
-## Blocking helper and logging
+## Blocking helper
 
-`MemoryClient.await(future)` returns a future's value, including null for a successful void operation. `MemoryClient.await(future, Duration)` supplies a timeout for that call. Both methods are static; importing `org.neo4j.agentmemory.MemoryClient.await` statically lets you write `await(...)` as shown below. Both throw the underlying client exception directly. Other runtime exceptions and errors propagate; checked failures are wrapped in `MemoryClientException` with their cause retained.
-
-`NAMS_AWAIT_TIMEOUT_SECONDS` configures the default wait in positive whole seconds. It is read once on first use of `await(future)` and defaults to 30 seconds when absent, blank, malformed, nonpositive, or too large. An explicit positive `Duration` bypasses it and supports subsecond waits. Null or invalid explicit durations throw `IllegalArgumentException`.
-
-The first use of the built-in fallback emits one event shared by all callers: INFO when the setting is absent or blank, or WARNING when it is invalid. Both identify the variable and the 30-second timeout. An invalid setting emits only the warning. A valid setting or explicit-duration call emits no fallback event.
-
-Timeout and interruption throw `MemoryClientException`, retaining `TimeoutException` or `InterruptedException` as the cause. Interruption restores the thread's interrupt flag. The timeout measures this wait, not the operation's total lifetime. Both outcomes leave the supplied future running, so a timed-out write can still complete.
-
-For example, pass an existing conversation UUID as the first command-line argument and provide `NAMS_API_KEY` in the environment. This example prints its recent messages in the service's newest-first order:
+`MemoryClient.await(future)` returns a future's value, including null for a successful void operation. `MemoryClient.await(future, Duration)` supplies a timeout for that call.`NAMS_AWAIT_TIMEOUT_SECONDS` configures the default wait in positive whole seconds. It is read once on first use of `await(future)` and defaults to 30 seconds when absent, blank, malformed, nonpositive, or too large. An explicit positive `Duration` bypasses it and supports subsecond waits.
 
 ```java
 import static org.neo4j.agentmemory.MemoryClient.await;
@@ -307,7 +227,9 @@ public final class ReadConversationMessages {
 }
 ```
 
-The client uses JDK `System.Logger`: `org.neo4j.agentmemory.MemoryClient` for initialization and operations. Earlier snapshots used `org.neo4j.agentmemory.JdkMemoryClient`. `org.neo4j.agentmemory.MemoryClientConfiguration` logs the default base URL warning, and `org.neo4j.agentmemory.AwaitSupport` logs await configuration. To capture these events with Logback, add the JDK Platform Logging bridge and Logback backend to the **application's** dependencies. The bridge routes `System.Logger` through SLF4J. [SLF4J documents the bridge here](https://www.slf4j.org/manual.html#jep264).
+## Logging
+
+The client uses JDK `System.Logger`. To capture these events with Logback, add the JDK Platform Logging bridge and Logback backend to the **application's** dependencies. The bridge routes `System.Logger` through SLF4J. [SLF4J documents the bridge here](https://www.slf4j.org/manual.html#jep264).
 
 ```xml
 <dependency>
@@ -324,36 +246,10 @@ The client uses JDK `System.Logger`: `org.neo4j.agentmemory.MemoryClient` for in
 </dependency>
 ```
 
-These are concrete example versions; use your application's dependency management to align its SLF4J 2.0 components. If the application already provides Logback, keep that backend and add the bridge. Select one SLF4J backend; for example, replace `slf4j-simple` when using Logback.
+The log entries are structured and follow the example below: `event=client.initialized transport=jdk-http json=jackson3 baseUrl=https://memory.neo4jlabs.com/v1`.
+The `transport` is `jdk-http`, `spring-rest-client`, `spring-web-client`, `langchain4j-http`, or a custom transport's name, depending on the configured HTTP client. The `json` field is `jackson3` or `jackson2`, depending on the usable codecs on the classpath. 
 
-Place this in the application's `src/main/resources/logback.xml`, or merge the logger entry into its existing configuration:
-
-```xml
-<configuration>
-  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-    <encoder>
-      <pattern>%d{HH:mm:ss.SSS} %-5level %logger - %msg%n</pattern>
-    </encoder>
-  </appender>
-  <logger name="org.neo4j.agentmemory" level="INFO"/>
-  <root level="WARN">
-    <appender-ref ref="CONSOLE"/>
-  </root>
-</configuration>
-```
-
-The package entry admits initialization and fallback INFO events even with a WARN root. Change this single entry to `level="DEBUG"` to expose ordinary operation summaries across the package. `System.Logger.Level.WARNING` appears as WARN in Logback. Configure the bridge and backend at application startup; once-only await fallback events are not replayed. See the [Logback configuration manual](https://logback.qos.ch/manual/configuration.html).
-
-| Level | Core events |
-| --- | --- |
-| DEBUG | Operation starts and terminal success, failure, or cancellation, including HTTP 4xx/5xx and encoding, transport, and decoding failures |
-| INFO | Successful local client construction; once-only absent or blank default-await setting fallback |
-| WARNING | Default base URL selection on each configuration build; once-only invalid default-await setting fallback |
-| ERROR | None currently; applications own reporting of returned exceptions |
-
-`event=client.initialized transport=jdk-http json=jackson3 baseUrl=https://memory.neo4jlabs.com/v1` means local construction succeeded and identifies the configured service URL. The `transport` is `jdk-http`, `spring-rest-client`, `spring-web-client`, `langchain4j-http`, or a custom transport's name, depending on the configured HTTP client. The `json` field is `jackson3` or `jackson2`, depending on the usable codecs on the classpath. It does not establish service reachability or authentication. Operation timing starts at shared request-helper entry, includes POST encoding, and ends after HTTP status validation, decoding, and domain conversion (status validation alone for DELETE). Success does not establish extraction or enrichment readiness. Synchronous validation before helper entry emits no operation event.
-
-For example, at DEBUG the client can emit these diagnostic summaries (values are illustrative):
+Additionally, at DEBUG the client can emit these diagnostic summaries (values are illustrative):
 
 ```text
 event=operation.started operation=listConversations callId=7
@@ -361,91 +257,3 @@ event=operation.completed operation=listConversations callId=7 outcome=success d
 event=operation.started operation=getConversation callId=8
 event=operation.completed operation=getConversation callId=8 outcome=failure durationMs=9 status=404 phase=http errorType=MemoryServiceException
 ```
-
-`callId` is a local counter shared across client instances in the loaded client classes; it is not a durable or distributed identifier. Terminal events carry elapsed `durationMs`, outcome, observed HTTP `status` when available, and optional result counts. Lists use `resultCount`; context uses `reflectionCount`, `observationCount`, and `messageCount`; traces use `stepCount` and `toolCallCount`; explanations use `toolCallCount` and `entityCount`. Failures and cancellations carry a phase (`encode`, `request`, `transport`, `http`, or `decode`) and the unwrapped exception's simple class name in `errorType`.
-
-An optional `requestId` comes from the first available `x-request-id`, `request-id`, or `x-amzn-requestid` response header, in that order, and is emitted only when it matches `[A-Za-z0-9._:-]{1,128}`. Configuration fallback warnings and initialization include the selected base URL. Operation events exclude URLs; all events exclude credentials, resource IDs, message and reasoning content, tool payloads, response excerpts, and exception messages or stack traces. Field text is a diagnostic convention, not a public event API.
-
-Cancellation describes the returned future's outcome, without confirming transport cancellation. An await timeout or interruption leaves the supplied future running and emits no extra operation failure; `await` also avoids reporting propagated failures again. Operations retain the original returned future and exception behavior. Ordinary logger runtime failures are isolated from operation results, while fatal errors are not swallowed. A caller can observe future completion before its terminal logging callback finishes: `join()` does not flush logging. Threshold changes can suppress one event of a pair, and configuring a backend does not guarantee delivery.
-
-You can verify package inheritance independently of a client operation:
-
-```java
-var clientLogger = System.getLogger("org.neo4j.agentmemory.MemoryClient");
-clientLogger.log(System.Logger.Level.INFO, "probe-initialized");
-clientLogger.log(System.Logger.Level.DEBUG, "probe-completed");
-System.getLogger("org.neo4j.agentmemory.AwaitSupport")
-        .log(System.Logger.Level.WARNING, "probe-invalid-setting");
-```
-
-With the package at INFO and root at WARN, only the INFO and WARNING probes appear. In a fresh JVM with the package changed to DEBUG, all three appear.
-
-## Dependency and source delivery
-
-```xml
-<dependency>
-  <groupId>org.neo4j</groupId>
-  <artifactId>agent-memory-client</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
-</dependency>
-<dependency>
-  <groupId>tools.jackson.core</groupId>
-  <artifactId>jackson-databind</artifactId>
-  <version>3.1.5</version>
-</dependency>
-```
-
-`com.fasterxml.jackson.core:jackson-databind` 2.19.0+ works instead of Jackson 3.
-
-Verified supported hosts:
-
-- Spring AI 2.0+ (Jackson 3.1.4+, Spring Framework 7.0+).
-- LangChain4j 1.0+ (its `langchain4j-core` brings Jackson 2.19+).
-- Standalone applications that declare either major.
-
-`micronaut-serde` applications have no `jackson-databind` and must add one.
-
-The default JDK client needs neither Spring nor LangChain4j. Add the corresponding optional application dependency only when injecting that framework's client:
-
-```xml
-<!-- Spring Framework 7.0+ -->
-<dependency>
-  <groupId>org.springframework</groupId>
-  <artifactId>spring-web</artifactId>
-  <version>7.0.9</version>
-</dependency>
-<!-- Spring Framework 7.0+, for a WebClient -->
-<dependency>
-  <groupId>org.springframework</groupId>
-  <artifactId>spring-webflux</artifactId>
-  <version>7.0.9</version>
-</dependency>
-<!-- LangChain4j 1.0+ -->
-<dependency>
-  <groupId>dev.langchain4j</groupId>
-  <artifactId>langchain4j-http-client</artifactId>
-  <version>1.22.0</version>
-</dependency>
-```
-
-The build tests the floors: Jackson 3.1.4 and 2.19.0, Spring Framework 7.0.0 with Micrometer 1.16.0 and Reactor Netty 1.3.0, and LangChain4j 1.0.0. The suite also passes at the newest supported releases below, verifying the endpoints of Jackson 3.1.4 through 3.1.5, Jackson 2.19.0 through 2.22.1, Spring Framework 7.0.0 through 7.0.9 with Micrometer 1.16.0 through 1.16.7 and Reactor Netty 1.3.0 through 1.3.7, and LangChain4j 1.0.0 through 1.22.0:
-
-```bash
-mvn -f clients/java/pom.xml -pl memory-client -am test \
-  -Djackson3.version=3.1.5 -Djackson2.version=2.22.1 \
-  -Dspring.version=7.0.9 -Dmicrometer.version=1.16.7 -Dlangchain4j.version=1.22.0 \
-  -Dreactor-netty.version=1.3.7
-```
-
-Reflecting over `MemoryClientConfiguration.Builder` methods requires Spring Web, Spring WebFlux, and LangChain4j on the classpath; otherwise it throws `NoClassDefFoundError`.
-
-These coordinates alone do not imply a published artifact. The supported handoff is a reachable, exact Git commit and a source build before downstream CI resolves the snapshot. From a clean checkout of the supplied commit, with Java 17+ and Maven available:
-
-```bash
-git clone <reachable-repository-url> agent-memory-tck
-cd agent-memory-tck
-git checkout --detach <delivery-commit-id>
-mvn -f clients/java/pom.xml -pl memory-client -am clean install
-```
-
-Downstream CI should run that build in its own Maven repository before resolving `org.neo4j:agent-memory-client:0.1.0-SNAPSHOT`. Delivery evidence must include the source commit ID, SHA-256 hashes of the built JAR and installed POM, Java and Maven versions, and hosted test counts. The credential-gated persistence check is `mvn -f clients/java/pom.xml -pl memory-client -Dit.test=ConversationMetadataIT verify`; a skip without `NAMS_API_KEY` is not hosted persistence evidence. Use a Workspace API key for an isolated hosted test workspace and `NAMS_BASE_URL` to select its service URL. The check deletes only the UUID it creates.

@@ -26,6 +26,24 @@ ReasoningStep, its request and trace types, explanations, and Tool Calls.
 The entity package owns Entity and EntitySearch. The exception package owns
 the public failure hierarchy and package-private ResponseDiagnostics.
 
+The reasoning package is a sibling of conversation rather than a
+conversation.reasoning subpackage, even though every Reasoning Step belongs to a
+Conversation. The dependency is one-way: Conversation delegates step recording
+and trace retrieval to reasoning types, and the reasoning package imports
+nothing from conversation. Once a Reasoning Step exists, it is addressed by its
+own identity. Tool Call recording and explanations take only a step UUID, and
+steps and traces carry a conversation UUID rather than a Conversation
+back-reference, as [ADR 0002](0002-domain-oriented-java-memory-client.md)
+requires. Reasoning also refers to Entities through explanations. The hosted
+service's reasoning provenance route, which this client does not yet expose, is
+addressed by Entity identity rather than by Conversation. Observations and
+Reflections stay in conversation because they are reachable only through a
+Conversation and its Conversation Context. Java gives a nested package no access
+to its parent package, so nesting would only signal an ownership that the
+dependencies and identities do not have. The split also matches the TCK and the
+other language clients, which treat reasoning memory as a peer of conversation
+and entity memory.
+
 The default JDK HTTP adapter, codecs, private wire records, and operation
 logging live together in internal.http. JdkMemoryClient and its static factory
 are public solely so the root default factory can call them across packages.
