@@ -50,11 +50,8 @@ public final class HttpMemoryClient implements MemoryClient {
 
     @Override
     public CompletableFuture<Conversation> createConversation(CreateConversation request) {
-        var body = new LinkedHashMap<String, Object>();
-        request.getUserId().ifPresent(userId -> body.put("userId", userId));
-        if (!request.metadata().isEmpty()) {
-            body.put("metadata", request.metadata());
-        }
+        var body = new CreateConversationRequest(
+                request.userId(), request.metadata().isEmpty() ? null : request.metadata());
         return post(
                 "createConversation",
                 "/conversations", Map.of(),
@@ -87,12 +84,7 @@ public final class HttpMemoryClient implements MemoryClient {
 
     @Override
     public CompletableFuture<List<Entity>> searchEntities(EntitySearch search) {
-        var body = new LinkedHashMap<String, Object>();
-        body.put("query", search.query());
-        body.put("limit", search.limit());
-        if (search.type() != null) {
-            body.put("type", search.type());
-        }
+        var body = new SearchEntitiesRequest(search.query(), search.limit(), search.type());
         return post(
                 "searchEntities",
                 "/entities/search", Map.of(),
@@ -157,11 +149,8 @@ public final class HttpMemoryClient implements MemoryClient {
     @Override
     public CompletableFuture<ReasoningStep> recordStep(
             UUID conversationId, NewReasoningStep step) {
-        var body = new LinkedHashMap<String, Object>();
-        body.put("conversationId", conversationId);
-        body.put("reasoning", step.reasoning());
-        body.put("actionTaken", step.actionTaken());
-        step.getResult().ifPresent(result -> body.put("result", result));
+        var body = new RecordStepRequest(
+                conversationId, step.reasoning(), step.actionTaken(), step.result());
         return post(
                 "recordStep",
                 "/reasoning/steps", Map.of(),
@@ -172,13 +161,9 @@ public final class HttpMemoryClient implements MemoryClient {
 
     @Override
     public CompletableFuture<ToolCall> recordToolCall(UUID stepId, NewToolCall call) {
-        var body = new LinkedHashMap<String, Object>();
-        body.put("stepId", stepId);
-        body.put("toolName", call.toolName());
-        body.put("input", call.input());
-        body.put("status", call.status());
-        call.getOutput().ifPresent(output -> body.put("output", output));
-        call.getDuration().ifPresent(duration -> body.put("durationMs", duration.toMillis()));
+        var body = new RecordToolCallRequest(
+                stepId, call.toolName(), call.input(), call.status(), call.output(),
+                call.duration() == null ? null : call.duration().toMillis());
         return post(
                 "recordToolCall",
                 "/reasoning/tool-calls", Map.of(),
@@ -413,6 +398,17 @@ public final class HttpMemoryClient implements MemoryClient {
                 ? text
                 : text.substring(0, BODY_EXCERPT_LIMIT) + "…";
     }
+
+    private record CreateConversationRequest(String userId, Map<String, String> metadata) {}
+
+    private record SearchEntitiesRequest(String query, int limit, String type) {}
+
+    private record RecordStepRequest(
+            UUID conversationId, String reasoning, String actionTaken, String result) {}
+
+    private record RecordToolCallRequest(
+            UUID stepId, String toolName, String input, ToolCallStatus status,
+            String output, Long durationMs) {}
 
     private record ConversationResponse(
             UUID id, String userId, Map<String, String> metadata,

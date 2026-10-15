@@ -1,5 +1,7 @@
 package org.neo4j.agentmemory.http;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.StreamReadConstraints;
@@ -29,6 +31,7 @@ final class Jackson2JsonCodec implements JsonCodec {
                 .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
                 .enable(MapperFeature.SORT_CREATOR_PROPERTIES_BY_DECLARATION_ORDER)
                 // Settings shared with Jackson3JsonCodec.
+                .serializationInclusion(JsonInclude.Include.NON_NULL)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
                 .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)

@@ -1,5 +1,7 @@
 package org.neo4j.agentmemory.http;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.MapperFeature;
@@ -14,6 +16,8 @@ final class Jackson3JsonCodec implements JsonCodec {
 
     Jackson3JsonCodec() {
         this.mapper = JsonMapper.builder()
+                .changeDefaultPropertyInclusion(inclusion ->
+                        inclusion.withValueInclusion(JsonInclude.Include.NON_NULL))
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
                 .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)

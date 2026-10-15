@@ -42,6 +42,18 @@ class JsonCodecTest {
     }
 
     @Test
+    void omitsNullPropertiesButPreservesEmptyAndZeroValues() {
+        var json = codec.encode(new OptionalRequestFixture(null, "", 0L));
+
+        assertThat(codec.decode(json, Map.class))
+                .containsEntry("output", "")
+                .containsEntry("durationMs", 0)
+                .doesNotContainKey("result");
+    }
+
+    private record OptionalRequestFixture(String result, String output, Long durationMs) {}
+
+    @Test
     void decodesRichHostedResponseValuesAndIgnoresUnknownFields() {
         var json = """
                 {
