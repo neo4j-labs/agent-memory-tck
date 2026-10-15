@@ -30,6 +30,18 @@
         <wiremock.version>3.13.2</wiremock.version>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>dev.langchain4j</groupId>
@@ -104,6 +116,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.junit-pioneer</groupId>
+            <artifactId>junit-pioneer</artifactId>
+            <version>2.3.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>
@@ -122,6 +140,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>io.github.netmikey.logunit</groupId>
+            <artifactId>logunit-logback</artifactId>
+            <version>2.0.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.wiremock</groupId>
             <artifactId>wiremock</artifactId>
             <version>${wiremock.version}</version>
@@ -135,6 +159,94 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.3</version>
+                <configuration>
+                    <forkCount>1</forkCount>
+                    <!-- JUnit Pioneer's environment annotations require reflective access on Java 17. -->
+                    <argLine>
+                        --add-opens java.base/java.util=ALL-UNNAMED
+                        --add-opens java.base/java.lang=ALL-UNNAMED
+                    </argLine>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>default-test</id>
+                        <configuration>
+                            <excludedGroups>without-frameworks, without-json-codecs, jackson2-only, broken-jackson3</excludedGroups>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>without-frameworks</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <groups>without-frameworks</groups>
+
+                            <excludes>
+                                <exclude>**/integrations/**</exclude>
+                            </excludes>
+                            <classpathDependencyExcludes>
+                                <classpathDependencyExclude>
+                                    org.springframework:spring-web
+                                </classpathDependencyExclude>
+                                <classpathDependencyExclude>
+                                    dev.langchain4j:langchain4j-http-client
+                                </classpathDependencyExclude>
+                            </classpathDependencyExcludes>
+                            <reportsDirectory>
+                                ${project.build.directory}/surefire-reports-without-frameworks
+                            </reportsDirectory>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>jackson2-only</id>
+                        <phase>test</phase>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <groups>jackson2-only</groups>
+                            <includes><include>**/JsonCodecSelectionTest.java</include></includes>
+                            <classpathDependencyExcludes>
+                                <classpathDependencyExclude>tools.jackson.core:jackson-databind</classpathDependencyExclude>
+                                <classpathDependencyExclude>tools.jackson.core:jackson-core</classpathDependencyExclude>
+                            </classpathDependencyExcludes>
+                            <reportsDirectory>${project.build.directory}/surefire-reports-jackson2-only</reportsDirectory>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>broken-jackson3</id>
+                        <phase>test</phase>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <groups>broken-jackson3</groups>
+                            <includes><include>**/JsonCodecSelectionTest.java</include></includes>
+                            <classpathDependencyExcludes>
+                                <classpathDependencyExclude>tools.jackson.core:jackson-core</classpathDependencyExclude>
+                            </classpathDependencyExcludes>
+                            <reportsDirectory>${project.build.directory}/surefire-reports-broken-jackson3</reportsDirectory>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>without-json-codecs</id>
+                        <phase>test</phase>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <groups>without-json-codecs</groups>
+                            <includes><include>**/MissingJsonCodecTest.java</include></includes>
+                            <classpathDependencyExcludes>
+                                <classpathDependencyExclude>tools.jackson.core:jackson-databind</classpathDependencyExclude>
+                                <classpathDependencyExclude>tools.jackson.core:jackson-core</classpathDependencyExclude>
+                                <classpathDependencyExclude>com.fasterxml.jackson.core:jackson-databind</classpathDependencyExclude>
+                                <classpathDependencyExclude>com.fasterxml.jackson.core:jackson-core</classpathDependencyExclude>
+                            </classpathDependencyExcludes>
+                            <reportsDirectory>${project.build.directory}/surefire-reports-without-json-codecs</reportsDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

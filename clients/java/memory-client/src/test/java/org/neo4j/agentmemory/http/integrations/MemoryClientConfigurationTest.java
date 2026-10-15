@@ -1,23 +1,32 @@
-package org.neo4j.agentmemory;
+package org.neo4j.agentmemory.http.integrations;
 
+import io.github.netmikey.logunit.api.LogCapturer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.neo4j.agentmemory.testsupport.EnvironmentProbe;
+import org.neo4j.agentmemory.MemoryClientConfiguration;
+import org.junitpioneer.jupiter.ClearEnvironmentVariable;
+import org.junitpioneer.jupiter.SetEnvironmentVariable;
+import org.slf4j.event.Level;
 
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@ClearEnvironmentVariable(key = "NAMS_API_KEY")
+@ClearEnvironmentVariable(key = "NAMS_BASE_URL")
 class MemoryClientConfigurationTest {
+    @RegisterExtension
+    final LogCapturer logs = LogCapturer.create().captureForType(MemoryClientConfiguration.class);
+
     @Test
     void rejectsNullLangChain4jArguments() {
         assertThatThrownBy(() -> MemoryClientConfiguration.builder()
-                .langChain4jHttpClient(null, org.neo4j.agentmemory.testsupport.HttpClientUnderTest.TEST_EXECUTOR))
+                .langChain4jHttpClient(null, HttpClientUnderTest.TEST_EXECUTOR))
                 .isInstanceOf(NullPointerException.class).hasMessage("httpClient");
         assertThatThrownBy(() -> MemoryClientConfiguration.builder()
                 .langChain4jHttpClient(dev.langchain4j.http.client.jdk.JdkHttpClient.builder().build(), null))
@@ -28,7 +37,7 @@ class MemoryClientConfigurationTest {
     void lastHttpClientSetterWins() {
         var restClient = org.springframework.web.client.RestClient.create();
         var httpClient = dev.langchain4j.http.client.jdk.JdkHttpClient.builder().build();
-        var executor = org.neo4j.agentmemory.testsupport.HttpClientUnderTest.TEST_EXECUTOR;
+        var executor = HttpClientUnderTest.TEST_EXECUTOR;
         var webClient = org.springframework.web.reactive.function.client.WebClient.create();
         var transport = org.neo4j.agentmemory.http.internal.HttpTransports.select(HttpClient.newHttpClient());
         var builder = MemoryClientConfiguration.builder().baseUrl("https://memory.test/v1").apiKey("key");
@@ -61,7 +70,7 @@ class MemoryClientConfigurationTest {
     @Test
     void rejectsNullRestClientArguments() {
         assertThatThrownBy(() -> MemoryClientConfiguration.builder()
-                .restClient(null, org.neo4j.agentmemory.testsupport.HttpClientUnderTest.TEST_EXECUTOR))
+                .restClient(null, HttpClientUnderTest.TEST_EXECUTOR))
                 .isInstanceOf(NullPointerException.class).hasMessage("restClient");
         assertThatThrownBy(() -> MemoryClientConfiguration.builder()
                 .restClient(org.springframework.web.client.RestClient.create(), null))
@@ -96,6 +105,8 @@ class MemoryClientConfigurationTest {
     }
 
     @Test
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "unused-key")
+    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "invalid URL")
     void buildsConfigurationWithExplicitValues() {
         var configuration = MemoryClientConfiguration.builder()
                 .apiKey("workspace-key")
@@ -129,33 +140,54 @@ class MemoryClientConfigurationTest {
     }
 
     @Test
-    void emptyBuilderResolvesEnvironmentWhenBuilt() throws Exception {
-        assertThat(EnvironmentProbe.run(ConfigurationProbe.class,
-                Map.of("NAMS_API_KEY", "environment-key", "NAMS_BASE_URL", "  https://environment.test/v1  ")))
-                .contains("https://environment.test/v1", "key-matches=true")
-                .doesNotContain(" WARN ");
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "environment-key")
+    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "  https://environment.test/v1  ")
+    void emptyBuilderResolvesEnvironmentWhenBuilt() {
+        var configuration = MemoryClientConfiguration.builder().build();
+
+        assertThat(configuration.apiKey()).isEqualTo("environment-key");
+        assertThat(configuration.baseUrl()).isEqualTo(URI.create("https://environment.test/v1"));
+        assertThat(logs.getEvents()).isEmpty();
     }
 
     @Test
-    void defaultsBaseUrlWhenEnvironmentIsAbsentOrBlank() throws Exception {
-        for (var environment : java.util.List.of(Map.of("NAMS_API_KEY", "environment-key"),
-                Map.of("NAMS_API_KEY", "environment-key", "NAMS_BASE_URL", " \t"))) {
-            assertThat(EnvironmentProbe.run(ConfigurationProbe.class, environment))
-                    .contains("https://memory.neo4jlabs.com/v1", "key-matches=true", " WARN ",
-                            "NAMS_BASE_URL is absent or blank; using default base URL")
-                    .doesNotContain("environment-key");
-        }
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "environment-key")
+    void defaultsBaseUrlWhenEnvironmentIsAbsent() {
+        assertDefaultBaseUrlAndWarning();
     }
 
     @Test
-    void validatesEnvironmentDuringBuild() throws Exception {
-        assertThat(EnvironmentProbe.run(ConfigurationProbe.class, Map.of()))
-                .contains("apiKey must not be blank").doesNotContain(" WARN ");
-        assertThat(EnvironmentProbe.run(ConfigurationProbe.class, Map.of("NAMS_API_KEY", " \t")))
-                .contains("apiKey must not be blank");
-        assertThat(EnvironmentProbe.run(ConfigurationProbe.class,
-                Map.of("NAMS_API_KEY", "environment-key", "NAMS_BASE_URL", "invalid URL")))
-                .contains("baseUrl must be an absolute HTTP(S) URL");
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "environment-key")
+    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = " \t")
+    void defaultsBaseUrlWhenEnvironmentIsBlank() {
+        assertDefaultBaseUrlAndWarning();
+    }
+
+    @Test
+    void rejectsAbsentEnvironmentKeyDuringBuild() {
+        assertThatThrownBy(() -> MemoryClientConfiguration.builder().build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("apiKey must not be blank");
+        assertThat(logs.getEvents()).isEmpty();
+    }
+
+    @Test
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = " \t")
+    void rejectsBlankEnvironmentKeyDuringBuild() {
+        assertThatThrownBy(() -> MemoryClientConfiguration.builder().build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("apiKey must not be blank");
+        assertThat(logs.getEvents()).isEmpty();
+    }
+
+    @Test
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "environment-key")
+    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "invalid URL")
+    void rejectsInvalidEnvironmentUrlDuringBuild() {
+        assertThatThrownBy(() -> MemoryClientConfiguration.builder().build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("baseUrl must be an absolute HTTP(S) URL without user info, query, or fragment");
+        assertThat(logs.getEvents()).isEmpty();
     }
 
     @Test
@@ -171,15 +203,17 @@ class MemoryClientConfigurationTest {
         assertThat(second.baseUrl()).isEqualTo(URI.create("https://second.test/v1"));
     }
 
-    public static class ConfigurationProbe {
-        public static void main(String[] args) {
-            try {
-                var configuration = MemoryClientConfiguration.builder().build();
-                System.out.println(configuration.baseUrl());
-                System.out.println("key-matches=" + configuration.apiKey().equals("environment-key"));
-            } catch (IllegalArgumentException failure) {
-                System.out.println(failure.getMessage());
-            }
-        }
+    private void assertDefaultBaseUrlAndWarning() {
+        var configuration = MemoryClientConfiguration.builder().build();
+
+        assertThat(configuration.apiKey()).isEqualTo("environment-key");
+        assertThat(configuration.baseUrl()).isEqualTo(URI.create("https://memory.neo4jlabs.com/v1"));
+        assertThat(logs.getEvents()).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getMessage())
+                    .contains("NAMS_BASE_URL is absent or blank; using default base URL",
+                            "https://memory.neo4jlabs.com/v1")
+                    .doesNotContain("environment-key");
+        });
     }
 }

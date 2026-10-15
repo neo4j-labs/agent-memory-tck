@@ -1,4 +1,4 @@
-package org.neo4j.agentmemory.http;
+package org.neo4j.agentmemory.http.integrations;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
@@ -14,7 +14,6 @@ import org.neo4j.agentmemory.exception.MemoryClientException;
 import org.neo4j.agentmemory.exception.MemoryServiceException;
 import org.neo4j.agentmemory.reasoning.NewReasoningStep;
 import org.neo4j.agentmemory.reasoning.NewToolCall;
-import org.neo4j.agentmemory.testsupport.HttpClientUnderTest;
 
 import java.util.UUID;
 import java.util.concurrent.Executors;

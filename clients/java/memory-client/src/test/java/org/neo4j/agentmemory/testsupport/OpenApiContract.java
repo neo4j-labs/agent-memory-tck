@@ -4,8 +4,9 @@ import com.atlassian.oai.validator.OpenApiInteractionValidator;
 import com.atlassian.oai.validator.wiremock.junit5.WireMockRequestResponseUtil;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -21,7 +22,7 @@ import static org.assertj.core.api.Assertions.fail;
 public final class OpenApiContract {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final String SPEC_JSON = readSpec();
-    private static final JsonNode SPEC = MAPPER.readTree(SPEC_JSON);
+    private static final JsonNode SPEC = readJson(SPEC_JSON);
     private static final String TIMESTAMP = Instant.parse("2026-08-26T09:15:30Z").toString();
     private static final int MAX_DEPTH = 8;
     private static final OpenApiInteractionValidator VALIDATOR =
@@ -43,7 +44,7 @@ public final class OpenApiContract {
                 .withHeader("Content-Type", "application/json");
         return schema == null
                 ? response
-                : response.withBody(MAPPER.writeValueAsString(synthesize(schema, "", 0)));
+                : response.withBody(synthesize(schema, "", 0).toString());
     }
 
     /**
@@ -60,7 +61,7 @@ public final class OpenApiContract {
             var path = templateFor(request.getUrl());
             var schema = requestBodySchema(operation(request.getMethod().getName(), path));
             if (schema != null) {
-                assertDeclared(MAPPER.readTree(body), schema, request.getMethod() + " " + path);
+                assertDeclared(readJson(body), schema, request.getMethod() + " " + path);
             }
         }
     }
@@ -121,7 +122,7 @@ public final class OpenApiContract {
         if (resolved.has("enum")) {
             return resolved.get("enum").get(0);
         }
-        var type = resolved.path("type").asString("string");
+        var type = resolved.path("type").asText("string");
         if ("array".equals(type)) {
             var array = MAPPER.createArrayNode();
             array.add(synthesize(resolved.get("items"), name, depth + 1));
@@ -170,7 +171,7 @@ public final class OpenApiContract {
         if (reference == null) {
             return schema;
         }
-        var name = reference.asString().substring(reference.asString().lastIndexOf('/') + 1);
+        var name = reference.asText().substring(reference.asText().lastIndexOf('/') + 1);
         var definition = SPEC.get("definitions").get(name);
         assertThat(definition).as("unresolved definition '%s'", name).isNotNull();
         return definition;
@@ -184,7 +185,7 @@ public final class OpenApiContract {
 
     private static JsonNode requestBodySchema(JsonNode operation) {
         for (var parameter : operation.path("parameters")) {
-            if ("body".equals(parameter.path("in").asString(""))) {
+            if ("body".equals(parameter.path("in").asText(""))) {
                 return parameter.get("schema");
             }
         }
@@ -193,8 +194,9 @@ public final class OpenApiContract {
 
     private static int declaredSuccessStatus(JsonNode responses, String method, String path) {
         var statuses = new ArrayList<Integer>();
-        for (var code : responses.propertyNames()) {
-            var status = Integer.parseInt(code);
+        var codes = responses.fieldNames();
+        while (codes.hasNext()) {
+            var status = Integer.parseInt(codes.next());
             if (status >= 200 && status < 300) {
                 statuses.add(status);
             }
@@ -208,7 +210,9 @@ public final class OpenApiContract {
     /** Match a concrete request URL back to the templated path that declares it. */
     private static String templateFor(String url) {
         var actual = url.split("\\?", 2)[0].split("/");
-        for (var candidate : SPEC.get("paths").propertyNames()) {
+        var candidates = SPEC.get("paths").fieldNames();
+        while (candidates.hasNext()) {
+            var candidate = candidates.next();
             var template = candidate.split("/");
             if (template.length != actual.length) {
                 continue;
@@ -225,6 +229,14 @@ public final class OpenApiContract {
             }
         }
         return fail("no declared path matches %s", url);
+    }
+
+    private static JsonNode readJson(String json) {
+        try {
+            return MAPPER.readTree(json);
+        } catch (JsonProcessingException failure) {
+            throw new UncheckedIOException(failure);
+        }
     }
 
     private static String readSpec() {

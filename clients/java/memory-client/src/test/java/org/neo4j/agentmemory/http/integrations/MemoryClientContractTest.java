@@ -1,4 +1,4 @@
-package org.neo4j.agentmemory;
+package org.neo4j.agentmemory.http.integrations;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import org.junit.jupiter.api.AfterEach;
@@ -8,6 +8,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.neo4j.agentmemory.MemoryClient;
+import org.neo4j.agentmemory.MemoryClientConfiguration;
 import org.neo4j.agentmemory.conversation.Conversation;
 import org.neo4j.agentmemory.conversation.CreateConversation;
 import org.neo4j.agentmemory.conversation.ListConversations;
@@ -17,7 +19,6 @@ import org.neo4j.agentmemory.http.JsonCodecUnderTest;
 import org.neo4j.agentmemory.reasoning.NewReasoningStep;
 import org.neo4j.agentmemory.reasoning.NewToolCall;
 import org.neo4j.agentmemory.reasoning.ToolCallStatus;
-import org.neo4j.agentmemory.testsupport.HttpClientUnderTest;
 import org.neo4j.agentmemory.testsupport.OpenApiContract;
 
 import java.time.Duration;

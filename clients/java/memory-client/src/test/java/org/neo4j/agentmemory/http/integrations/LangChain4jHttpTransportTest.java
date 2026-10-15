@@ -1,4 +1,4 @@
-package org.neo4j.agentmemory.http;
+package org.neo4j.agentmemory.http.integrations;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
@@ -11,19 +11,14 @@ import dev.langchain4j.http.client.sse.ServerSentEventParser;
 import org.junit.jupiter.api.Test;
 import org.neo4j.agentmemory.MemoryClient;
 import org.neo4j.agentmemory.MemoryClientConfiguration;
-import org.neo4j.agentmemory.exception.MemoryServiceException;
-import org.neo4j.agentmemory.http.internal.HttpTransports;
-import org.neo4j.agentmemory.testsupport.HttpClientUnderTest;
 import org.neo4j.agentmemory.testsupport.OpenApiContract;
 
-import java.net.URI;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
@@ -61,19 +56,4 @@ class LangChain4jHttpTransportTest {
         OpenApiContract.assertOnlyDeclaredRequestProperties();
     }
 
-    @Test
-    void nonSuccessEventsOmitTheRequestId(WireMockRuntimeInfo server) throws InterruptedException {
-        var sink = new RecordingClientLogger(System.Logger.Level.DEBUG);
-        var client = new HttpMemoryClient(URI.create(server.getHttpBaseUrl() + "/v1"), "api-key-secret",
-                HttpTransports.select(JdkHttpClient.builder().build(), HttpClientUnderTest.TEST_EXECUTOR),
-                new Jackson3JsonCodec(), new ClientLogging(sink));
-        stubFor(get(urlEqualTo(PATH)).willReturn(aResponse().withStatus(404).withHeader("X-Request-ID", "req-404")));
-
-        assertThat(catchThrowable(() -> await(client.getConversation(ID)))).isInstanceOf(MemoryServiceException.class);
-
-        var terminal = sink.awaitEvents(3).stream()
-                .filter(entry -> entry.message().contains("event=operation.completed"))
-                .findFirst().orElseThrow();
-        assertThat(terminal.message()).contains("status=404", "outcome=failure").doesNotContain("requestId=");
-    }
 }

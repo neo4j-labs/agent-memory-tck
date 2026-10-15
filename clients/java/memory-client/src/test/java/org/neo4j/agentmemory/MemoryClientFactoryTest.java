@@ -2,17 +2,23 @@ package org.neo4j.agentmemory;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
+import io.github.netmikey.logunit.api.LogCapturer;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junitpioneer.jupiter.ClearEnvironmentVariable;
+import org.junitpioneer.jupiter.SetEnvironmentVariable;
 import org.neo4j.agentmemory.conversation.ListConversations;
-import org.neo4j.agentmemory.testsupport.EnvironmentProbe;
 import org.neo4j.agentmemory.testsupport.OpenApiContract;
+import org.slf4j.event.LoggingEvent;
 
 import java.net.http.HttpClient;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -21,49 +27,32 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
+@ClearEnvironmentVariable(key = "NAMS_API_KEY")
+@ClearEnvironmentVariable(key = "NAMS_BASE_URL")
 class MemoryClientFactoryTest {
+
+    @RegisterExtension
+    final LogCapturer logs = LogCapturer.create().captureForType(MemoryClient.class);
+
     @Test
-    void defaultClientRunsWithoutSpringOrLangChain4j(WireMockRuntimeInfo server) throws Exception {
-        var response = OpenApiContract.response("get", "/v1/conversations/{id}");
-        var id = UUID.fromString(tools.jackson.databind.json.JsonMapper.builder().build()
-                .readTree(response.build().getBody()).get("id").asString());
-        stubFor(get(urlEqualTo("/v1/conversations/" + id)).willReturn(response));
+    @Tag("without-frameworks")
+    void defaultClientRunsWithoutSpringOrLangChain4j(WireMockRuntimeInfo server) {
+        assertThatThrownBy(() -> Class.forName("org.springframework.web.client.RestClient"))
+                .isInstanceOf(ClassNotFoundException.class);
+        assertThatThrownBy(() -> Class.forName("dev.langchain4j.http.client.HttpClient"))
+                .isInstanceOf(ClassNotFoundException.class);
 
-        var output = EnvironmentProbe.runOnClasspath(
-                EnvironmentProbe.classpathWithout(
-                        "spring-", "langchain4j-", "micrometer-", "reactor-", "reactive-streams-", "netty-"),
-                FrameworkFreeProbe.class,
-                Map.of("NAMS_API_KEY", "workspace-key", "NAMS_BASE_URL", server.getHttpBaseUrl() + "/v1"),
-                id.toString());
+        var id = UUID.randomUUID();
+        stubFor(get(urlEqualTo("/v1/conversations/" + id))
+                .willReturn(OpenApiContract.response("get", "/v1/conversations/{id}")));
+        var client = MemoryClient.create(MemoryClientConfiguration.builder()
+                .apiKey("workspace-key").baseUrl(server.getHttpBaseUrl() + "/v1").build());
 
-        assertThat(output.lines()).contains("spring=absent", "langchain4j=absent",
-                "conversation=" + id, "builderReflection=NoClassDefFoundError");
+        assertThat(await(client.getConversation(id)).id()).isNotNull();
+        logs.assertContains("event=client.initialized transport=jdk-http");
         verify(getRequestedFor(urlEqualTo("/v1/conversations/" + id))
                 .withHeader("Authorization", equalTo("Bearer workspace-key")));
-        OpenApiContract.assertEveryExchangeMatchesTheContract();
-        OpenApiContract.assertOnlyDeclaredRequestProperties();
-    }
-
-    public static class FrameworkFreeProbe {
-        public static void main(String[] args) throws Exception {
-            try {
-                Class.forName("org.springframework.web.client.RestClient");
-            } catch (ClassNotFoundException absent) {
-                System.out.println("spring=absent");
-            }
-            try {
-                Class.forName("dev.langchain4j.http.client.HttpClient");
-            } catch (ClassNotFoundException absent) {
-                System.out.println("langchain4j=absent");
-            }
-            System.out.println("conversation=" + await(MemoryClient.create()
-                    .getConversation(UUID.fromString(args[0]))).id());
-            try {
-                MemoryClientConfiguration.Builder.class.getDeclaredMethods();
-            } catch (NoClassDefFoundError absent) {
-                System.out.println("builderReflection=NoClassDefFoundError");
-            }
-        }
+        assertContract();
     }
 
     @Test
@@ -91,66 +80,90 @@ class MemoryClientFactoryTest {
         }
     }
 
-    @Test
-    void environmentFactoryUsesConfiguredUrlAndWorkspaceApiKey(WireMockRuntimeInfo server) throws Exception {
-        stubFor(get(urlEqualTo("/v1/conversations?limit=10"))
-                .willReturn(OpenApiContract.response("get", "/v1/conversations")));
+    @ParameterizedTest
+    @EnumSource(Factory.class)
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "workspace-key")
+    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "  https://environment.test/v1  ")
+    void factoriesUseConfiguredEnvironmentUrl(Factory factory) {
+        assertThat(factory.create()).isNotNull();
 
-        assertThat(probe(Map.of("NAMS_BASE_URL", "  " + server.getHttpBaseUrl() + "/v1  ",
-                "NAMS_API_KEY", "workspace-key"), "read")).contains("read-success");
-
-        verify(getRequestedFor(urlEqualTo("/v1/conversations?limit=10"))
-                .withHeader("Authorization", equalTo("Bearer workspace-key")));
-        OpenApiContract.assertEveryExchangeMatchesTheContract();
-        OpenApiContract.assertOnlyDeclaredRequestProperties();
+        logs.assertContains("event=client.initialized transport=jdk-http json=jackson3 baseUrl=https://environment.test/v1");
+        assertNoCredentialsLogged();
+        assertThat(getAllServeEvents()).isEmpty();
     }
 
     @Test
-    void environmentFactoryRejectsAbsentOrBlankApiKey() throws Exception {
-        for (var environment : java.util.List.of(Map.<String, String>of(),
-                Map.of("NAMS_API_KEY", " \t"))) {
-            assertThat(probe(environment, "create")).contains("apiKey must not be blank");
-        }
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "workspace-key")
+    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "https://environment.test/v1")
+    void configurationUsesEnvironmentKeyWithExplicitUrl(WireMockRuntimeInfo server) {
+        stubConversationList();
+        var client = MemoryClient.create(MemoryClientConfiguration.builder()
+                .baseUrl(server.getHttpBaseUrl() + "/v1").build());
+
+        assertConversationList(client, "workspace-key");
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Factory.class, names = {"NO_ARGUMENT", "EMPTY_CONFIGURATION"})
+    void factoriesRejectAbsentEnvironmentKey(Factory factory) {
+        assertThat(System.getenv("NAMS_API_KEY")).isNull();
+        assertMissingEnvironmentKey(factory);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Factory.class, names = {"NO_ARGUMENT", "EMPTY_CONFIGURATION"})
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = " \t")
+    void factoriesRejectBlankEnvironmentKey(Factory factory) {
+        assertThat(System.getenv("NAMS_API_KEY")).isBlank();
+        assertMissingEnvironmentKey(factory);
+    }
+
+    @ParameterizedTest
+    @EnumSource(Factory.class)
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "workspace-key")
+    void factoriesUseDefaultUrlForAbsentEnvironmentUrl(Factory factory) {
+        assertThat(System.getenv("NAMS_BASE_URL")).isNull();
+        assertDefaultUrl(factory);
+    }
+
+    @ParameterizedTest
+    @EnumSource(Factory.class)
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "workspace-key")
+    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = " \t")
+    void factoriesUseDefaultUrlForBlankEnvironmentUrl(Factory factory) {
+        assertThat(System.getenv("NAMS_BASE_URL")).isBlank();
+        assertDefaultUrl(factory);
     }
 
     @Test
-    void factoriesUseDefaultUrlForAbsentOrBlankConfiguration() throws Exception {
-        assertThat(probe(Map.of("NAMS_API_KEY", "workspace-key"), "create"))
-                .contains("constructed", "event=client.initialized transport=jdk-http json=jackson3 baseUrl=https://memory.neo4jlabs.com/v1")
-                .doesNotContain("workspace-key");
-        assertThat(probe(Map.of("NAMS_API_KEY", "workspace-key", "NAMS_BASE_URL", " \t"),
-                "create")).contains("constructed");
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "unused-key")
+    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "  https://environment.test/v1  ")
+    void configurationKeyOverridesEnvironmentAndRetainsEnvironmentUrl() {
+        var configuration = MemoryClientConfiguration.builder().apiKey("explicit-key").build();
+        assertThat(configuration.apiKey()).isEqualTo("explicit-key");
+        assertThat(configuration.baseUrl().toString()).isEqualTo("https://environment.test/v1");
+
+        assertThat(MemoryClient.create(configuration)).isNotNull();
+
+        logs.assertContains("baseUrl=https://environment.test/v1");
+        assertNoCredentialsLogged();
+        assertThat(getAllServeEvents()).isEmpty();
     }
 
-    @Test
-    void configurationKeyOverridesEnvironmentAndUsesConfiguredUrl(WireMockRuntimeInfo server) throws Exception {
-        stubFor(get(urlEqualTo("/v1/conversations?limit=10"))
-                .willReturn(OpenApiContract.response("get", "/v1/conversations")));
+    @ParameterizedTest
+    @ValueSource(strings = {"", "/"})
+    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "unused-key")
+    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "invalid environment URL")
+    void configurationOverridesEnvironmentAndSupportsTrailingSlash(String suffix, WireMockRuntimeInfo server) {
+        stubConversationList();
+        var baseUrl = server.getHttpBaseUrl() + "/v1" + suffix;
+        var client = MemoryClient.create(MemoryClientConfiguration.builder()
+                .apiKey("explicit-key").baseUrl(baseUrl).build());
 
-        assertThat(probe(Map.of("NAMS_BASE_URL", server.getHttpBaseUrl() + "/v1",
-                "NAMS_API_KEY", "unused-environment-key"), "explicit-key")).contains("read-success");
-
-        verify(getRequestedFor(urlEqualTo("/v1/conversations?limit=10"))
-                .withHeader("Authorization", equalTo("Bearer explicit-key")));
-        OpenApiContract.assertEveryExchangeMatchesTheContract();
-        OpenApiContract.assertOnlyDeclaredRequestProperties();
-    }
-
-    @Test
-    void configurationOverridesEnvironmentAndSupportsTrailingSlash(WireMockRuntimeInfo server) throws Exception {
-        stubFor(get(urlEqualTo("/v1/conversations?limit=10"))
-                .willReturn(OpenApiContract.response("get", "/v1/conversations")));
-
-        assertThat(EnvironmentProbe.run(FactoryProbe.class,
-                Map.of("NAMS_BASE_URL", "invalid environment URL", "NAMS_API_KEY", "unused-key"),
-                "explicit-configuration", server.getHttpBaseUrl() + "/v1/"))
-                .contains("read-success", "baseUrl=" + server.getHttpBaseUrl() + "/v1/")
-                .doesNotContain("unused-key", "explicit-key", "invalid environment URL");
-
-        verify(getRequestedFor(urlEqualTo("/v1/conversations?limit=10"))
-                .withHeader("Authorization", equalTo("Bearer explicit-key")));
-        OpenApiContract.assertEveryExchangeMatchesTheContract();
-        OpenApiContract.assertOnlyDeclaredRequestProperties();
+        assertConversationList(client, "explicit-key");
+        logs.assertContains("baseUrl=" + baseUrl);
+        assertThat(logs.getEvents()).extracting(LoggingEvent::getMessage)
+                .allSatisfy(message -> assertThat(message).doesNotContain("invalid environment URL"));
     }
 
     @Test
@@ -167,31 +180,61 @@ class MemoryClientFactoryTest {
                 .hasMessage("configuration");
     }
 
-    private static String probe(Map<String, String> environment, String mode) throws Exception {
-        return EnvironmentProbe.run(FactoryProbe.class, environment, mode);
+    private void assertMissingEnvironmentKey(Factory factory) {
+        assertThatThrownBy(factory::create)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("apiKey must not be blank");
+        assertThat(logs.getEvents()).isEmpty();
     }
 
-    public static class FactoryProbe {
-        public static void main(String[] args) throws Exception {
-            try {
-                MemoryClient client;
-                if (args[0].equals("explicit-configuration")) {
-                    client = MemoryClient.create(MemoryClientConfiguration.builder()
-                            .apiKey("explicit-key").baseUrl(args[1]).build());
-                } else if (args[0].equals("explicit-key")) {
-                    client = MemoryClient.create(MemoryClientConfiguration.builder().apiKey("explicit-key").build());
-                } else {
-                    client = MemoryClient.create();
-                }
-                if (args[0].equals("create")) {
-                    System.out.println("constructed");
-                } else {
-                    client.listConversations(new ListConversations(10)).get(5, TimeUnit.SECONDS);
-                    System.out.println("read-success");
-                }
-            } catch (IllegalArgumentException failure) {
-                System.out.println(failure.getMessage());
+    private void assertDefaultUrl(Factory factory) {
+        assertThat(factory.create()).isNotNull();
+        logs.assertContains("event=client.initialized transport=jdk-http json=jackson3 baseUrl=https://memory.neo4jlabs.com/v1");
+        assertNoCredentialsLogged();
+        assertThat(getAllServeEvents()).isEmpty();
+    }
+
+    private static void stubConversationList() {
+        stubFor(get(urlEqualTo("/v1/conversations?limit=10"))
+                .willReturn(OpenApiContract.response("get", "/v1/conversations")));
+    }
+
+    private void assertConversationList(MemoryClient client, String apiKey) {
+        assertThat(await(client.listConversations(new ListConversations(10)))).isNotEmpty();
+        verify(getRequestedFor(urlEqualTo("/v1/conversations?limit=10"))
+                .withHeader("Authorization", equalTo("Bearer " + apiKey)));
+        assertNoCredentialsLogged();
+        assertContract();
+    }
+
+    private void assertNoCredentialsLogged() {
+        assertThat(logs.getEvents()).extracting(LoggingEvent::getMessage)
+                .allSatisfy(message -> assertThat(message)
+                        .doesNotContain("workspace-key", "explicit-key", "unused-key"));
+    }
+
+    private static void assertContract() {
+        OpenApiContract.assertEveryExchangeMatchesTheContract();
+        OpenApiContract.assertOnlyDeclaredRequestProperties();
+    }
+
+    enum Factory {
+        NO_ARGUMENT {
+            @Override MemoryClient create() {
+                return MemoryClient.create();
             }
-        }
+        },
+        EMPTY_CONFIGURATION {
+            @Override MemoryClient create() {
+                return MemoryClient.create(MemoryClientConfiguration.builder().build());
+            }
+        },
+        EXPLICIT_KEY {
+            @Override MemoryClient create() {
+                return MemoryClient.create(MemoryClientConfiguration.builder().apiKey("explicit-key").build());
+            }
+        };
+
+        abstract MemoryClient create();
     }
 }

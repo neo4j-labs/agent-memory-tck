@@ -1567,55 +1567,53 @@
       },
       "type": "object"
     },
-    "handlers.WorkspaceAuthInfo": {
+    "handlers.WorkspaceArchive": {
       "properties": {
-        "token": {
+        "createdAt": {
+          "example": "2026-10-01T03:00:00Z",
           "type": "string"
         },
-        "workspace_id": {
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "handlers.WorkspaceBackup": {
-      "properties": {
-        "key": {
-          "example": "dumps/3f2a9c/neo4j-2026-09-30.dump",
+        "expiresAt": {
+          "example": "2026-10-31T03:00:00Z",
           "type": "string"
         },
-        "lastModified": {
-          "example": "2026-09-30T12:00:00Z",
+        "id": {
+          "example": "Jm9xk2Lr0a8Q",
           "type": "string"
         },
-        "size": {
-          "example": 1048576,
+        "nodes": {
+          "example": 1520,
           "type": "integer"
+        },
+        "relationships": {
+          "example": 3410,
+          "type": "integer"
+        },
+        "takenAt": {
+          "description": "When the data was captured. The same as createdAt, except for a\nsnapshot imported from a backup taken before the managed-database pool.",
+          "example": "2026-10-01T03:00:00Z",
+          "type": "string"
         }
       },
       "type": "object"
     },
-    "handlers.WorkspaceBackupsResponse": {
+    "handlers.WorkspaceArchivesResponse": {
       "properties": {
-        "backups": {
+        "archives": {
           "items": {
-            "$ref": "#/definitions/handlers.WorkspaceBackup"
+            "$ref": "#/definitions/handlers.WorkspaceArchive"
           },
           "type": "array"
         }
       },
       "type": "object"
     },
-    "handlers.WorkspaceBootstrapRequiredResponse": {
+    "handlers.WorkspaceAuthInfo": {
       "properties": {
-        "bootstrap_url": {
+        "token": {
           "type": "string"
         },
-        "code": {
-          "example": "database_bootstrap_required",
-          "type": "string"
-        },
-        "message": {
+        "workspace_id": {
           "type": "string"
         }
       },
@@ -1756,9 +1754,6 @@
         "mode": {
           "example": "managed",
           "type": "string"
-        },
-        "sandboxActive": {
-          "type": "boolean"
         }
       },
       "type": "object"
@@ -1843,7 +1838,7 @@
           "type": "boolean"
         },
         "status": {
-          "example": "provisioning",
+          "example": "active",
           "type": "string"
         }
       },
@@ -1852,6 +1847,10 @@
     "handlers.WorkspaceDetailsResponse": {
       "properties": {
         "createdAt": {
+          "type": "string"
+        },
+        "dbMode": {
+          "example": "managed",
           "type": "string"
         },
         "id": {
@@ -1864,9 +1863,6 @@
           "type": "string"
         },
         "plan": {
-          "type": "string"
-        },
-        "provisioningStage": {
           "type": "string"
         },
         "status": {
@@ -2003,8 +1999,26 @@
     },
     "handlers.WorkspaceProvisionRequest": {
       "properties": {
-        "restoreFromKey": {
-          "example": "dumps/3f2a9c/neo4j-2026-09-30.dump",
+        "restoreFromArchive": {
+          "example": "Jm9xk2Lr0a8Q",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.WorkspaceProvisionResponse": {
+      "properties": {
+        "adopted": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "retry": {
+          "type": "boolean"
+        },
+        "status": {
+          "example": "active",
           "type": "string"
         }
       },
@@ -2589,18 +2603,12 @@
         "perf": {
           "$ref": "#/definitions/handlers.feedbackPerf"
         },
-        "provisioningStage": {
-          "type": "string"
-        },
         "referrer": {
           "description": "Browser / device",
           "type": "string"
         },
         "route": {
           "type": "string"
-        },
-        "sandboxActive": {
-          "type": "boolean"
         },
         "screen": {
           "$ref": "#/definitions/handlers.feedbackScreen"
@@ -3694,7 +3702,7 @@
       "name": "Apache 2.0"
     },
     "title": "NAMS Memory API",
-    "version": "1.1.0"
+    "version": "1.4.0"
   },
   "paths": {
     "/.well-known/jwks.json": {
@@ -7696,6 +7704,7 @@
     },
     "/v1/reviews": {
       "get": {
+        "description": "The pending queue holds only pairs whose two entities share at least one neighbouring entity; a pending pair nothing in the graph connects is left out until something does.",
         "parameters": [
           {
             "description": "Page size (1-200, default 50)",
@@ -7826,7 +7835,7 @@
         "consumes": [
           "application/json"
         ],
-        "description": "Pairs whose entities belong to different users (or a user's and a shared one) are never merged: they are skipped and counted in excludedCrossUser, in the dry-run preview and in the result. While the workspace's existing memory is still being assigned to users, the call (dry run included) answers 503 user_partition_not_ready with Retry-After.",
+        "description": "Only pairs in the pending queue are candidates: pairs whose two entities share at least one neighbouring entity.\nPairs whose entities belong to different users (or a user's and a shared one) are never merged: they are skipped and counted in excludedCrossUser, in the dry-run preview and in the result. While the workspace's existing memory is still being assigned to users, the call (dry run included) answers 503 user_partition_not_ready with Retry-After.",
         "parameters": [
           {
             "description": "Bulk decision payload",
@@ -7881,6 +7890,7 @@
     },
     "/v1/reviews/clusters": {
       "get": {
+        "description": "The pending queue holds only pairs whose two entities share at least one neighbouring entity; a pending pair nothing in the graph connects is left out until something does.",
         "parameters": [
           {
             "description": "Only return clusters with at least this many entities (default 3)",
@@ -7996,6 +8006,7 @@
     },
     "/v1/reviews/stats": {
       "get": {
+        "description": "The pending queue holds only pairs whose two entities share at least one neighbouring entity; a pending pair nothing in the graph connects is left out until something does. Every pending figure counts that queue.",
         "produces": [
           "application/json"
         ],
@@ -8051,6 +8062,7 @@
     },
     "/v1/reviews/stats/pending": {
       "get": {
+        "description": "The pending queue holds only pairs whose two entities share at least one neighbouring entity; a pending pair nothing in the graph connects is left out until something does.",
         "produces": [
           "application/json"
         ],
@@ -9138,15 +9150,7 @@
     },
     "/v1/workspace": {
       "delete": {
-        "description": "Soft-delete the current workspace. Owner only, with a user token. A user's last remaining workspace cannot be deleted. When the request carries the user's Auth0 access token in X-Auth0-Token, the managed database is stopped as well; otherwise it expires through inactivity.",
-        "parameters": [
-          {
-            "description": "Auth0 access token, used to stop the managed database",
-            "in": "header",
-            "name": "X-Auth0-Token",
-            "type": "string"
-          }
-        ],
+        "description": "Delete the current workspace. Owner only, with a user token. A user's last remaining workspace cannot be deleted. A managed workspace's database is deleted with it, permanently. While a database copy, snapshot restore or move onto the managed pool runs, the delete is refused with 409 copy_in_progress. If the tenant's access to it cannot be removed, the workspace is kept and the call answers 503; once access is removed the call succeeds, and a database Aura does not delete at once is queued and retried by the worker.",
         "produces": [
           "application/json"
         ],
@@ -9165,6 +9169,24 @@
           },
           "403": {
             "description": "insufficient workspace role",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "workspace not found",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "copy_in_progress",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "503": {
+            "description": "database_delete_failed",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9271,9 +9293,9 @@
         ]
       }
     },
-    "/v1/workspace/backups": {
+    "/v1/workspace/archives": {
       "get": {
-        "description": "List the backups of the workspace's current or previous managed database, most recent first. Empty when the workspace never had a managed database. Requires a user token whose workspace role is owner or admin.",
+        "description": "List the snapshots the workspace's database can be restored from, newest first. A snapshot is written when a managed database is deleted after a period without activity, and is kept until expiresAt. Restore one with POST /v1/workspace/provision {\"restoreFromArchive\": \"\u003cid\u003e\"}. Requires a user token or Admin key whose workspace role is owner or admin.",
         "produces": [
           "application/json"
         ],
@@ -9281,23 +9303,11 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/handlers.WorkspaceBackupsResponse"
+              "$ref": "#/definitions/handlers.WorkspaceArchivesResponse"
             }
           },
           "403": {
             "description": "insufficient workspace role",
-            "schema": {
-              "$ref": "#/definitions/handlers.ErrorResponse"
-            }
-          },
-          "412": {
-            "description": "a one-time dashboard login is required first",
-            "schema": {
-              "$ref": "#/definitions/handlers.WorkspaceBootstrapRequiredResponse"
-            }
-          },
-          "502": {
-            "description": "failed to list backups",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9308,7 +9318,7 @@
             "BearerAuth": []
           }
         ],
-        "summary": "List database backups",
+        "summary": "List database snapshots",
         "tags": [
           "Workspace"
         ]
@@ -9316,7 +9326,7 @@
     },
     "/v1/workspace/database": {
       "get": {
-        "description": "Return the workspace's database mode and connection info. The password is never included. Managed mode returns connections.rw; external mode returns a single connection object instead. sandboxActive is omitted when the database's liveness cannot be determined.",
+        "description": "Return the workspace's database mode and connection info. The password is never included. Managed mode returns connections.rw once the database exists; external mode returns a single connection object instead. Whether the database serves is the workspace's status (GET /v1/workspace).",
         "produces": [
           "application/json"
         ],
@@ -9354,7 +9364,7 @@
         "consumes": [
           "application/json"
         ],
-        "description": "Switch the workspace between a managed database and an external Neo4j. Switching to external tests the connection and creates the schema before anything is stored; on failure the workspace keeps its current mode. Switching to managed reuses the previous managed database if it is still running (200), and otherwise provisions a new one in the background (202), which needs the user's Auth0 access token in X-Auth0-Token. Data is not copied: use the database copy endpoints for that. Requires a user token whose workspace role is owner or admin.",
+        "description": "Switch the workspace between a managed database and an external Neo4j. Switching to external tests the connection and creates the schema before anything is stored; on failure the workspace keeps its current mode. Switching to managed provisions synchronously, reusing the workspace's previous managed database while it still exists. Data is not copied: use the database copy endpoints for that. Requires a user token whose workspace role is owner or admin.",
         "parameters": [
           {
             "description": "Target mode and, for external, the connection",
@@ -9364,12 +9374,6 @@
             "schema": {
               "$ref": "#/definitions/handlers.WorkspaceDatabaseUpdateRequest"
             }
-          },
-          {
-            "description": "Auth0 access token, required to provision a managed database",
-            "in": "header",
-            "name": "X-Auth0-Token",
-            "type": "string"
           }
         ],
         "produces": [
@@ -9382,14 +9386,8 @@
               "$ref": "#/definitions/handlers.WorkspaceDatabaseUpdateResponse"
             }
           },
-          "202": {
-            "description": "managed database provisioning",
-            "schema": {
-              "$ref": "#/definitions/handlers.WorkspaceDatabaseUpdateResponse"
-            }
-          },
           "400": {
-            "description": "invalid mode or connection, or missing Auth0 token",
+            "description": "invalid mode or connection",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9400,16 +9398,16 @@
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
-          "409": {
-            "description": "copy_in_progress or database_in_use",
+          "404": {
+            "description": "workspace not found, or being deleted",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
-          "412": {
-            "description": "a one-time dashboard login is required first",
+          "409": {
+            "description": "copy_in_progress, database_in_use (another workspace uses or is copying into that database), database_busy, or external_database (switched back to external while provisioning)",
             "schema": {
-              "$ref": "#/definitions/handlers.WorkspaceBootstrapRequiredResponse"
+              "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
           "424": {
@@ -9420,6 +9418,12 @@
           },
           "502": {
             "description": "external database schema init failed",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "503": {
+            "description": "switched to managed, but provisioning did not finish (retry); workspace_limit_unavailable; or external_target_busy (another request is adopting that database; retry)",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9438,7 +9442,7 @@
     },
     "/v1/workspace/database/copy": {
       "get": {
-        "description": "Return the most recent database-copy job for the workspace (the optional data copy that runs when switching database mode), or 404 when none exists. Polled by the dashboard for progress. status switched_empty means the switch completed into an empty managed database because the copy failed, and the source external database still holds the data; failureMessage accompanies the failure states. Requires a user token whose workspace role is owner or admin.",
+        "description": "Return the most recent database-copy job for the workspace (the optional data copy that runs when switching database mode), or 204 with no body when none exists. Polled by the dashboard for progress. status switched_empty means the switch completed into an empty managed database because the copy failed, and the source external database still holds the data; failureMessage accompanies the failure states. Requires a user token whose workspace role is owner or admin.",
         "produces": [
           "application/json"
         ],
@@ -9449,11 +9453,8 @@
               "$ref": "#/definitions/handlers.WorkspaceDatabaseCopyResponse"
             }
           },
-          "404": {
-            "description": "no database copy for this workspace",
-            "schema": {
-              "$ref": "#/definitions/handlers.ErrorResponse"
-            }
+          "204": {
+            "description": "no database copy for this workspace"
           }
         },
         "security": [
@@ -9498,14 +9499,26 @@
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
+          "403": {
+            "description": "insufficient workspace role, or workspace_limit_reached",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
           "409": {
-            "description": "copy_in_progress or destination_not_empty",
+            "description": "copy_in_progress, destination_not_empty, database_in_use or database_busy",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
           "422": {
             "description": "preflight failed",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "503": {
+            "description": "workspace_limit_unavailable or external_target_busy (retry)",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9872,10 +9885,10 @@
         "consumes": [
           "application/json"
         ],
-        "description": "Start provisioning a managed database for the workspace. Runs in the background: poll GET /v1/workspace for status. Pass restoreFromKey (a key from GET /v1/workspace/backups) to load the new database from a backup. Requires a user token whose workspace role is owner or admin.",
+        "description": "Create the workspace's managed database and answer once it serves, usually within a minute, occasionally two or three. When the request budget runs out while the database is still starting, the call answers 202 with retry=true: call again, with the same body, and that call continues where this one stopped. Idempotent: a workspace whose database already answers returns at once, and a call cut short (client timeout, disconnect) is completed by the next one, which reuses the work already done.\nTo bring back a database deleted for inactivity, name one of GET /v1/workspace/archives in restoreFromArchive. The call then answers status \"restoring\": the new database is filled from the snapshot in the background, writes are refused with 503 writes_paused until it finishes, and GET /v1/workspace reports \"active\" (or \"error\" with a statusMessage) when it does. A call without a body on a workspace with a restore that has not started cancels it. Requires a user token or Admin key whose workspace role is owner or admin.",
         "parameters": [
           {
-            "description": "Optional backup to restore",
+            "description": "Optional snapshot to restore",
             "in": "body",
             "name": "body",
             "schema": {
@@ -9887,14 +9900,20 @@
           "application/json"
         ],
         "responses": {
-          "202": {
-            "description": "status is provisioning",
+          "200": {
+            "description": "status is active, or restoring when a snapshot is being loaded",
             "schema": {
-              "$ref": "#/definitions/handlers.WorkspaceStatusResponse"
+              "$ref": "#/definitions/handlers.WorkspaceProvisionResponse"
+            }
+          },
+          "202": {
+            "description": "status is provisioning and retry is true: call again",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceProvisionResponse"
             }
           },
           "400": {
-            "description": "invalid restoreFromKey",
+            "description": "invalid_body",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9905,16 +9924,22 @@
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
-          "409": {
-            "description": "provisioning_in_progress",
+          "404": {
+            "description": "workspace not found, or archive_not_found",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
-          "412": {
-            "description": "a one-time dashboard login is required first",
+          "409": {
+            "description": "external_database, copy_in_progress (a restore is already running), or restore_not_allowed (the workspace has a database)",
             "schema": {
-              "$ref": "#/definitions/handlers.WorkspaceBootstrapRequiredResponse"
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "503": {
+            "description": "provisioning_failed (retry), no_capacity, or managed_provisioning_disabled",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
             }
           }
         },
@@ -10017,15 +10042,21 @@
     },
     "/v1/workspace/reprovision": {
       "post": {
-        "description": "Restart provisioning for a workspace whose provisioning is stuck or failed. Runs in the background: poll GET /v1/workspace for status. Requires a user token whose workspace role is owner or admin.",
+        "description": "Bring back a workspace whose database failed or was deleted after the inactivity window. Identical to POST /v1/workspace/provision: synchronous, idempotent, and a workspace whose database still answers is left as it is. Requires a user token or Admin key whose workspace role is owner or admin.",
         "produces": [
           "application/json"
         ],
         "responses": {
-          "202": {
-            "description": "status is provisioning",
+          "200": {
+            "description": "status is active",
             "schema": {
-              "$ref": "#/definitions/handlers.WorkspaceStatusResponse"
+              "$ref": "#/definitions/handlers.WorkspaceProvisionResponse"
+            }
+          },
+          "202": {
+            "description": "status is provisioning and retry is true: call again",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceProvisionResponse"
             }
           },
           "403": {
@@ -10035,15 +10066,15 @@
             }
           },
           "409": {
-            "description": "provisioning_in_progress",
+            "description": "external_database",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
-          "412": {
-            "description": "a one-time dashboard login is required first",
+          "503": {
+            "description": "provisioning_failed (retry), no_capacity, or managed_provisioning_disabled",
             "schema": {
-              "$ref": "#/definitions/handlers.WorkspaceBootstrapRequiredResponse"
+              "$ref": "#/definitions/handlers.ErrorResponse"
             }
           }
         },
@@ -10149,7 +10180,7 @@
         "consumes": [
           "application/json"
         ],
-        "description": "Create a new workspace with status \"pending\". A database is not provisioned automatically — provisioning is a separate step that requires a user-token session (performed from the dashboard). Workspace names are unique per owner.",
+        "description": "Create a new workspace with status \"pending\". A managed workspace has no database until POST /v1/workspace/provision, which callers chain straight after this one. Workspace names are unique per owner.",
         "parameters": [
           {
             "description": "Workspace name",
@@ -10185,6 +10216,12 @@
           },
           "409": {
             "description": "name_taken (includes existing_workspace_id)",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "503": {
+            "description": "workspace_limit_unavailable: the managed-workspace limit could not be checked; retry",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
