@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.UUID;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.getAllServeEvents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -52,7 +51,7 @@ public final class OpenApiContract {
      * misspelled property name validates cleanly. Reject anything the request definition omits.
      */
     public static void assertOnlyDeclaredRequestProperties() {
-        for (var event : getAllServeEvents()) {
+        for (var event : WireMock.getAllServeEvents()) {
             var request = event.getRequest();
             var body = request.getBodyAsString();
             if (body == null || body.isBlank()) {
@@ -72,7 +71,7 @@ public final class OpenApiContract {
      * recorded exchange directly and synchronously instead, so there is no timing dependency.
      */
     public static void assertEveryExchangeMatchesTheContract() {
-        for (var event : getAllServeEvents()) {
+        for (var event : WireMock.getAllServeEvents()) {
             var request = event.getRequest();
             var report = VALIDATOR.validate(
                     WireMockRequestResponseUtil.toRequest(request),
