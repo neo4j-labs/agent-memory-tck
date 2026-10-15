@@ -23,6 +23,7 @@ import java.util.concurrent.RejectedExecutionException;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 @ParameterizedClass
@@ -46,7 +47,7 @@ class MemoryClientHttpTransportTest {
                         """)));
         var client = client(wireMock);
 
-        client.createConversation(new CreateConversation("alice")).join();
+        await(client.createConversation(new CreateConversation("alice")));
 
         verify(1, postRequestedFor(urlEqualTo("/v1/conversations"))
                 .withHeader("Authorization", equalTo("Bearer test-api-key"))
@@ -97,11 +98,10 @@ class MemoryClientHttpTransportTest {
                                 """)));
         var client = client(wireMock);
 
-        var conversation = client.createConversation(new CreateConversation()).join();
-        var step = conversation
-                .recordStep(new NewReasoningStep("reason", "act"))
-                .join();
-        var call = step.recordToolCall(NewToolCall.builder("search", "{}").build()).join();
+        var conversation = await(client.createConversation(new CreateConversation()));
+        var step = await(conversation
+                .recordStep(new NewReasoningStep("reason", "act")));
+        var call = await(step.recordToolCall(NewToolCall.builder("search", "{}").build()));
 
         verify(1, postRequestedFor(urlEqualTo("/v1/conversations"))
                 .withRequestBody(equalToJson("{}")));
@@ -137,9 +137,9 @@ class MemoryClientHttpTransportTest {
                         .withBody("{\"id\":\"15c63f73-f00f-45de-b62e-851ea483a552\","
                                 + "\"role\":\"user\",\"content\":\"" + content + "\"}")));
 
-        var message = client(wireMock).addMessage(id,
+        var message = await(client(wireMock).addMessage(id,
                 new NewMessage(
-                        MessageRole.USER, content)).join();
+                        MessageRole.USER, content)));
 
         assertThat(message.content()).isEqualTo(content);
         verify(postRequestedFor(urlEqualTo("/v1/conversations/" + id + "/messages"))
@@ -155,9 +155,9 @@ class MemoryClientHttpTransportTest {
                         .withHeader("content-type", "application/problem+json").withBody("{\"detail\":\"busy\"}")));
 
         var failure = catchThrowable(
-                () -> client(wireMock).getConversation(id).join());
-        assertThat(failure.getCause()).isInstanceOf(MemoryServiceException.class);
-        var serviceFailure = (MemoryServiceException) failure.getCause();
+                () -> await(client(wireMock).getConversation(id)));
+        assertThat(failure).isInstanceOf(MemoryServiceException.class);
+        var serviceFailure = (MemoryServiceException) failure;
         assertThat(serviceFailure.statusCode()).isEqualTo(503);
         assertThat(serviceFailure.responseBodyExcerpt()).contains("busy");
         if (httpClient.keepsFailureHeaders()) {
@@ -178,8 +178,8 @@ class MemoryClientHttpTransportTest {
                 .willReturn(aResponse().withFault(com.github.tomakehurst.wiremock.http.Fault.EMPTY_RESPONSE)));
 
         var failure = catchThrowable(
-                () -> client(wireMock).getConversation(id).join());
-        assertThat(failure.getCause()).isInstanceOf(MemoryClientException.class)
+                () -> await(client(wireMock).getConversation(id)));
+        assertThat(failure).isInstanceOf(MemoryClientException.class)
                 .satisfies(clientFailure -> assertThat(clientFailure.getCause()).isNotNull());
     }
 
@@ -192,8 +192,8 @@ class MemoryClientHttpTransportTest {
                 .baseUrl(wireMock.getHttpBaseUrl() + "/v1").apiKey("test-api-key"), executor).build());
 
         var future = client.getConversation(UUID.randomUUID());
-        var failure = catchThrowable(future::join);
-        assertThat(failure.getCause()).isInstanceOf(MemoryClientException.class)
+        var failure = catchThrowable(() -> await(future));
+        assertThat(failure).isInstanceOf(MemoryClientException.class)
                 .hasCauseInstanceOf(RejectedExecutionException.class);
         verify(0, anyRequestedFor(anyUrl()));
     }

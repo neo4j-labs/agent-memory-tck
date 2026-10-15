@@ -15,6 +15,7 @@ import java.util.UUID;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 class ConversationMessageLimitTest {
@@ -30,7 +31,7 @@ class ConversationMessageLimitTest {
     @ValueSource(ints = {1, 20, 200})
     void sendsExactLimit(int limit, WireMockRuntimeInfo server) {
         stubFor(get(urlEqualTo(PATH + "?limit=" + limit)).willReturn(okJson("{\"messages\":[]}")));
-        assertThat(conversation(server).messages(limit).join()).isEmpty();
+        assertThat(await(conversation(server).messages(limit))).isEmpty();
         verify(1, getRequestedFor(urlEqualTo(PATH + "?limit=" + limit)));
     }
 
@@ -46,7 +47,7 @@ class ConversationMessageLimitTest {
     @Test
     void noArgumentReadOmitsLimit(WireMockRuntimeInfo server) {
         stubFor(get(urlEqualTo(PATH)).willReturn(okJson("{\"messages\":[]}")));
-        assertThat(conversation(server).messages().join()).isEmpty();
+        assertThat(await(conversation(server).messages())).isEmpty();
         verify(1, getRequestedFor(urlEqualTo(PATH)));
     }
 
@@ -62,7 +63,7 @@ class ConversationMessageLimitTest {
               {"id":"00000000-0000-0000-0000-000000000002","role":"assistant","content":"same"}
             ]}
             """)));
-        var messages = conversation(server).messages(20).join();
+        var messages = await(conversation(server).messages(20));
         assertThat(messages).extracting(Message::id).containsExactly(newest, middle, oldest);
         assertThat(messages).extracting(Message::role)
                 .containsExactly(MessageRole.ASSISTANT, MessageRole.USER, MessageRole.ASSISTANT);

@@ -21,6 +21,7 @@ import java.util.UUID;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 class WebClientHttpTransportTest {
@@ -33,7 +34,7 @@ class WebClientHttpTransportTest {
         var webClient = WebClient.builder().observationRegistry(registry).build();
         stubConversation();
 
-        client(server, webClient).getConversation(ID).join();
+        await(client(server, webClient).getConversation(ID));
 
         TestObservationRegistryAssert.assertThat(registry)
                 .hasObservationWithNameEqualTo("http.client.requests").that()
@@ -47,7 +48,7 @@ class WebClientHttpTransportTest {
                 ClientRequest.from(request).header("X-App-Trace", "trace-1").build())).build();
         stubConversation();
 
-        client(server, webClient).getConversation(ID).join();
+        await(client(server, webClient).getConversation(ID));
 
         verify(getRequestedFor(urlEqualTo(PATH)).withHeader("X-App-Trace", equalTo("trace-1")));
         assertContract();
@@ -63,7 +64,7 @@ class WebClientHttpTransportTest {
                 .defaultRequest(request -> request.header("X-App-Request", "request-1")).build();
         stubConversation();
 
-        client(server, webClient).getConversation(ID).join();
+        await(client(server, webClient).getConversation(ID));
 
         verify(getRequestedFor(urlEqualTo(PATH))
                 .withHeader("Authorization", equalTo("Bearer nams-key"))
@@ -80,10 +81,10 @@ class WebClientHttpTransportTest {
         stubFor(get(urlEqualTo(PATH)).willReturn(aResponse().withStatus(503)
                 .withHeader("X-Request-ID", "req-503")));
 
-        var failure = catchThrowable(() -> client(server, webClient).getConversation(ID).join());
+        var failure = catchThrowable(() -> await(client(server, webClient).getConversation(ID)));
 
-        assertThat(failure).hasCauseInstanceOf(MemoryServiceException.class);
-        var serviceFailure = (MemoryServiceException) failure.getCause();
+        assertThat(failure).isInstanceOf(MemoryServiceException.class);
+        var serviceFailure = (MemoryServiceException) failure;
         assertThat(serviceFailure.statusCode()).isEqualTo(503);
         assertThat(serviceFailure.responseHeaders().keySet())
                 .anyMatch(name -> name.equalsIgnoreCase("x-request-id"));
@@ -95,9 +96,9 @@ class WebClientHttpTransportTest {
                 .codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(16)).build();
         stubConversation();
 
-        var failure = catchThrowable(() -> client(server, webClient).getConversation(ID).join());
+        var failure = catchThrowable(() -> await(client(server, webClient).getConversation(ID)));
 
-        assertThat(failure).hasCauseInstanceOf(MemoryClientException.class)
+        assertThat(failure).isInstanceOf(MemoryClientException.class)
                 .hasRootCauseInstanceOf(DataBufferLimitException.class);
     }
 

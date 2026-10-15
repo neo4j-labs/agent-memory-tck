@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 class ClientLoggingTest {
     @Test
@@ -80,7 +81,7 @@ class ClientLoggingTest {
             return future;
         })).isSameAs(future);
         future.completeExceptionally(failure);
-        assertThatThrownBy(future::join).isInstanceOf(CompletionException.class).hasCause(failure);
+        assertThatThrownBy(() -> await(future)).isSameAs(failure);
         var events = sink.awaitEvents(2);
         assertThat(events).extracting(RecordingClientLogger.Entry::level)
                 .containsExactly(System.Logger.Level.DEBUG, System.Logger.Level.DEBUG);
@@ -214,12 +215,12 @@ class ClientLoggingTest {
         var success = new CompletableFuture<String>();
         assertThat(logging.call("messages", operation -> success)).isSameAs(success);
         success.complete("result");
-        assertThat(success.join()).isEqualTo("result");
+        assertThat(await(success)).isEqualTo("result");
         var failure = new IllegalArgumentException("original-failure");
         var failed = new CompletableFuture<String>();
         assertThat(logging.call("messages", operation -> failed)).isSameAs(failed);
         failed.completeExceptionally(failure);
-        assertThatThrownBy(failed::join).isInstanceOf(CompletionException.class).hasCause(failure);
+        assertThatThrownBy(() -> await(failed)).isSameAs(failure);
         assertThatThrownBy(() -> logging.call("messages", operation -> {
             throw failure;
         })).isSameAs(failure);

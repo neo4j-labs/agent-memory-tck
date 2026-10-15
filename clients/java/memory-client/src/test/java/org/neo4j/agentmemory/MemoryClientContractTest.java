@@ -31,6 +31,7 @@ import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMoc
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @ParameterizedClass
 @MethodSource("clients")
@@ -77,7 +78,7 @@ class MemoryClientContractTest {
         stubFor(post(urlEqualTo("/v1/conversations"))
                 .willReturn(OpenApiContract.response("post", "/v1/conversations")));
 
-        var conversation = client.createConversation(new CreateConversation("alice")).join();
+        var conversation = await(client.createConversation(new CreateConversation("alice")));
 
         assertThat(conversation.id()).isNotNull();
     }
@@ -87,7 +88,7 @@ class MemoryClientContractTest {
         stubFor(get(urlPathEqualTo("/v1/conversations"))
                 .willReturn(OpenApiContract.response("get", "/v1/conversations")));
 
-        var conversations = client.listConversations(new ListConversations(25)).join();
+        var conversations = await(client.listConversations(new ListConversations(25)));
 
         assertThat(conversations).isNotEmpty();
     }
@@ -98,7 +99,7 @@ class MemoryClientContractTest {
         stubFor(get(urlEqualTo("/v1/conversations/" + conversationId))
                 .willReturn(OpenApiContract.response("get", "/v1/conversations/{id}")));
 
-        var conversation = client.getConversation(conversationId).join();
+        var conversation = await(client.getConversation(conversationId));
 
         assertThat(conversation.id()).isNotNull();
     }
@@ -109,7 +110,7 @@ class MemoryClientContractTest {
         stubFor(delete(urlEqualTo("/v1/conversations/" + conversation.id()))
                 .willReturn(OpenApiContract.response("delete", "/v1/conversations/{id}")));
 
-        assertThatNoException().isThrownBy(() -> conversation.delete().join());
+        assertThatNoException().isThrownBy(() -> await(conversation.delete()));
     }
 
     @Test
@@ -119,7 +120,7 @@ class MemoryClientContractTest {
                 .willReturn(OpenApiContract.response(
                         "post", "/v1/conversations/{id}/messages")));
 
-        var message = conversation.addMessage(NewMessage.user("hello")).join();
+        var message = await(conversation.addMessage(NewMessage.user("hello")));
 
         assertThat(message.id()).isNotNull();
     }
@@ -131,9 +132,8 @@ class MemoryClientContractTest {
                 .willReturn(OpenApiContract.response(
                         "post", "/v1/conversations/{id}/messages/bulk")));
 
-        var messages = conversation
-                .addMessages(List.of(NewMessage.user("hello"), NewMessage.assistant("hi")))
-                .join();
+        var messages = await(conversation
+                .addMessages(List.of(NewMessage.user("hello"), NewMessage.assistant("hi"))));
 
         assertThat(messages).isNotEmpty();
     }
@@ -144,7 +144,7 @@ class MemoryClientContractTest {
         stubFor(get(urlPathEqualTo("/v1/conversations/" + conversation.id() + "/messages"))
                 .willReturn(OpenApiContract.response("get", "/v1/conversations/{id}/messages")));
 
-        assertThat(conversation.messages().join()).isNotEmpty();
+        assertThat(await(conversation.messages())).isNotEmpty();
     }
 
     @Test
@@ -153,7 +153,7 @@ class MemoryClientContractTest {
         stubFor(get(urlEqualTo("/v1/conversations/" + conversation.id() + "/context"))
                 .willReturn(OpenApiContract.response("get", "/v1/conversations/{id}/context")));
 
-        var context = conversation.context().join();
+        var context = await(conversation.context());
 
         assertThat(context.recentMessages()).isNotEmpty();
     }
@@ -163,7 +163,7 @@ class MemoryClientContractTest {
         stubFor(post(urlEqualTo("/v1/entities/search"))
                 .willReturn(OpenApiContract.response("post", "/v1/entities/search")));
 
-        assertThat(client.searchEntities(new EntitySearch("neo4j", "person", 5)).join())
+        assertThat(await(client.searchEntities(new EntitySearch("neo4j", "person", 5))))
                 .isNotEmpty();
     }
 
@@ -172,7 +172,7 @@ class MemoryClientContractTest {
         stubFor(post(urlEqualTo("/v1/reasoning/steps"))
                 .willReturn(OpenApiContract.response("post", "/v1/reasoning/steps")));
 
-        var step = conversation().recordStep(new NewReasoningStep("why", "what", "done")).join();
+        var step = await(conversation().recordStep(new NewReasoningStep("why", "what", "done")));
 
         assertThat(step.id()).isNotNull();
     }
@@ -184,13 +184,13 @@ class MemoryClientContractTest {
         stubFor(post(urlEqualTo("/v1/reasoning/tool-calls"))
                 .willReturn(OpenApiContract.response("post", "/v1/reasoning/tool-calls")));
 
-        var step = conversation().recordStep(new NewReasoningStep("why", "what")).join();
-        var call = step.recordToolCall(NewToolCall.builder("search", "{}")
+        var step = await(conversation().recordStep(new NewReasoningStep("why", "what")));
+        var call = await(step.recordToolCall(NewToolCall.builder("search", "{}")
                         .output("{}")
                         .duration(Duration.ofMillis(150))
                         .status(ToolCallStatus.SUCCESS)
                         .build())
-                .join();
+                );
 
         assertThat(call.id()).isNotNull();
     }
@@ -202,23 +202,24 @@ class MemoryClientContractTest {
                 .willReturn(OpenApiContract.response(
                         "get", "/v1/reasoning/trace/{conversationId}")));
 
-        assertThat(conversation.trace().join().steps()).isNotEmpty();
+        assertThat(await(conversation.trace()).steps()).isNotEmpty();
     }
 
     @Test
     void explainReasoningStep() {
         stubFor(post(urlEqualTo("/v1/reasoning/steps"))
                 .willReturn(OpenApiContract.response("post", "/v1/reasoning/steps")));
-        var step = conversation().recordStep(new NewReasoningStep("why", "what")).join();
+        var step = await(conversation().recordStep(new NewReasoningStep("why", "what")));
         stubFor(get(urlEqualTo("/v1/reasoning/explain/" + step.id()))
                 .willReturn(OpenApiContract.response("get", "/v1/reasoning/explain/{stepId}")));
 
-        assertThat(step.explanation().join().toolCalls()).isNotEmpty();
+        assertThat(await(step.explanation()).toolCalls()).isNotEmpty();
     }
 
     private Conversation conversation() {
         stubFor(post(urlEqualTo("/v1/conversations"))
                 .willReturn(OpenApiContract.response("post", "/v1/conversations")));
-        return client.createConversation(new CreateConversation()).join();
+        return await(client.createConversation(new CreateConversation()));
     }
+
 }

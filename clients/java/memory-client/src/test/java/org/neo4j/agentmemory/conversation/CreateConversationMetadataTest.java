@@ -15,6 +15,7 @@ import java.util.UUID;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 class CreateConversationMetadataTest {
@@ -37,7 +38,7 @@ class CreateConversationMetadataTest {
         var input = new HashMap<>(Map.of("title", "Find hotels in Zermatt", "origin", "java"));
         var request = new CreateConversation(" alice ", input);
         input.put("title", "changed after construction");
-        var created = client(server).createConversation(request).join();
+        var created = await(client(server).createConversation(request));
         assertThat(created.id()).isEqualTo(ID);
         assertThat(created.title()).contains("Find hotels in Zermatt");
         assertThat(created.createdAt()).isEmpty();
@@ -55,11 +56,11 @@ class CreateConversationMetadataTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"id\":\"" + ID + "\"}")));
         var client = client(server);
-        client.createConversation(new CreateConversation()).join();
-        client.createConversation(new CreateConversation("alice")).join();
-        client.createConversation(new CreateConversation(null, null)).join();
-        client.createConversation(new CreateConversation(null, Map.of())).join();
-        client.createConversation(new CreateConversation(null, Map.of("title", "Find hotels in Zermatt"))).join();
+        await(client.createConversation(new CreateConversation()));
+        await(client.createConversation(new CreateConversation("alice")));
+        await(client.createConversation(new CreateConversation(null, null)));
+        await(client.createConversation(new CreateConversation(null, Map.of())));
+        await(client.createConversation(new CreateConversation(null, Map.of("title", "Find hotels in Zermatt"))));
         verify(3, postRequestedFor(urlEqualTo(PATH)).withRequestBody(equalToJson("{}")));
         verify(1, postRequestedFor(urlEqualTo(PATH)).withRequestBody(equalToJson("{\"userId\":\"alice\"}")));
         verify(1, postRequestedFor(urlEqualTo(PATH)).withRequestBody(equalToJson(

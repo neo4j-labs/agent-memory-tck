@@ -30,12 +30,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 class MemoryClientLoggingTest {
@@ -51,8 +51,8 @@ class MemoryClientLoggingTest {
         var sink = new RecordingClientLogger(System.Logger.Level.DEBUG);
         var client = new HttpMemoryClient(URI.create(wireMock.getHttpBaseUrl() + "/v1"),
                 "api-key-secret", HttpTransports.select(HttpClient.newHttpClient()), new Jackson3JsonCodec(), new ClientLogging(sink));
-        assertThatThrownBy(() -> client.listConversations(new ListConversations(20)).join())
-                .hasCauseInstanceOf(ResponseDecodingException.class);
+        assertThatThrownBy(() -> await(client.listConversations(new ListConversations(20))))
+                .isInstanceOf(ResponseDecodingException.class);
         var events = sink.awaitEvents(3);
         assertThat(events.get(2).message()).contains("outcome=failure", "status=200",
                 "phase=decode", "requestId=req-decode", "errorType=ResponseDecodingException");
@@ -76,7 +76,7 @@ class MemoryClientLoggingTest {
     void emptyListCountsAndRespectsThreshold(String threshold, WireMockRuntimeInfo server) throws Exception {
         stubFor(get(urlEqualTo("/v1/conversations?limit=20")).willReturn(okJson("{\"conversations\":[]}")));
         var sink = new RecordingClientLogger(System.Logger.Level.valueOf(threshold));
-        assertThat(client(server, sink).listConversations(new ListConversations(20)).join()).isEmpty();
+        assertThat(await(client(server, sink).listConversations(new ListConversations(20)))).isEmpty();
         if (threshold.equals("DEBUG")) terminal(sink, "listConversations", "resultCount=0", "status=200");
         else assertThat(sink.entries()).hasSize(1);
         assertContract();
@@ -88,8 +88,8 @@ class MemoryClientLoggingTest {
                 .willReturn(okJson("{\"messages\":[{\"id\":\"" + ID + "\",\"role\":\"user\",\"content\":\"response-secret\"},"
                         + "{\"id\":\"" + ID + "\",\"role\":\"assistant\",\"content\":\"response-secret\"}]}").withStatus(201)));
         var sink = debug();
-        assertThat(client(server, sink).addMessages(ID, List.of(
-                NewMessage.user("payload-secret"), NewMessage.assistant("payload-secret"))).join()).hasSize(2);
+        assertThat(await(client(server, sink).addMessages(ID, List.of(
+                NewMessage.user("payload-secret"), NewMessage.assistant("payload-secret"))))).hasSize(2);
         terminal(sink, "addMessages", "resultCount=2");
         assertContract();
     }
@@ -103,13 +103,13 @@ class MemoryClientLoggingTest {
         stubFor(get(urlEqualTo("/v1/reasoning/explain/" + ID))
                 .willReturn(okJson("{\"id\":\"" + ID + "\",\"toolCalls\":[],\"influencedEntities\":[]}")));
         var contextSink = debug();
-        assertThat(client(server, contextSink).context(ID).join().recentMessages()).isEmpty();
+        assertThat(await(client(server, contextSink).context(ID)).recentMessages()).isEmpty();
         terminal(contextSink, "context", "reflectionCount=0", "observationCount=0", "messageCount=0");
         var traceSink = debug();
-        assertThat(client(server, traceSink).trace(ID).join().steps()).isEmpty();
+        assertThat(await(client(server, traceSink).trace(ID)).steps()).isEmpty();
         terminal(traceSink, "trace", "stepCount=0", "toolCallCount=0");
         var explainSink = debug();
-        assertThat(client(server, explainSink).explainReasoningStep(ID).join().toolCalls()).isEmpty();
+        assertThat(await(client(server, explainSink).explainReasoningStep(ID)).toolCalls()).isEmpty();
         terminal(explainSink, "explainReasoningStep", "toolCallCount=0", "entityCount=0");
         assertContract();
     }
@@ -118,7 +118,7 @@ class MemoryClientLoggingTest {
     void deleteCompletesWithoutDecoding(WireMockRuntimeInfo server) throws Exception {
         stubFor(delete(urlEqualTo("/v1/conversations/" + ID)).willReturn(aResponse().withStatus(204)));
         var sink = debug();
-        assertThat(client(server, sink).deleteConversation(ID).join()).isNull();
+        assertThat(await(client(server, sink).deleteConversation(ID))).isNull();
         assertThat(terminal(sink, "deleteConversation", "status=204")).doesNotContain("Count=", "phase=decode");
         // The published contract declares 200 only; 204 deliberately exercises empty-body compatibility.
         verify(1, deleteRequestedFor(urlEqualTo("/v1/conversations/" + ID)));
@@ -129,7 +129,7 @@ class MemoryClientLoggingTest {
         stubFor(delete(urlEqualTo("/v1/conversations/" + ID))
                 .willReturn(OpenApiContract.response("delete", "/v1/conversations/{id}")));
         var sink = debug();
-        assertThat(client(server, sink).deleteConversation(ID).join()).isNull();
+        assertThat(await(client(server, sink).deleteConversation(ID))).isNull();
         terminal(sink, "deleteConversation", "outcome=success", "status=200");
         assertContract();
     }
@@ -143,7 +143,7 @@ class MemoryClientLoggingTest {
                         .withBody("body-secret")));
         var sink = debug();
         var future = client(server, sink).listConversations(new ListConversations(20));
-        var failure = catchThrowable(future::join).getCause();
+        var failure = catchThrowable(() -> await(future));
         assertThat(failure).isInstanceOf(MemoryServiceException.class);
         var service = (MemoryServiceException) failure;
         assertThat(service.statusCode()).isEqualTo(status);
@@ -160,8 +160,8 @@ class MemoryClientLoggingTest {
     void invalidDomainResponseIsDecodingFailure(String body, WireMockRuntimeInfo server) throws Exception {
         stubFor(get(urlEqualTo("/v1/conversations?limit=20")).willReturn(okJson(body)));
         var sink = debug();
-        assertThatThrownBy(() -> client(server, sink).listConversations(new ListConversations(20)).join())
-                .hasCauseInstanceOf(ResponseDecodingException.class);
+        assertThatThrownBy(() -> await(client(server, sink).listConversations(new ListConversations(20))))
+                .isInstanceOf(ResponseDecodingException.class);
         assertThat(terminal(sink, "listConversations", "phase=decode", "outcome=failure"))
                 .doesNotContain("outcome=success", "invalid-uuid-secret");
     }
@@ -178,7 +178,7 @@ class MemoryClientLoggingTest {
         var client = new HttpMemoryClient(URI.create(server.getHttpBaseUrl() + "/v1"),
                 "api-key-secret", HttpTransports.select(HttpClient.newHttpClient()), codec, new ClientLogging(sink));
         var future = client.createConversation(new CreateConversation());
-        assertThat(catchThrowable(future::join).getCause()).isInstanceOf(MemoryClientException.class).hasCause(original);
+        assertThat(catchThrowable(() -> await(future))).isInstanceOf(MemoryClientException.class).hasCause(original);
         terminal(sink, "createConversation", "phase=encode", "outcome=failure");
         assertThat(getAllServeEvents()).isEmpty();
     }
@@ -214,9 +214,8 @@ class MemoryClientLoggingTest {
                     () -> client.listConversations(new ListConversations(20)));
         };
         var future = requestCase.invoke().get();
-        assertThatThrownBy(future::join).isInstanceOf(CompletionException.class)
-                .hasCauseInstanceOf(MemoryClientException.class);
-        assertThat(catchThrowable(future::join).getCause()).hasCause(original);
+        assertThatThrownBy(() -> await(future)).isInstanceOf(MemoryClientException.class);
+        assertThat(catchThrowable(() -> await(future))).hasCause(original);
         terminal(sink, requestCase.operation(), "phase=transport", "outcome=failure",
                 "errorType=MemoryClientException");
     }
@@ -252,7 +251,7 @@ class MemoryClientLoggingTest {
         stubFor(post(urlEqualTo("/v1/conversations"))
                 .willReturn(OpenApiContract.response("post", "/v1/conversations")));
         var sink = debug();
-        assertThat(client(server, sink).createConversation(new CreateConversation()).join()).isNotNull();
+        assertThat(await(client(server, sink).createConversation(new CreateConversation()))).isNotNull();
         terminal(sink, "createConversation", "outcome=success");
         assertContract();
     }
@@ -262,7 +261,7 @@ class MemoryClientLoggingTest {
         stubFor(get(urlEqualTo("/v1/conversations/" + ID))
                 .willReturn(OpenApiContract.response("get", "/v1/conversations/{id}")));
         var sink = debug();
-        assertThat(client(server, sink).getConversation(ID).join()).isNotNull();
+        assertThat(await(client(server, sink).getConversation(ID))).isNotNull();
         terminal(sink, "getConversation", "outcome=success");
         assertContract();
     }
@@ -272,7 +271,7 @@ class MemoryClientLoggingTest {
         stubFor(post(urlEqualTo("/v1/entities/search"))
                 .willReturn(OpenApiContract.response("post", "/v1/entities/search")));
         var sink = debug();
-        assertThat(client(server, sink).searchEntities(new EntitySearch("payload-secret")).join()).isNotNull();
+        assertThat(await(client(server, sink).searchEntities(new EntitySearch("payload-secret")))).isNotNull();
         terminal(sink, "searchEntities", "outcome=success");
         assertContract();
     }
@@ -282,7 +281,7 @@ class MemoryClientLoggingTest {
         stubFor(post(urlEqualTo("/v1/conversations/" + ID + "/messages"))
                 .willReturn(OpenApiContract.response("post", "/v1/conversations/{id}/messages")));
         var sink = debug();
-        assertThat(client(server, sink).addMessage(ID, NewMessage.user("payload-secret")).join()).isNotNull();
+        assertThat(await(client(server, sink).addMessage(ID, NewMessage.user("payload-secret")))).isNotNull();
         terminal(sink, "addMessage", "outcome=success");
         assertContract();
     }
@@ -292,7 +291,7 @@ class MemoryClientLoggingTest {
         stubFor(get(urlEqualTo("/v1/conversations/" + ID + "/messages"))
                 .willReturn(OpenApiContract.response("get", "/v1/conversations/{id}/messages")));
         var sink = debug();
-        assertThat(client(server, sink).messages(ID).join()).isNotNull();
+        assertThat(await(client(server, sink).messages(ID))).isNotNull();
         terminal(sink, "messages", "outcome=success");
         assertContract();
     }
@@ -302,7 +301,7 @@ class MemoryClientLoggingTest {
         stubFor(get(urlEqualTo("/v1/conversations/" + ID + "/messages?limit=20"))
                 .willReturn(OpenApiContract.response("get", "/v1/conversations/{id}/messages")));
         var sink = debug();
-        assertThat(client(server, sink).messages(ID, 20).join()).isNotNull();
+        assertThat(await(client(server, sink).messages(ID, 20))).isNotNull();
         terminal(sink, "messages", "outcome=success");
         assertContract();
     }
@@ -312,7 +311,7 @@ class MemoryClientLoggingTest {
         stubFor(post(urlEqualTo("/v1/reasoning/steps"))
                 .willReturn(OpenApiContract.response("post", "/v1/reasoning/steps")));
         var sink = debug();
-        assertThat(client(server, sink).recordStep(ID, new NewReasoningStep("payload-secret", "payload-secret")).join()).isNotNull();
+        assertThat(await(client(server, sink).recordStep(ID, new NewReasoningStep("payload-secret", "payload-secret")))).isNotNull();
         terminal(sink, "recordStep", "outcome=success");
         assertContract();
     }
@@ -322,7 +321,7 @@ class MemoryClientLoggingTest {
         stubFor(post(urlEqualTo("/v1/reasoning/tool-calls"))
                 .willReturn(OpenApiContract.response("post", "/v1/reasoning/tool-calls")));
         var sink = debug();
-        assertThat(client(server, sink).recordToolCall(ID, NewToolCall.builder("payload-secret", "payload-secret").build()).join()).isNotNull();
+        assertThat(await(client(server, sink).recordToolCall(ID, NewToolCall.builder("payload-secret", "payload-secret").build()))).isNotNull();
         terminal(sink, "recordToolCall", "outcome=success");
         assertContract();
     }

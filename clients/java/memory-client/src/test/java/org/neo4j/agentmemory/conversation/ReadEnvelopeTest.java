@@ -12,11 +12,11 @@ import org.neo4j.agentmemory.exception.ResponseDecodingException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 class ReadEnvelopeTest {
@@ -51,7 +51,7 @@ class ReadEnvelopeTest {
                 : "{\"messages\":[]}";
         stubFor(get(urlEqualTo(path)).willReturn(okJson(body)));
 
-        assertThat(read(read, server).join()).isEmpty();
+        assertThat(await(read(read, server))).isEmpty();
     }
 
     @ParameterizedTest
@@ -65,7 +65,7 @@ class ReadEnvelopeTest {
                 ]}
                 """)));
 
-        assertThat(read(read, server).join()).extracting(record -> ((Message) record).id())
+        assertThat(await(read(read, server))).extracting(record -> ((Message) record).id())
                 .containsExactly(
                         UUID.fromString("00000000-0000-0000-0000-000000000003"),
                         UUID.fromString("00000000-0000-0000-0000-000000000001"));
@@ -80,7 +80,7 @@ class ReadEnvelopeTest {
                 ]}
                 """)));
 
-        assertThat(client(server).listConversations(new ListConversations(20)).join())
+        assertThat(await(client(server).listConversations(new ListConversations(20))))
                 .extracting(Conversation::id)
                 .containsExactly(
                         UUID.fromString("00000000-0000-0000-0000-000000000003"),
@@ -104,9 +104,8 @@ class ReadEnvelopeTest {
     }
 
     private static void assertDecodingFailure(CompletableFuture<?> future) {
-        assertThatThrownBy(future::join)
-                .isInstanceOf(CompletionException.class)
-                .hasCauseInstanceOf(ResponseDecodingException.class);
+        assertThatThrownBy(() -> await(future))
+                .isInstanceOf(ResponseDecodingException.class);
     }
 
     private static Conversation conversation(WireMockRuntimeInfo server) {

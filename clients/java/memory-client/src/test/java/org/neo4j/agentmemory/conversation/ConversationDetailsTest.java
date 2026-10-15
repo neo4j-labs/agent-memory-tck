@@ -16,6 +16,7 @@ import java.util.UUID;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 class ConversationDetailsTest {
@@ -43,8 +44,8 @@ class ConversationDetailsTest {
              "createdAt":"2026-09-24T08:00:00Z","updatedAt":"2026-09-24T08:30:00Z"}
             """)));
         var client = client(server);
-        var listed = client.listConversations(new ListConversations(50)).join().get(0);
-        var detail = client.getConversation(ID).join();
+        var listed = await(client.listConversations(new ListConversations(50))).get(0);
+        var detail = await(client.getConversation(ID));
 
         assertThat(listed.id()).isEqualTo(ID);
         assertThat(detail.id()).isEqualTo(ID);
@@ -75,14 +76,14 @@ class ConversationDetailsTest {
               "title":"","firstMessageSnippet":"","messageCount":0,"metadata":{}}]}
             """)));
         var client = client(server);
-        var absent = client.getConversation(ID).join();
+        var absent = await(client.getConversation(ID));
         assertThat(absent.metadata()).isEmpty();
         assertThat(absent.title()).isEmpty();
         assertThat(absent.createdAt()).isEmpty();
         assertThat(absent.updatedAt()).isEmpty();
         assertThat(absent.firstMessageSnippet()).isEmpty();
         assertThat(absent.messageCount()).isEmpty();
-        var empty = client.listConversations(new ListConversations(1)).join().get(0);
+        var empty = await(client.listConversations(new ListConversations(1))).get(0);
         assertThat(empty.metadata()).isEmpty();
         assertThat(empty.title()).contains("");
         assertThat(empty.firstMessageSnippet()).contains("");

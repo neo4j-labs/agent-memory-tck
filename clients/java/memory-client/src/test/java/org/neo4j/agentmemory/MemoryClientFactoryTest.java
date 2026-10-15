@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 class MemoryClientFactoryTest {
@@ -55,8 +56,8 @@ class MemoryClientFactoryTest {
             } catch (ClassNotFoundException absent) {
                 System.out.println("langchain4j=absent");
             }
-            System.out.println("conversation=" + MemoryClient.create()
-                    .getConversation(UUID.fromString(args[0])).join().id());
+            System.out.println("conversation=" + await(MemoryClient.create()
+                    .getConversation(UUID.fromString(args[0]))).id());
             try {
                 MemoryClientConfiguration.Builder.class.getDeclaredMethods();
             } catch (NoClassDefFoundError absent) {
@@ -81,7 +82,7 @@ class MemoryClientFactoryTest {
                     .baseUrl(server.getHttpBaseUrl() + "/v1").apiKey("workspace-key")
                     .jdkHttpClient(HttpClient.newBuilder().executor(counting).build()).build());
 
-            assertThat(client.getConversation(id).join().id()).isNotNull();
+            assertThat(await(client.getConversation(id)).id()).isNotNull();
             assertThat(executions.get()).isGreaterThan(0);
             OpenApiContract.assertEveryExchangeMatchesTheContract();
             OpenApiContract.assertOnlyDeclaredRequestProperties();

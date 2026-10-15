@@ -26,6 +26,7 @@ import static org.neo4j.agentmemory.conversation.MessageRole.ASSISTANT;
 import static org.neo4j.agentmemory.conversation.MessageRole.USER;
 import static org.neo4j.agentmemory.conversation.NewMessage.assistant;
 import static org.neo4j.agentmemory.conversation.NewMessage.user;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 /**
  * Focused end-to-end tests against the live hosted Neo4j Agent Memory Service.
@@ -58,13 +59,13 @@ class HostedServiceIT {
                 var userId = uniqueUserId();
                 var client = client();
 
-                var created = client.createConversation(new CreateConversation(userId)).join();
+                var created = await(client.createConversation(new CreateConversation(userId)));
 
                 ConversationAssert.assertThat(created)
                                 .hasId()
                                 .hasUserId(userId);
 
-                var conversations = client.listConversations(new ListConversations(200)).join();
+                var conversations = await(client.listConversations(new ListConversations(200)));
 
                 assertThat(conversations)
                                 .extracting(Conversation::id)
@@ -76,26 +77,23 @@ class HostedServiceIT {
                 var userId = uniqueUserId();
                 var marker = UUID.randomUUID().toString();
                 var client = client();
-                var created = client.createConversation(new CreateConversation(userId)).join();
+                var created = await(client.createConversation(new CreateConversation(userId)));
 
-                var conversation = client.getConversation(created.id()).join();
+                var conversation = await(client.getConversation(created.id()));
 
                 ConversationAssert.assertThat(conversation)
                                 .hasId(created.id())
                                 .hasUserId(userId);
 
-                var firstUser = conversation
-                                .addMessages(List.of(user("java e2e user " + marker)))
-                                .join()
+                var firstUser = await(conversation
+                                .addMessages(List.of(user("java e2e user " + marker))))
                                 .get(0);
-                var firstAssistant = conversation
-                                .addMessage(assistant("java e2e assistant " + marker))
-                                .join();
-                var exchange = conversation
+                var firstAssistant = await(conversation
+                                .addMessage(assistant("java e2e assistant " + marker)));
+                var exchange = await(conversation
                                 .addMessages(List.of(
                                                 user("java e2e follow-up user " + marker),
-                                                assistant("java e2e follow-up assistant " + marker)))
-                                .join();
+                                                assistant("java e2e follow-up assistant " + marker))));
 
                 assertThat(exchange)
                                 .extracting(Message::role)
@@ -110,11 +108,11 @@ class HostedServiceIT {
                                 .hasRole(ASSISTANT)
                                 .hasContent("java e2e assistant " + marker);
 
-                assertThat(conversation.messages().join())
+                assertThat(await(conversation.messages()))
                                 .extracting(Message::id)
                                 .contains(firstUser.id(), firstAssistant.id());
 
-                var context = conversation.context().join();
+                var context = await(conversation.context());
 
                 ConversationContextAssert.assertThat(context)
                                 .hasThreeTiers()
@@ -124,75 +122,70 @@ class HostedServiceIT {
         @Test
         void deletesConversation() {
                 var client = client();
-                var created = client.createConversation(new CreateConversation(uniqueUserId())).join();
+                var created = await(client.createConversation(new CreateConversation(uniqueUserId())));
 
-                assertThatCode(() -> created.delete().join()).doesNotThrowAnyException();
+                assertThatCode(() -> await(created.delete())).doesNotThrowAnyException();
         }
 
         @Test
         void supportsMemorySkillPrimitivesAndReasoningTrace() {
                 var marker = UUID.randomUUID().toString();
                 var client = client();
-                var conversation = client.createConversation(new CreateConversation()).join();
+                var conversation = await(client.createConversation(new CreateConversation()));
 
                 assertThat(conversation.userId()).isEmpty();
 
-                var priorEntities = client.searchEntities(marker).join();
+                var priorEntities = await(client.searchEntities(marker));
                 assertThatThrownBy(priorEntities::clear)
                                 .isInstanceOf(UnsupportedOperationException.class);
 
-                var firstUser = conversation
-                                .addMessages(List.of(user("first user " + marker)))
-                                .join()
+                var firstUser = await(conversation
+                                .addMessages(List.of(user("first user " + marker))))
                                 .get(0);
-                var firstAssistant = conversation
-                                .addMessage(assistant("first assistant " + marker))
-                                .join();
-                var exchange = conversation
+                var firstAssistant = await(conversation
+                                .addMessage(assistant("first assistant " + marker)));
+                var exchange = await(conversation
                                 .addMessages(List.of(
                                                 user("next user " + marker),
-                                                assistant("next assistant " + marker)))
-                                .join();
+                                                assistant("next assistant " + marker))));
 
                 assertThat(exchange)
                                 .extracting(Message::role)
                                 .containsExactly(USER, ASSISTANT);
 
-                var step = conversation
+                var step = await(conversation
                                 .recordStep(new NewReasoningStep(
                                                 "Application supplied reasoning " + marker,
                                                 "Search prior entities",
-                                                "Search completed"))
-                                .join();
+                                                "Search completed")));
 
-                var call = step.recordToolCall(NewToolCall
+                var call = await(step.recordToolCall(NewToolCall
                                 .builder(
                                                 "memory_search_entities",
                                                 "{\"query\":\"" + marker + "\"}")
                                 .output("{\"entities\":[]}")
                                 .status(ToolCallStatus.SUCCESS)
                                 .duration(Duration.ofMillis(25))
-                                .build())
-                                .join();
+                                .build()));
 
                 assertThat(call.stepId()).isEqualTo(step.id());
                 assertThat(call.input()).contains(marker);
                 assertThat(call.duration()).isEqualTo(Duration.ofMillis(25));
                 assertThat(call.getDuration()).contains(Duration.ofMillis(25));
 
-                var trace = conversation.trace().join();
+                var trace = await(conversation.trace());
 
                 assertThat(trace.conversationId()).isEqualTo(conversation.id());
                 assertThat(trace.steps()).contains(step);
                 assertThat(trace.toolCalls(step)).contains(call);
 
-                var explanation = step.explanation().join();
+                var explanation = await(step.explanation());
 
                 assertThat(explanation.step()).isEqualTo(step);
                 assertThat(explanation.toolCalls()).contains(call);
                 assertThat(explanation.influencedEntities()).isNotNull();
 
-                assertThat(conversation.messages().join())
+                assertThat(await(conversation.messages()))
                                 .extracting(Message::id)
                                 .contains(
                                                 firstUser.id(),

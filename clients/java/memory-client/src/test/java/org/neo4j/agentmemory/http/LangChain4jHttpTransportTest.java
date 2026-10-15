@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 class LangChain4jHttpTransportTest {
@@ -52,7 +53,7 @@ class LangChain4jHttpTransportTest {
                 .baseUrl(server.getHttpBaseUrl() + "/v1").apiKey("api-key-secret")
                 .langChain4jHttpClient(httpClient, HttpClientUnderTest.TEST_EXECUTOR).build());
 
-        client.getConversation(ID).join();
+        await(client.getConversation(ID));
 
         assertThat(calls).hasValue(1);
         assertThat(body.get()).isNull();
@@ -68,7 +69,7 @@ class LangChain4jHttpTransportTest {
                 new Jackson3JsonCodec(), new ClientLogging(sink));
         stubFor(get(urlEqualTo(PATH)).willReturn(aResponse().withStatus(404).withHeader("X-Request-ID", "req-404")));
 
-        assertThat(catchThrowable(() -> client.getConversation(ID).join())).hasCauseInstanceOf(MemoryServiceException.class);
+        assertThat(catchThrowable(() -> await(client.getConversation(ID)))).isInstanceOf(MemoryServiceException.class);
 
         var terminal = sink.awaitEvents(3).stream()
                 .filter(entry -> entry.message().contains("event=operation.completed"))

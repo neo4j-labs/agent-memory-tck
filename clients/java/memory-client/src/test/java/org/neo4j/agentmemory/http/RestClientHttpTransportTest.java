@@ -19,6 +19,7 @@ import java.util.UUID;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 class RestClientHttpTransportTest {
@@ -31,7 +32,7 @@ class RestClientHttpTransportTest {
         var restClient = builder().observationRegistry(registry).build();
         stubConversation();
 
-        client(server, restClient).getConversation(ID).join();
+        await(client(server, restClient).getConversation(ID));
 
         TestObservationRegistryAssert.assertThat(registry)
                 .hasObservationWithNameEqualTo("http.client.requests").that()
@@ -47,7 +48,7 @@ class RestClientHttpTransportTest {
         }).build();
         stubConversation();
 
-        client(server, restClient).getConversation(ID).join();
+        await(client(server, restClient).getConversation(ID));
 
         verify(getRequestedFor(urlEqualTo(PATH)).withHeader("X-App-Trace", equalTo("trace-1")));
         assertContract();
@@ -64,7 +65,7 @@ class RestClientHttpTransportTest {
                         .header("Authorization", "Bearer app-request-token")).build();
         stubConversation();
 
-        client(server, restClient).getConversation(ID).join();
+        await(client(server, restClient).getConversation(ID));
 
         verify(getRequestedFor(urlEqualTo(PATH))
                 .withHeader("Authorization", equalTo("Bearer nams-key"))
@@ -82,10 +83,10 @@ class RestClientHttpTransportTest {
         stubFor(get(urlEqualTo(PATH)).willReturn(aResponse().withStatus(503)
                 .withHeader("X-Request-ID", "req-503")));
 
-        var failure = catchThrowable(() -> client(server, restClient).getConversation(ID).join());
+        var failure = catchThrowable(() -> await(client(server, restClient).getConversation(ID)));
 
-        assertThat(failure).hasCauseInstanceOf(MemoryServiceException.class);
-        var serviceFailure = (MemoryServiceException) failure.getCause();
+        assertThat(failure).isInstanceOf(MemoryServiceException.class);
+        var serviceFailure = (MemoryServiceException) failure;
         assertThat(serviceFailure.statusCode()).isEqualTo(503);
         assertThat(serviceFailure.responseHeaders().keySet())
                 .anyMatch(name -> name.equalsIgnoreCase("x-request-id"));

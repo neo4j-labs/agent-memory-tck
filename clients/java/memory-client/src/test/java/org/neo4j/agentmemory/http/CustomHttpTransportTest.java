@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
 class CustomHttpTransportTest {
@@ -41,7 +42,7 @@ class CustomHttpTransportTest {
                 .baseUrl(server.getHttpBaseUrl() + "/v1").apiKey("nams-key")
                 .httpTransport(transport).build();
 
-        MemoryClient.create(configuration).getConversation(ID).join();
+        await(MemoryClient.create(configuration).getConversation(ID));
 
         assertThat(configuration.httpTransport()).isSameAs(transport);
         assertThat(calls).hasValue(1);
@@ -64,13 +65,13 @@ class CustomHttpTransportTest {
         var client = MemoryClient.create(MemoryClientConfiguration.builder()
                 .baseUrl("https://memory.test/v1").apiKey("nams-key").httpTransport(transport).build());
 
-        var failure = catchThrowable(() -> client.getConversation(ID).join());
+        var failure = catchThrowable(() -> await(client.getConversation(ID)));
 
-        assertThat(failure).hasCauseInstanceOf(MemoryClientException.class);
+        assertThat(failure).isInstanceOf(MemoryClientException.class);
         if ("failed".equals(outcome)) {
-            assertThat(failure.getCause()).hasCause(original);
+            assertThat(failure).hasCause(original);
         } else {
-            assertThat(failure.getCause()).hasCauseInstanceOf(NullPointerException.class);
+            assertThat(failure).hasCauseInstanceOf(NullPointerException.class);
         }
     }
 }
