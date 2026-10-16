@@ -8,6 +8,15 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.neo4j.agentmemory.MemoryClient;
 import org.neo4j.agentmemory.MemoryClientConfiguration;
 import org.neo4j.agentmemory.conversation.CreateConversation;
+import org.neo4j.agentmemory.conversation.ListConversations;
+import io.micrometer.observation.tck.TestObservationRegistry;
+import io.micrometer.observation.tck.TestObservationRegistryAssert;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.DefaultUriBuilderFactory;
+import org.springframework.web.util.DefaultUriBuilderFactory.EncodingMode;
 import org.neo4j.agentmemory.conversation.MessageRole;
 import org.neo4j.agentmemory.conversation.NewMessage;
 import org.neo4j.agentmemory.exception.MemoryClientException;
@@ -32,6 +41,52 @@ class MemoryClientHttpTransportTest {
 
     MemoryClientHttpTransportTest(HttpClientUnderTest httpClient) {
         this.httpClient = httpClient;
+    }
+
+    @Test
+    void userIdIsStrictlyEncodedOnTheWire(WireMockRuntimeInfo wireMock) {
+        stubFor(get(urlPathEqualTo("/v1/conversations"))
+                .willReturn(aResponse().withHeader("Content-Type", "application/json")
+                        .withBody("{\"conversations\":[]}")));
+
+        await(client(wireMock).listConversations(new ListConversations(25, "user one&a+b/ł")));
+
+        assertThat(findAll(getRequestedFor(urlPathEqualTo("/v1/conversations"))))
+                .singleElement().satisfies(request -> assertThat(request.getUrl())
+                        .isEqualTo("/v1/conversations?limit=25&userId=user%20one%26a%2Bb%2F%C5%82"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(EncodingMode.class)
+    void springEncodingModesPreserveStrictQueryAndTemplate(EncodingMode mode, WireMockRuntimeInfo wireMock) {
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                httpClient == HttpClientUnderTest.REST_CLIENT || httpClient == HttpClientUnderTest.WEB_CLIENT);
+        var factory = new DefaultUriBuilderFactory();
+        factory.setEncodingMode(mode);
+        var registry = TestObservationRegistry.create();
+        var configuration = MemoryClientConfiguration.builder()
+                .baseUrl(wireMock.getHttpBaseUrl() + "/v1").apiKey("test-api-key");
+        if (httpClient == HttpClientUnderTest.REST_CLIENT) {
+            configuration.restClient(RestClient.builder().uriBuilderFactory(factory)
+                    .observationRegistry(registry).requestFactory(new JdkClientHttpRequestFactory()).build(),
+                    HttpClientUnderTest.TEST_EXECUTOR);
+        } else {
+            configuration.webClient(WebClient.builder().uriBuilderFactory(factory)
+                    .observationRegistry(registry).build());
+        }
+        stubFor(get(urlPathEqualTo("/v1/conversations"))
+                .willReturn(aResponse().withHeader("Content-Type", "application/json")
+                        .withBody("{\"conversations\":[]}")));
+
+        await(MemoryClient.create(configuration.build())
+                .listConversations(new ListConversations(25, "user one&a+b/ł")));
+
+        assertThat(findAll(getRequestedFor(urlPathEqualTo("/v1/conversations"))))
+                .singleElement().satisfies(request -> assertThat(request.getUrl())
+                        .isEqualTo("/v1/conversations?limit=25&userId=user%20one%26a%2Bb%2F%C5%82"));
+        TestObservationRegistryAssert.assertThat(registry)
+                .hasObservationWithNameEqualTo("http.client.requests").that()
+                .hasLowCardinalityKeyValue("uri", "/v1/conversations?limit={limit}&userId={userId}");
     }
 
     @Test

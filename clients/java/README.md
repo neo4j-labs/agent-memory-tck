@@ -43,6 +43,8 @@ Verified supported application frameworks are:
 
 ## Public API
 
+List one user's Conversations with `client.listConversations(new ListConversations(25, "alice"))`.
+
 `MemoryClient.create()` uses the default configuration, that resolves environment settings: `MEMORY_API_KEY` must contain a nonblank Workspace API key. `MEMORY_ENDPOINT` is optional: when absent or blank, the client uses `https://memory.neo4jlabs.com/v1` and emits a WARN identifying the default URL on each successful build. Explicit builder settings take precedence over environment settings. The default JDK http transport is used.
 
 The client expects a **Workspace API key** bound to the target workspace. It does not yet support an Admin key combined with an explicitly provided workspace ID.
@@ -132,6 +134,8 @@ MemoryClient memoryClient(RestClient.Builder restClientBuilder, AsyncTaskExecuto
 ```
 
 The client is used as configured. Its interceptors, observation registry, request-factory timeouts, TLS settings, default headers, cookies, and `defaultRequest` customizations all apply to memory requests. Observations are tagged with route templates such as `/v1/conversations/{conversationId}`. The memory configuration supplies absolute service URLs, so the RestClient's base URL does not apply, and the memory client's `Authorization`, `Accept`, and `Content-Type` headers replace same-named headers. Everything else you configure is sent to the memory service, including a default API version: a path-segment version inserter rewrites memory URLs too. Inject a client meant for the memory service rather than one carrying another service's credentials or tenant headers. Status handlers do not apply; non-success responses retain their headers and are mapped to the memory client's exceptions.
+
+Requests with String URI variables, such as user IDs, use the memory client's strict percent encoding while retaining template observation tags. For these requests, a Spring `UriBuilderFactory` still parses the template but does not expand variables or transform the resulting URI. Its custom URI transformations therefore do not apply. Requests containing only UUID and integer variables continue using the application's factory expansion.
 
 Blocking exchanges run on the supplied executor, which holds one thread per request in flight; the returned futures still never block the caller. On Java 21 with `spring.threads.virtual.enabled=true`, Spring Boot's `applicationTaskExecutor` runs on virtual threads, which makes those waiting threads cheap. The memory client closes neither the RestClient nor the executor, and the last HTTP client setter wins. 
 

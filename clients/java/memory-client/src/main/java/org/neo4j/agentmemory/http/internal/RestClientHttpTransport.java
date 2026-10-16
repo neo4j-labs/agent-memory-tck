@@ -34,9 +34,11 @@ final class RestClientHttpTransport implements HttpTransport {
     @Override
     public CompletableFuture<HttpResult> send(HttpCall call) {
         return CompletableFuture.supplyAsync(() -> {
-            var request = restClient.method(HttpMethod.valueOf(call.method()))
-                    .uri(call.uriTemplate(), call.uriVariables())
-                    .headers(headers -> call.headers().forEach(headers::set));
+            var uriSpec = restClient.method(HttpMethod.valueOf(call.method()));
+            var request = call.uriVariables().values().stream().anyMatch(String.class::isInstance)
+                    ? uriSpec.uri(call.uriTemplate(), builder -> call.uri())
+                    : uriSpec.uri(call.uriTemplate(), call.uriVariables());
+            request.headers(headers -> call.headers().forEach(headers::set));
             if (!(call.body() instanceof HttpCall.NoBody)) {
                 request.body(call.body().body());
             }

@@ -30,9 +30,11 @@ final class WebClientHttpTransport implements HttpTransport {
 
     @Override
     public CompletableFuture<HttpResult> send(HttpCall call) {
-        var request = webClient.method(HttpMethod.valueOf(call.method()))
-                .uri(call.uriTemplate(), call.uriVariables())
-                .headers(headers -> call.headers().forEach(headers::set));
+        var uriSpec = webClient.method(HttpMethod.valueOf(call.method()));
+        var request = call.uriVariables().values().stream().anyMatch(String.class::isInstance)
+                ? uriSpec.uri(call.uriTemplate(), builder -> call.uri())
+                : uriSpec.uri(call.uriTemplate(), call.uriVariables());
+        request.headers(headers -> call.headers().forEach(headers::set));
         WebClient.RequestHeadersSpec<?> exchange = call.body() instanceof HttpCall.NoBody
                 ? request : request.bodyValue(call.body().body());
         return exchange.exchangeToMono(response -> response.bodyToMono(byte[].class)

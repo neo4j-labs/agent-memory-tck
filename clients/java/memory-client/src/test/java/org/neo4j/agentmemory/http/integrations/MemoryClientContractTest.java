@@ -87,9 +87,22 @@ class MemoryClientContractTest {
     @Test
     void listConversations() {
         stubFor(get(urlPathEqualTo("/v1/conversations"))
+                .withQueryParam("userId", absent())
                 .willReturn(OpenApiContract.response("get", "/v1/conversations")));
 
         var conversations = await(client.listConversations(new ListConversations(25)));
+
+        assertThat(conversations).isNotEmpty();
+    }
+
+    @Test
+    void listConversationsForOneUser() {
+        stubFor(get(urlPathEqualTo("/v1/conversations"))
+                .withQueryParam("userId", equalTo("alice"))
+                .withQueryParam("limit", equalTo("25"))
+                .willReturn(OpenApiContract.response("get", "/v1/conversations")));
+
+        var conversations = await(client.listConversations(new ListConversations(25, "alice")));
 
         assertThat(conversations).isNotEmpty();
     }

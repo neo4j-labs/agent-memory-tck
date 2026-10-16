@@ -62,9 +62,13 @@ public final class HttpMemoryClient implements MemoryClient {
 
     @Override
     public CompletableFuture<List<Conversation>> listConversations(ListConversations request) {
+        var path = request.getUserId().isPresent()
+                ? "/conversations?limit={limit}&userId={userId}" : "/conversations?limit={limit}";
+        Map<String, Object> variables = request.getUserId().isPresent()
+                ? Map.of("limit", request.limit(), "userId", request.userId()) : Map.of("limit", request.limit());
         return get(
                 "listConversations",
-                "/conversations?limit={limit}", Map.of("limit", request.limit()),
+                path, variables,
                 ConversationsResponse.class,
                 response -> Objects.requireNonNull(
                                 response.conversations(), "conversations array is required")

@@ -140,7 +140,11 @@ public interface MemoryClient {
      * conversations array in an HTTP response fails the future with
      * {@link ResponseDecodingException}.
      *
-     * @param request the requested list limit
+     * <p>A present user ID restricts results to Conversations created for that
+     * user; matching is exact and case-sensitive. An absent user ID lists
+     * Conversations without a user filter.
+     *
+     * @param request the requested list limit and optional user ID
      * @return a future containing an immutable list of live Conversations
      */
     CompletableFuture<List<Conversation>> listConversations(ListConversations request);

@@ -1,13 +1,15 @@
 package org.neo4j.agentmemory.http;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * One memory request: a method, an absolute URI template with UUID or Integer
- * variables, the memory headers, and a body.
+ * One memory request: a method, an absolute URI template with UUID, Integer, or String
+ * variables, the memory headers, and a body. String variables are UTF-8
+ * percent-encoded, leaving only RFC 3986 unreserved characters literal.
  */
 public sealed interface HttpCall permits HttpCallRecord {
     String method();
@@ -56,8 +58,8 @@ record HttpCallRecord(String method, String uriTemplate, Map<String, Object> uri
             throw new IllegalArgumentException("unsupported HTTP method: " + method);
         }
         uriVariables.forEach((name, value) -> {
-            if (!(value instanceof UUID) && !(value instanceof Integer)) {
-                throw new IllegalArgumentException("uri variable " + name + " must be a UUID or Integer");
+            if (!(value instanceof UUID) && !(value instanceof Integer) && !(value instanceof String)) {
+                throw new IllegalArgumentException("uri variable " + name + " must be a UUID, Integer, or String");
             }
         });
         uriVariables = Map.copyOf(uriVariables);
@@ -71,8 +73,25 @@ record HttpCallRecord(String method, String uriTemplate, Map<String, Object> uri
             if (!uriVariables.containsKey(name)) {
                 throw new IllegalArgumentException("unbound uri variable: " + name);
             }
-            return String.valueOf(uriVariables.get(name));
+            var value = uriVariables.get(name);
+            return value instanceof String string ? encode(string) : String.valueOf(value);
         });
         return URI.create(expanded);
+    }
+
+    private static String encode(String value) {
+        var encoded = new StringBuilder();
+        var hex = "0123456789ABCDEF";
+        for (byte octet : value.getBytes(StandardCharsets.UTF_8)) {
+            int character = octet & 0xff;
+            if (character >= 'A' && character <= 'Z' || character >= 'a' && character <= 'z'
+                    || character >= '0' && character <= '9' || character == '-'
+                    || character == '.' || character == '_' || character == '~') {
+                encoded.append((char) character);
+            } else {
+                encoded.append('%').append(hex.charAt(character >>> 4)).append(hex.charAt(character & 15));
+            }
+        }
+        return encoded.toString();
     }
 }
