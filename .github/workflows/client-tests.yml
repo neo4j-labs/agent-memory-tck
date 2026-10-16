@@ -1,7 +1,7 @@
 name: Client Tests
 
 # Per-client unit + integration tests (always run) and e2e tests (gated on
-# the MEMORY_API_KEY repo secret) for the five language SDKs.
+# the MEMORY_API_KEY repo secret) for the six language SDKs.
 #
 # Forks and PRs without secret access still pass: every e2e test skips
 # gracefully when MEMORY_API_KEY is empty.
@@ -86,6 +86,34 @@ jobs:
         run: |
           cd clients/typescript
           npm run test:e2e
+
+  # ---------------- Java ----------------
+  java-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/java
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: clients/java/**/pom.xml
+      - name: Unit tests
+        run: mvn clean test
+      - name: Verify (if MEMORY_API_KEY is set)
+        env:
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
+          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
+        run: |
+          if [ -n "$MEMORY_API_KEY" ]; then
+            mvn clean verify
+          else
+            echo "Skipping verification: MEMORY_API_KEY is not set."
+          fi
 
   # ---------------- Go ----------------
   go-tests:
