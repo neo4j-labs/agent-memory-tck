@@ -9,6 +9,7 @@ import org.neo4j.agentmemory.exception.MissingJsonCodecException;
 import org.neo4j.agentmemory.exception.ResponseDecodingException;
 import org.neo4j.agentmemory.http.HttpMemoryClient;
 import org.neo4j.agentmemory.reasoning.*;
+import org.neo4j.agentmemory.user.UserMemoryDeletion;
 
 import java.time.Duration;
 import java.util.List;
@@ -292,6 +293,20 @@ public interface MemoryClient {
      * @return a future containing the Reasoning Step Explanation
      */
     CompletableFuture<ReasoningStepExplanation> explainReasoningStep(UUID stepId);
+
+    /**
+     * Deletes the identified user's User Memory in one service call.
+     * An incomplete result means the service ran out of time; repeating the
+     * call continues deletion. The client does not repeat the call.
+     *
+     * @param userId the user whose User Memory is deleted
+     * @return a future containing the echoed user ID and whether deletion is complete
+     * @throws NullPointerException if userId is null, with message {@code userId};
+     *         thrown before this method returns a future
+     * @throws IllegalArgumentException if userId is blank, with message
+     *         {@code userId must not be blank}; thrown before this method returns a future
+     */
+    CompletableFuture<UserMemoryDeletion> deleteUserMemory(String userId);
 
     /**
      * Deletes the identified Conversation.

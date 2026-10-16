@@ -1,6 +1,8 @@
 package org.neo4j.agentmemory.http.integrations;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -116,6 +118,24 @@ class MemoryClientContractTest {
         var conversation = await(client.getConversation(conversationId));
 
         assertThat(conversation.id()).isNotNull();
+    }
+
+    @Test
+    void deleteUserMemory() throws Exception {
+        var response = OpenApiContract.response("delete", "/v1/memory");
+        // The published schema has no status enum; the generic fixture supplies "success".
+        var body = (ObjectNode) JsonMapper.builder().build().readTree(response.build().getBody());
+        body.put("status", "deleted");
+        stubFor(delete(urlPathEqualTo("/v1/memory"))
+                .withQueryParam("userId", equalTo("alice"))
+                .willReturn(response.withBody(body.toString())));
+
+        var result = await(client.deleteUserMemory("alice"));
+
+        assertThat(result.userId()).isEqualTo(body.get("userId").asText());
+        assertThat(result.complete()).isTrue();
+        verify(1, deleteRequestedFor(urlPathEqualTo("/v1/memory"))
+                .withQueryParam("userId", equalTo("alice")));
     }
 
     @Test

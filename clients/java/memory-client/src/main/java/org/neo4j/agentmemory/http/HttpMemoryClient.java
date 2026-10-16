@@ -9,6 +9,7 @@ import org.neo4j.agentmemory.exception.MemoryClientException;
 import org.neo4j.agentmemory.exception.MemoryServiceException;
 import org.neo4j.agentmemory.exception.ResponseDecodingException;
 import org.neo4j.agentmemory.reasoning.*;
+import org.neo4j.agentmemory.user.UserMemoryDeletion;
 
 import java.net.URI;
 import java.time.Duration;
@@ -200,6 +201,28 @@ public final class HttpMemoryClient implements MemoryClient {
                 "/reasoning/explain/{stepId}", Map.of("stepId", stepId),
                 ReasoningStepExplanationResponse.class,
                 this::reasoningStepExplanation);
+    }
+
+    @Override
+    public CompletableFuture<UserMemoryDeletion> deleteUserMemory(String userId) {
+        Objects.requireNonNull(userId, "userId");
+        if (userId.isBlank()) {
+            throw new IllegalArgumentException("userId must not be blank");
+        }
+        var operation = "deleteUserMemory";
+        return logging.call(operation, log -> {
+            var call = HttpCall.delete(uriTemplate("/memory?userId={userId}"),
+                    Map.of("userId", userId), headers());
+            return exchangeAndDecode(operation, call, UserMemoryDeletionResponse.class,
+                    response -> {
+                        var complete = switch (Objects.requireNonNull(response.status(), "status is required")) {
+                            case "deleted" -> true;
+                            case "incomplete" -> false;
+                            default -> throw new IllegalArgumentException("unknown deletion status");
+                        };
+                        return new UserMemoryDeletion(response.userId(), complete);
+                    }, log);
+        });
     }
 
     @Override
@@ -402,6 +425,8 @@ public final class HttpMemoryClient implements MemoryClient {
                 ? text
                 : text.substring(0, BODY_EXCERPT_LIMIT) + "…";
     }
+
+    private record UserMemoryDeletionResponse(String userId, String status) {}
 
     private record CreateConversationRequest(String userId, Map<String, String> metadata) {}
 

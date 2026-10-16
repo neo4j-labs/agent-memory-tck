@@ -45,6 +45,16 @@ Verified supported application frameworks are:
 
 List one user's Conversations with `client.listConversations(new ListConversations(25, "alice"))`.
 
+Delete one user's User Memory with one service call per invocation. An incomplete
+result means the service ran out of time; the caller decides whether to repeat:
+
+```java
+var deletion = MemoryClient.await(client.deleteUserMemory("alice"));
+while (!deletion.complete()) {
+    deletion = MemoryClient.await(client.deleteUserMemory("alice"));
+}
+```
+
 `MemoryClient.create()` uses the default configuration, that resolves environment settings: `MEMORY_API_KEY` must contain a nonblank Workspace API key. `MEMORY_ENDPOINT` is optional: when absent or blank, the client uses `https://memory.neo4jlabs.com/v1` and emits a WARN identifying the default URL on each successful build. Explicit builder settings take precedence over environment settings. The default JDK http transport is used.
 
 The client expects a **Workspace API key** bound to the target workspace. It does not yet support an Admin key combined with an explicitly provided workspace ID.
@@ -72,6 +82,7 @@ MemoryClient defines all supported domain operations. Applications can use these
 | org.neo4j.agentmemory.conversation | Conversation, requests, Messages, and Conversation Context |
 | org.neo4j.agentmemory.reasoning | Reasoning Steps, traces, explanations, and Tool Calls |
 | org.neo4j.agentmemory.entity | Entity values and search inputs |
+| org.neo4j.agentmemory.user | User Memory deletion results |
 | org.neo4j.agentmemory.exception | Client-owned failures |
 | org.neo4j.agentmemory.http | The HTTP transport extension point (`HttpTransport`, `HttpCall`, `HttpResult`) and the internal `HttpMemoryClient` |
 
