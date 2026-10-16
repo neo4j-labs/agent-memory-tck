@@ -105,7 +105,7 @@ public final class HttpMemoryClient implements MemoryClient {
         return post(
                 "addMessage",
                 "/conversations/{conversationId}/messages", Map.of("conversationId", conversationId),
-                message,
+                new AddMessageRequest(message),
                 Message.class,
                 response -> response);
     }
@@ -113,7 +113,7 @@ public final class HttpMemoryClient implements MemoryClient {
     @Override
     public CompletableFuture<List<Message>> addMessages(
             UUID conversationId, List<NewMessage> messages) {
-        var snapshot = List.copyOf(messages);
+        var snapshot = messages.stream().map(AddMessageRequest::new).toList();
         return post(
                 "addMessages",
                 "/conversations/{conversationId}/messages/bulk", Map.of("conversationId", conversationId),
@@ -448,7 +448,13 @@ public final class HttpMemoryClient implements MemoryClient {
 
     private record MessagesResponse(List<Message> messages) {}
 
-    private record AddMessagesRequest(List<NewMessage> messages) {}
+    private record AddMessageRequest(MessageRole role, String content, Map<String, String> metadata) {
+        AddMessageRequest(NewMessage message) {
+            this(message.role(), message.content(), message.metadata().isEmpty() ? null : message.metadata());
+        }
+    }
+
+    private record AddMessagesRequest(List<AddMessageRequest> messages) {}
 
     private record EntitiesResponse(
             List<Entity> entities,

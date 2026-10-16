@@ -106,6 +106,22 @@ conversation.addMessage(NewMessage.user("Find hotels in Catalona"));
 var recent = await(conversation.messages(20)); //get most recent messages
 ```
 
+Messages accept string-valued metadata, which is returned on writes and reads:
+
+```java
+var message = await(conversation.addMessage(new NewMessage(
+        org.neo4j.agentmemory.conversation.MessageRole.USER,
+        "Find hotels in Catalonia", Map.of("source", "travel-planner", "priority", "high"))));
+var source = message.metadata().get("source");
+```
+
+`NewMessage.metadata()` and `Message.metadata()` are immutable snapshots, empty
+when metadata is absent or null. Existing constructors and the `user` and
+`assistant` factories remain available. Single and bulk writes omit empty
+metadata. The hosted service accepts only string values, with at most 8192 bytes
+of keys and values combined; numbers, booleans, arrays, and nested objects are
+outside its metadata contract.
+
 ### Supplying and configuring http transport
 
 The library does not enforce a single HTTP client and allows supplying own's configuration (for example with a desired observability or headers set-up). The supplied client is used as configured, including its executor, proxy,  timeouts, and TLS settings. The last HTTP client setter wins. The memory client never closes injected clients or executors; their lifecycle belongs to the application. The client does not perform any automatic write retries.

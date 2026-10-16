@@ -7,8 +7,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 final class BridgeJson {
     private final JsonMapper mapper = JsonMapper.builder().build();
@@ -59,10 +61,25 @@ final class BridgeJson {
         return Math.min(value.asInt(), 200);
     }
 
+    Map<String, String> metadata(ObjectNode body) {
+        var metadata = body.get("metadata");
+        if (metadata == null || metadata.isNull()) return Map.of();
+        if (!metadata.isObject()) throw new InvalidArgument("metadata must be an object");
+        var result = new HashMap<String, String>();
+        for (var entry : metadata.properties()) {
+            if (!entry.getValue().isString()) {
+                throw new BridgeMethods.Gap("service gap: message metadata supports only string values");
+            }
+            result.put(entry.getKey(), entry.getValue().asString());
+        }
+        return result;
+    }
+
     ObjectNode message(Message message) {
         return object().put("id", message.id().toString())
                 .put("role", message.role().name().toLowerCase(Locale.ROOT))
-                .put("content", message.content()).putNull("timestamp");
+                .put("content", message.content()).putNull("timestamp")
+                .set("metadata", mapper.valueToTree(message.metadata()));
     }
 
     ObjectNode conversation(String session, Conversation conversation, List<Message> messages) {

@@ -32,3 +32,10 @@ uv run --extra bridge pytest -m 'bronze or silver' \
 If you change `TCK_BRIDGE_PORT`, use the same port in `--bridge-url`. Pytest reports the conformance results directly and exits nonzero when scenarios fail, including known gaps. The JSON report records the results for inspection or use with the shared TCK compliance reporter.
 
 Some scenarios pass through defaults supplied by the bridge adapter, such as timestamps and empty metadata. Those passes do not demonstrate client support for the fields. Client Gaps require client or translation work; Service Gaps require a hosted service change. Gold and Platinum Bridge Methods are outside this server's scope and answer HTTP 404.
+
+Message metadata is forwarded to the client and returned from service responses.
+Absent, null, or empty metadata is accepted. The hosted contract supports only
+string values: numeric, boolean, null, array, or object values within metadata
+receive HTTP 501 naming the Service Gap before any service call. A non-object
+metadata field receives HTTP 400. The string-only metadata scenario can pass;
+the typed and nested metadata scenarios still require a service change.

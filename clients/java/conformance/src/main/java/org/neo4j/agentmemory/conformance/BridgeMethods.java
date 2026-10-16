@@ -24,7 +24,7 @@ final class BridgeMethods {
         });
         methods.put("add_message", body -> {
             var session = json.required(body, "session_id");
-            var message = new NewMessage(json.role(body), json.required(body, "content"));
+            var message = new NewMessage(json.role(body), json.required(body, "content"), json.metadata(body));
             var conversation = sessions.bind(session);
             return json.message(MemoryClient.await(client.addMessage(conversation.id(), message),
                     Duration.ofSeconds(20)));

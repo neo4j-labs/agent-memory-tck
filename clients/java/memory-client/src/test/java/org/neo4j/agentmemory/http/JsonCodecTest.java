@@ -36,9 +36,9 @@ class JsonCodecTest {
 
     @Test
     void encodesHostedMessageRequestAndLowercaseRole() {
-        var messageJson = new String(codec.encode(new NewMessage(USER, "hello")), UTF_8);
+        var messageJson = new String(codec.encode(new NewMessage(USER, "hello", Map.of("source", "test"))), UTF_8);
 
-        assertThat(messageJson).isEqualTo("{\"role\":\"user\",\"content\":\"hello\"}");
+        assertThat(messageJson).isEqualTo("{\"role\":\"user\",\"content\":\"hello\",\"metadata\":{\"source\":\"test\"}}");
     }
 
     @Test
