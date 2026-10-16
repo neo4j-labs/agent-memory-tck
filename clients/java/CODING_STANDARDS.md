@@ -10,7 +10,7 @@ Use [GLOSSARY.md](../../CONTEXT.md) for shared domain language. Read the ADRs fo
 
 - **Client configuration:** [immutable validated settings and base URL initialization logging (0023)](docs/adr/0023-build-validated-client-configuration.md).
 
-- **API boundaries:** [live domain handles (0002)](docs/adr/0002-domain-oriented-java-memory-client.md), [integration-owned orchestration (0007)](docs/adr/0007-keep-agent-workflow-orchestration-outside-core.md), [hosted service, conformance, and framework boundaries (0014)](docs/adr/0014-keep-java-client-within-hosted-service-boundary.md).
+- **API boundaries:** [live domain handles (0002)](docs/adr/0002-domain-oriented-java-memory-client.md), [integration-owned orchestration (0007)](docs/adr/0007-keep-agent-workflow-orchestration-outside-core.md), [hosted service, conformance, and framework boundaries (0014)](docs/adr/0014-keep-java-client-within-hosted-service-boundary.md), refined by [hosted strict-translator conformance (0026)](docs/adr/0026-run-conformance-against-the-hosted-service-as-a-strict-translator.md).
 - **Async and blocking:** [operation return types (0001)](docs/adr/0001-completablefuture-for-java-client.md), [bounded waits, exception identity, and future preservation (0018)](docs/adr/0018-bound-waits-without-mutating-futures.md).
 
 ### Models

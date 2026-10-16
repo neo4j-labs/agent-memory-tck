@@ -14,6 +14,9 @@ A structured view of a conversation's reflections, observations, and recent mess
 **Entity**:
 A named piece of knowledge discovered or stored in the knowledge graph. Its type is an open, service-provided classification rather than a fixed client vocabulary.
 
+**User Memory**:
+Everything stored for one known user: the Conversations created for them, with everything those Conversations own, and the Entities in that user's memory. Shared Entities extracted from their Conversations are not part of it.
+
 **Exchange**:
 An ordered user message and assistant response belonging to the same conversational turn. Each message in an exchange is persisted exactly once, even when the first exchange is anchored through separate writes.
 _Avoid_: Turn
