@@ -18,9 +18,6 @@ _Avoid_: Reasoning Trace (the client's history of one Conversation's Reasoning S
 
 ## Progress
 
-**Ledger**:
-The reviewed record of which TCK scenarios the Java client is expected to pass, and which are blocked by a Client Gap or a Service Gap.
-
 **Client Gap**:
 A Bridge Method the hosted service can honour but the Java client, through the conformance server, does not yet carry. Closing it is planned client or translation work.
 
