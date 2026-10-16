@@ -70,6 +70,8 @@ class HostedServiceIT {
                 assertThat(conversations)
                                 .extracting(Conversation::id)
                                 .contains(created.id());
+
+                await(client.deleteUserMemory(userId));
         }
 
         @Test
@@ -117,6 +119,8 @@ class HostedServiceIT {
                 ConversationContextAssert.assertThat(context)
                                 .hasThreeTiers()
                                 .containsRecentMessages(firstUser.id(), firstAssistant.id());
+
+                await(client.deleteUserMemory(userId));
         }
 
         @Test
@@ -192,6 +196,8 @@ class HostedServiceIT {
                                                 firstAssistant.id(),
                                                 exchange.get(0).id(),
                                                 exchange.get(1).id());
+
+                await(client.deleteConversation(conversation.id()));
         }
 
         private static MemoryClient client() {
