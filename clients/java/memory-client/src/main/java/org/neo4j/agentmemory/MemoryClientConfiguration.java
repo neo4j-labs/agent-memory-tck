@@ -61,7 +61,7 @@ public final class MemoryClientConfiguration {
         private Builder() {}
 
         /**
-         * Overrides NAMS_BASE_URL with a service URL including its version path.
+         * Overrides MEMORY_ENDPOINT with a service URL including its version path.
          * Leading and trailing whitespace is trimmed when building; a trailing
          * slash is supported. Null is rejected immediately; blank values fail in build().
          *
@@ -76,7 +76,7 @@ public final class MemoryClientConfiguration {
         }
 
         /**
-         * Overrides NAMS_API_KEY with a Workspace API key.
+         * Overrides MEMORY_API_KEY with a Workspace API key.
          * Null is rejected immediately; blank values fail in build().
          *
          * @param apiKey the nonblank Workspace API key
@@ -171,7 +171,7 @@ public final class MemoryClientConfiguration {
         }
 
         /**
-         * Resolves omitted settings from NAMS_API_KEY and NAMS_BASE_URL and
+         * Resolves omitted settings from MEMORY_API_KEY and MEMORY_ENDPOINT and
          * validates them without creating a client or making a remote request.
          * An absent or blank environment base URL defaults to
          * https://memory.neo4jlabs.com/v1 and emits a WARNING through System.Logger.
@@ -183,8 +183,8 @@ public final class MemoryClientConfiguration {
          *         user info, query, or fragment
          */
         public MemoryClientConfiguration build() {
-            var resolvedKey = apiKey != null ? apiKey : System.getenv("NAMS_API_KEY");
-            var resolvedUrl = baseUrl != null ? baseUrl : System.getenv("NAMS_BASE_URL");
+            var resolvedKey = apiKey != null ? apiKey : System.getenv("MEMORY_API_KEY");
+            var resolvedUrl = baseUrl != null ? baseUrl : System.getenv("MEMORY_ENDPOINT");
             if (resolvedKey == null || resolvedKey.isBlank()) {
                 throw new IllegalArgumentException("apiKey must not be blank");
             }
@@ -216,7 +216,7 @@ public final class MemoryClientConfiguration {
         private static void logDefaultBaseUrl() {
             try {
                 System.getLogger(MemoryClientConfiguration.class.getName()).log(System.Logger.Level.WARNING,
-                        "NAMS_BASE_URL is absent or blank; using default base URL " + DEFAULT_BASE_URL);
+                        "MEMORY_ENDPOINT is absent or blank; using default base URL " + DEFAULT_BASE_URL);
             } catch (RuntimeException ignored) {
                 // Logging has no effect on configuration validation.
             }

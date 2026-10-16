@@ -27,8 +27,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
 
 @WireMockTest
-@ClearEnvironmentVariable(key = "NAMS_API_KEY")
-@ClearEnvironmentVariable(key = "NAMS_BASE_URL")
+@ClearEnvironmentVariable(key = "MEMORY_API_KEY")
+@ClearEnvironmentVariable(key = "MEMORY_ENDPOINT")
 class MemoryClientFactoryTest {
 
     @RegisterExtension
@@ -82,8 +82,8 @@ class MemoryClientFactoryTest {
 
     @ParameterizedTest
     @EnumSource(Factory.class)
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "workspace-key")
-    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "  https://environment.test/v1  ")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "workspace-key")
+    @SetEnvironmentVariable(key = "MEMORY_ENDPOINT", value = "  https://environment.test/v1  ")
     void factoriesUseConfiguredEnvironmentUrl(Factory factory) {
         assertThat(factory.create()).isNotNull();
 
@@ -93,8 +93,8 @@ class MemoryClientFactoryTest {
     }
 
     @Test
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "workspace-key")
-    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "https://environment.test/v1")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "workspace-key")
+    @SetEnvironmentVariable(key = "MEMORY_ENDPOINT", value = "https://environment.test/v1")
     void configurationUsesEnvironmentKeyWithExplicitUrl(WireMockRuntimeInfo server) {
         stubConversationList();
         var client = MemoryClient.create(MemoryClientConfiguration.builder()
@@ -106,38 +106,38 @@ class MemoryClientFactoryTest {
     @ParameterizedTest
     @EnumSource(value = Factory.class, names = {"NO_ARGUMENT", "EMPTY_CONFIGURATION"})
     void factoriesRejectAbsentEnvironmentKey(Factory factory) {
-        assertThat(System.getenv("NAMS_API_KEY")).isNull();
+        assertThat(System.getenv("MEMORY_API_KEY")).isNull();
         assertMissingEnvironmentKey(factory);
     }
 
     @ParameterizedTest
     @EnumSource(value = Factory.class, names = {"NO_ARGUMENT", "EMPTY_CONFIGURATION"})
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = " \t")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = " \t")
     void factoriesRejectBlankEnvironmentKey(Factory factory) {
-        assertThat(System.getenv("NAMS_API_KEY")).isBlank();
+        assertThat(System.getenv("MEMORY_API_KEY")).isBlank();
         assertMissingEnvironmentKey(factory);
     }
 
     @ParameterizedTest
     @EnumSource(Factory.class)
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "workspace-key")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "workspace-key")
     void factoriesUseDefaultUrlForAbsentEnvironmentUrl(Factory factory) {
-        assertThat(System.getenv("NAMS_BASE_URL")).isNull();
+        assertThat(System.getenv("MEMORY_ENDPOINT")).isNull();
         assertDefaultUrl(factory);
     }
 
     @ParameterizedTest
     @EnumSource(Factory.class)
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "workspace-key")
-    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = " \t")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "workspace-key")
+    @SetEnvironmentVariable(key = "MEMORY_ENDPOINT", value = " \t")
     void factoriesUseDefaultUrlForBlankEnvironmentUrl(Factory factory) {
-        assertThat(System.getenv("NAMS_BASE_URL")).isBlank();
+        assertThat(System.getenv("MEMORY_ENDPOINT")).isBlank();
         assertDefaultUrl(factory);
     }
 
     @Test
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "unused-key")
-    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "  https://environment.test/v1  ")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "unused-key")
+    @SetEnvironmentVariable(key = "MEMORY_ENDPOINT", value = "  https://environment.test/v1  ")
     void configurationKeyOverridesEnvironmentAndRetainsEnvironmentUrl() {
         var configuration = MemoryClientConfiguration.builder().apiKey("explicit-key").build();
         assertThat(configuration.apiKey()).isEqualTo("explicit-key");
@@ -152,8 +152,8 @@ class MemoryClientFactoryTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"", "/"})
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "unused-key")
-    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "invalid environment URL")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "unused-key")
+    @SetEnvironmentVariable(key = "MEMORY_ENDPOINT", value = "invalid environment URL")
     void configurationOverridesEnvironmentAndSupportsTrailingSlash(String suffix, WireMockRuntimeInfo server) {
         stubConversationList();
         var baseUrl = server.getHttpBaseUrl() + "/v1" + suffix;

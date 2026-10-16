@@ -92,7 +92,8 @@ public interface MemoryClient {
     /**
      * Constructs a client with environment settings and a new default JDK HTTP client.
      * Equivalent to create(MemoryClientConfiguration.builder().build()).
-     * NAMS_API_KEY is required; NAMS_BASE_URL defaults to
+     * MEMORY_API_KEY is required.
+     * MEMORY_ENDPOINT defaults to
      * https://memory.neo4jlabs.com/v1 when absent or blank.
      * Construction logs the base URL and makes no remote request.
      *

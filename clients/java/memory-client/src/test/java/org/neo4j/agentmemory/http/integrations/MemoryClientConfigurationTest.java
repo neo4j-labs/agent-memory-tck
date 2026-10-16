@@ -17,8 +17,8 @@ import java.net.http.HttpClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@ClearEnvironmentVariable(key = "NAMS_API_KEY")
-@ClearEnvironmentVariable(key = "NAMS_BASE_URL")
+@ClearEnvironmentVariable(key = "MEMORY_API_KEY")
+@ClearEnvironmentVariable(key = "MEMORY_ENDPOINT")
 class MemoryClientConfigurationTest {
     @RegisterExtension
     final LogCapturer logs = LogCapturer.create().captureForType(MemoryClientConfiguration.class);
@@ -105,8 +105,8 @@ class MemoryClientConfigurationTest {
     }
 
     @Test
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "unused-key")
-    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "invalid URL")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "unused-key")
+    @SetEnvironmentVariable(key = "MEMORY_ENDPOINT", value = "invalid URL")
     void buildsConfigurationWithExplicitValues() {
         var configuration = MemoryClientConfiguration.builder()
                 .apiKey("workspace-key")
@@ -140,8 +140,8 @@ class MemoryClientConfigurationTest {
     }
 
     @Test
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "environment-key")
-    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "  https://environment.test/v1  ")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "environment-key")
+    @SetEnvironmentVariable(key = "MEMORY_ENDPOINT", value = "  https://environment.test/v1  ")
     void emptyBuilderResolvesEnvironmentWhenBuilt() {
         var configuration = MemoryClientConfiguration.builder().build();
 
@@ -151,14 +151,14 @@ class MemoryClientConfigurationTest {
     }
 
     @Test
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "environment-key")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "environment-key")
     void defaultsBaseUrlWhenEnvironmentIsAbsent() {
         assertDefaultBaseUrlAndWarning();
     }
 
     @Test
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "environment-key")
-    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = " \t")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "environment-key")
+    @SetEnvironmentVariable(key = "MEMORY_ENDPOINT", value = " \t")
     void defaultsBaseUrlWhenEnvironmentIsBlank() {
         assertDefaultBaseUrlAndWarning();
     }
@@ -172,7 +172,7 @@ class MemoryClientConfigurationTest {
     }
 
     @Test
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = " \t")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = " \t")
     void rejectsBlankEnvironmentKeyDuringBuild() {
         assertThatThrownBy(() -> MemoryClientConfiguration.builder().build())
                 .isInstanceOf(IllegalArgumentException.class)
@@ -181,8 +181,8 @@ class MemoryClientConfigurationTest {
     }
 
     @Test
-    @SetEnvironmentVariable(key = "NAMS_API_KEY", value = "environment-key")
-    @SetEnvironmentVariable(key = "NAMS_BASE_URL", value = "invalid URL")
+    @SetEnvironmentVariable(key = "MEMORY_API_KEY", value = "environment-key")
+    @SetEnvironmentVariable(key = "MEMORY_ENDPOINT", value = "invalid URL")
     void rejectsInvalidEnvironmentUrlDuringBuild() {
         assertThatThrownBy(() -> MemoryClientConfiguration.builder().build())
                 .isInstanceOf(IllegalArgumentException.class)
@@ -211,7 +211,7 @@ class MemoryClientConfigurationTest {
         assertThat(logs.getEvents()).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
             assertThat(event.getMessage())
-                    .contains("NAMS_BASE_URL is absent or blank; using default base URL",
+                    .contains("MEMORY_ENDPOINT is absent or blank; using default base URL",
                             "https://memory.neo4jlabs.com/v1")
                     .doesNotContain("environment-key");
         });

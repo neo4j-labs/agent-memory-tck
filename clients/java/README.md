@@ -43,7 +43,7 @@ Verified supported application frameworks are:
 
 ## Public API
 
-`MemoryClient.create()` uses the default configuration, that resolves environment settings: `NAMS_API_KEY` must contain a nonblank Workspace API key. `NAMS_BASE_URL` is optional: an absent or blank value uses `https://memory.neo4jlabs.com/v1` and emits a WARN identifying the default URL on each successful build. The default JDK http transport is used.
+`MemoryClient.create()` uses the default configuration, that resolves environment settings: `MEMORY_API_KEY` must contain a nonblank Workspace API key. `MEMORY_ENDPOINT` is optional: when absent or blank, the client uses `https://memory.neo4jlabs.com/v1` and emits a WARN identifying the default URL on each successful build. Explicit builder settings take precedence over environment settings. The default JDK http transport is used.
 
 The client expects a **Workspace API key** bound to the target workspace. It does not yet support an Admin key combined with an explicitly provided workspace ID.
 

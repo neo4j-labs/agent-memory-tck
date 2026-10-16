@@ -35,7 +35,7 @@ import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
  * The suite exercises only the initial conversation workflows. Maven Failsafe
  * discovers it
  * during {@code verify}; every workflow is marked skipped when
- * {@code NAMS_API_KEY} is absent or
+ * {@code MEMORY_API_KEY} is absent or
  * blank. Each workflow creates uniquely identified data and owns all state it
  * uses. Workflows are
  * parallel-safe but run sequentially by default.
@@ -47,11 +47,11 @@ import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
  */
 @Timeout(value = 30, unit = SECONDS)
 class HostedServiceIT {
-        private static final String API_KEY = environment("NAMS_API_KEY", "").trim();
+        private static final String API_KEY = environment("MEMORY_API_KEY", "").trim();
 
         @BeforeEach
         void requireApiKey() {
-                assumeFalse(API_KEY.isBlank(), "NAMS_API_KEY is not set");
+                assumeFalse(API_KEY.isBlank(), "MEMORY_API_KEY are not set");
         }
 
         @Test
@@ -204,6 +204,6 @@ class HostedServiceIT {
 
         private static String environment(String name, String fallback) {
                 var value = System.getenv(name);
-                return value == null ? fallback : value;
+                return value == null || value.isBlank() ? fallback : value;
         }
 }
