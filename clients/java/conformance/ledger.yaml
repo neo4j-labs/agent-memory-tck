@@ -1,0 +1,748 @@
+# test_schema::TestSchemaConversationCreation::test_first_message_creates_conversation
+SCN-B-001:
+  status: pass
+
+# test_schema::TestSchemaConversationCreation::test_subsequent_messages_reuse_conversation
+SCN-B-002:
+  status: pass
+
+# test_schema::TestSchemaSessionIsolation::test_messages_isolated_between_sessions
+SCN-B-003:
+  status: pass
+
+# test_schema::TestSchemaMessageDeletion::test_deleted_message_not_retrievable
+SCN-B-004:
+  status: service-gap
+  note: delete_message
+
+# test_schema::TestSchemaConversationCreation::test_conversation_id_is_valid_uuid
+SCN-B-005:
+  status: pass
+
+# test_schema::TestSchemaConversationCreation::test_conversation_created_at_is_set
+SCN-B-006:
+  status: pass
+
+# test_schema::TestSchemaConversationCreation::test_conversation_title_is_optional
+SCN-B-007:
+  status: pass
+
+# test_schema::TestSchemaConversationCreation::test_conversation_reuses_same_id_across_messages
+SCN-B-008:
+  status: pass
+
+# test_schema::TestSchemaSessionIsolation::test_sessions_have_different_conversation_ids
+SCN-B-009:
+  status: pass
+
+# test_schema::TestSchemaMessageDeletion::test_deletion_does_not_affect_other_messages
+SCN-B-010:
+  status: service-gap
+  note: delete_message
+
+# test_schema::TestSchemaMessageProperties::test_message_has_id
+SCN-B-011:
+  status: pass
+
+# test_schema::TestSchemaMessageProperties::test_message_has_role
+SCN-B-012:
+  status: pass
+
+# test_schema::TestSchemaMessageProperties::test_message_has_content
+SCN-B-013:
+  status: pass
+
+# test_schema::TestSchemaMessageProperties::test_message_has_timestamp
+SCN-B-014:
+  status: client-gap
+  note: passes only through a bridge default
+
+# test_schema::TestSchemaEntityCreation::test_entity_created_with_required_fields
+SCN-B-015:
+  status: client-gap
+  note: add_entity
+
+# test_schema::TestSchemaEntityCreation::test_entity_id_is_valid_uuid
+SCN-B-016:
+  status: client-gap
+  note: add_entity
+
+# test_schema::TestSchemaEntityCreation::test_entity_person_type_schema
+SCN-B-017:
+  status: client-gap
+  note: add_entity
+
+# test_schema::TestSchemaEntityCreation::test_entity_organization_type_schema
+SCN-B-018:
+  status: client-gap
+  note: add_entity
+
+# test_schema::TestSchemaEntityCreation::test_entity_location_type_schema
+SCN-B-019:
+  status: client-gap
+  note: add_entity
+
+# test_schema::TestSchemaEntityCreation::test_entity_event_type_schema
+SCN-B-020:
+  status: client-gap
+  note: add_entity
+
+# test_schema::TestSchemaEntityCreation::test_entity_object_type_schema
+SCN-B-021:
+  status: client-gap
+  note: add_entity
+
+# test_schema::TestSchemaEntityCreation::test_entity_created_at_is_set
+SCN-B-022:
+  status: client-gap
+  note: add_entity
+
+# test_schema::TestSchemaPreferenceCreation::test_preference_has_required_fields
+SCN-B-023:
+  status: service-gap
+  note: add_preference
+
+# test_schema::TestSchemaPreferenceCreation::test_preference_id_is_valid_uuid
+SCN-B-024:
+  status: service-gap
+  note: add_preference
+
+# test_schema::TestSchemaFactCreation::test_fact_has_required_fields
+SCN-B-025:
+  status: service-gap
+  note: add_fact
+
+# test_schema::TestSchemaFactCreation::test_fact_id_is_valid_uuid
+SCN-B-026:
+  status: service-gap
+  note: add_fact
+
+# test_short_term::TestAddMessage::test_add_message_returns_valid_message
+SCN-B-027:
+  status: client-gap
+  note: passes only through a bridge default
+
+# test_short_term::TestAddMessage::test_add_message_user_role
+SCN-B-028:
+  status: pass
+
+# test_short_term::TestAddMessage::test_add_message_assistant_role
+SCN-B-029:
+  status: pass
+
+# test_short_term::TestAddMessage::test_add_message_system_role
+SCN-B-030:
+  status: pass
+
+# test_short_term::TestAddMessage::test_add_message_with_metadata
+SCN-B-031:
+  status: client-gap
+  note: Message metadata is not carried by the Java client
+
+# test_short_term::TestAddMessage::test_add_message_creates_conversation_on_first_call
+SCN-B-032:
+  status: pass
+
+# test_short_term::TestAddMessage::test_add_message_empty_content
+SCN-B-033:
+  status: service-gap
+  note: 'Hosted add_message rejects empty content (HTTP 400: content is required)'
+
+# test_short_term::TestAddMessage::test_add_message_long_content
+SCN-B-034:
+  status: pass
+
+# test_short_term::TestAddMessage::test_add_message_unicode_content
+SCN-B-035:
+  status: pass
+
+# test_short_term::TestAddMessage::test_add_message_special_characters
+SCN-B-036:
+  status: pass
+
+# test_short_term::TestAddMessage::test_add_message_empty_metadata
+SCN-B-037:
+  status: client-gap
+  note: passes only through a bridge default
+
+# test_short_term::TestAddMessage::test_add_message_nested_metadata
+SCN-B-038:
+  status: client-gap
+  note: Message metadata is not carried by the Java client
+
+# test_short_term::TestAddMessage::test_add_message_null_metadata_defaults_empty
+SCN-B-039:
+  status: client-gap
+  note: passes only through a bridge default
+
+# test_short_term::TestAddMessage::test_add_message_uuid_format
+SCN-B-040:
+  status: pass
+
+# test_short_term::TestAddMessage::test_add_message_timestamp_is_recent
+SCN-B-041:
+  status: client-gap
+  note: passes only through a bridge default
+
+# test_short_term::TestAddMessage::test_add_message_rapid_succession
+SCN-B-042:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_message_order
+SCN-B-043:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_with_limit
+SCN-B-044:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_empty_session
+SCN-B-045:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_multiple_sessions_isolated
+SCN-B-046:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_limit_exceeds_count
+SCN-B-047:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_limit_one
+SCN-B-048:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_preserves_content_fidelity
+SCN-B-049:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_preserves_metadata
+SCN-B-050:
+  status: client-gap
+  note: Message metadata is not carried by the Java client
+
+# test_short_term::TestGetConversation::test_get_conversation_preserves_roles
+SCN-B-051:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_twenty_messages_ordered
+SCN-B-052:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_returns_valid_conversation_id
+SCN-B-053:
+  status: pass
+
+# test_short_term::TestGetConversation::test_get_conversation_three_sessions_fully_isolated
+SCN-B-054:
+  status: pass
+
+# test_short_term::TestSearchMessages::test_search_messages_finds_relevant
+SCN-B-055:
+  status: client-gap
+  note: search_messages
+
+# test_short_term::TestSearchMessages::test_search_messages_session_filter
+SCN-B-056:
+  status: client-gap
+  note: search_messages
+
+# test_short_term::TestSearchMessages::test_search_messages_respects_limit
+SCN-B-057:
+  status: client-gap
+  note: search_messages
+
+# test_short_term::TestSearchMessages::test_search_messages_no_results
+SCN-B-058:
+  status: client-gap
+  note: search_messages
+
+# test_short_term::TestSearchMessages::test_search_messages_limit_one
+SCN-B-059:
+  status: client-gap
+  note: search_messages
+
+# test_short_term::TestSearchMessages::test_search_messages_empty_database
+SCN-B-060:
+  status: client-gap
+  note: search_messages
+
+# test_short_term::TestSearchMessages::test_search_messages_across_sessions
+SCN-B-061:
+  status: client-gap
+  note: search_messages
+
+# test_short_term::TestListSessions::test_list_sessions_returns_all
+SCN-B-062:
+  status: pass
+
+# test_short_term::TestListSessions::test_list_sessions_includes_message_count
+SCN-B-063:
+  status: pass
+
+# test_short_term::TestListSessions::test_list_sessions_empty
+SCN-B-064:
+  status: pass
+
+# test_short_term::TestListSessions::test_list_sessions_single_session
+SCN-B-065:
+  status: pass
+
+# test_short_term::TestListSessions::test_list_sessions_respects_limit
+SCN-B-066:
+  status: pass
+
+# test_short_term::TestListSessions::test_list_sessions_created_at_present
+SCN-B-067:
+  status: pass
+
+# test_short_term::TestListSessions::test_list_sessions_message_count_after_delete
+SCN-B-068:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestListSessions::test_list_sessions_multiple_sessions_independent_counts
+SCN-B-069:
+  status: pass
+
+# test_short_term::TestDeleteMessage::test_delete_message_returns_true
+SCN-B-070:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestDeleteMessage::test_delete_message_removes_from_conversation
+SCN-B-071:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestDeleteMessage::test_delete_message_nonexistent_returns_false
+SCN-B-072:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestDeleteMessage::test_delete_message_preserves_remaining_order
+SCN-B-073:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestDeleteMessage::test_delete_first_message
+SCN-B-074:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestDeleteMessage::test_delete_last_message
+SCN-B-075:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestDeleteMessage::test_delete_middle_message
+SCN-B-076:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestDeleteMessage::test_delete_all_messages_one_by_one
+SCN-B-077:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestDeleteMessage::test_delete_same_message_twice
+SCN-B-078:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestClearSession::test_clear_session_removes_all_messages
+SCN-B-079:
+  status: pass
+
+# test_short_term::TestClearSession::test_clear_session_preserves_other_sessions
+SCN-B-080:
+  status: pass
+
+# test_short_term::TestClearSession::test_clear_session_idempotent_on_empty
+SCN-B-081:
+  status: pass
+
+# test_short_term::TestClearSession::test_clear_session_then_add_new_messages
+SCN-B-082:
+  status: pass
+
+# test_short_term::TestClearSession::test_clear_session_multiple_sessions_selective
+SCN-B-083:
+  status: pass
+
+# test_short_term::TestMessageChainStructure::test_messages_maintain_insertion_order
+SCN-B-084:
+  status: pass
+
+# test_short_term::TestMessageChainStructure::test_timestamps_are_monotonically_increasing
+SCN-B-085:
+  status: client-gap
+  note: passes only through a bridge default
+
+# test_short_term::TestMessageChainStructure::test_chain_with_single_message
+SCN-B-086:
+  status: pass
+
+# test_short_term::TestMessageChainStructure::test_chain_with_two_messages
+SCN-B-087:
+  status: pass
+
+# test_short_term::TestMessageChainStructure::test_chain_integrity_after_middle_delete
+SCN-B-088:
+  status: service-gap
+  note: delete_message
+
+# test_short_term::TestMessageChainStructure::test_large_chain_ordering
+SCN-B-089:
+  status: pass
+
+# test_short_term::TestMessageChainStructure::test_mixed_roles_maintain_order
+SCN-B-090:
+  status: pass
+
+# test_short_term::TestIdempotency::test_add_message_returns_unique_ids
+SCN-B-091:
+  status: pass
+
+# test_short_term::TestIdempotency::test_duplicate_content_stored_separately
+SCN-B-092:
+  status: pass
+
+# test_short_term::TestIdempotency::test_clear_session_is_idempotent
+SCN-B-093:
+  status: pass
+
+# test_long_term::TestAddEntity::test_add_entity_basic
+SCN-S-001:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddEntity::test_add_entity_with_description
+SCN-S-002:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddEntity::test_add_entity_person_type
+SCN-S-003:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddEntity::test_add_entity_organization_type
+SCN-S-004:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddEntity::test_add_entity_location_type
+SCN-S-005:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddEntity::test_add_entity_event_type
+SCN-S-006:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddEntity::test_add_entity_object_type
+SCN-S-007:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddEntity::test_add_multiple_entities
+SCN-S-008:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddPreference::test_add_preference_basic
+SCN-S-009:
+  status: service-gap
+  note: add_preference
+
+# test_long_term::TestAddPreference::test_add_preference_with_context
+SCN-S-010:
+  status: service-gap
+  note: add_preference
+
+# test_long_term::TestAddPreference::test_add_multiple_preferences
+SCN-S-011:
+  status: service-gap
+  note: add_preference
+
+# test_long_term::TestAddFact::test_add_fact_basic
+SCN-S-012:
+  status: service-gap
+  note: add_fact
+
+# test_long_term::TestAddFact::test_add_multiple_facts
+SCN-S-013:
+  status: service-gap
+  note: add_fact
+
+# test_long_term::TestSearchEntities::test_search_entities_finds_relevant
+SCN-S-014:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestSearchEntities::test_search_entities_respects_limit
+SCN-S-015:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestSearchPreferences::test_search_preferences_finds_relevant
+SCN-S-016:
+  status: service-gap
+  note: add_preference
+
+# test_long_term::TestSearchPreferences::test_search_preferences_by_category
+SCN-S-017:
+  status: service-gap
+  note: add_preference
+
+# test_long_term::TestGetEntityByName::test_get_entity_by_name_found
+SCN-S-018:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestGetEntityByName::test_get_entity_by_name_not_found
+SCN-S-019:
+  status: client-gap
+  note: get_entity_by_name
+
+# test_long_term::TestGetRelatedEntities::test_get_related_entities_with_relationship
+SCN-S-020:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestGetRelatedEntities::test_get_related_entities_empty
+SCN-S-021:
+  status: client-gap
+  note: add_entity
+
+# test_reasoning::TestStartTrace::test_start_trace_basic
+SCN-S-022:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestStartTrace::test_start_trace_unique_ids
+SCN-S-023:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestAddStep::test_add_step_basic
+SCN-S-024:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestAddStep::test_add_step_sequential_numbering
+SCN-S-025:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestAddStep::test_add_step_partial_fields
+SCN-S-026:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestRecordToolCall::test_record_tool_call_basic
+SCN-S-027:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestRecordToolCall::test_record_tool_call_with_result
+SCN-S-028:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestRecordToolCall::test_record_tool_call_failure_status
+SCN-S-029:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestRecordToolCall::test_record_tool_call_timeout_status
+SCN-S-030:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestCompleteTrace::test_complete_trace_with_outcome
+SCN-S-031:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestCompleteTrace::test_complete_trace_failure
+SCN-S-032:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestGetTraceWithSteps::test_get_trace_with_steps
+SCN-S-033:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestGetTraceWithSteps::test_get_trace_includes_tool_calls
+SCN-S-034:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestGetTraceWithSteps::test_get_trace_nonexistent
+SCN-S-035:
+  status: service-gap
+  note: get_trace_with_steps
+
+# test_reasoning::TestListTraces::test_list_traces_all
+SCN-S-036:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestListTraces::test_list_traces_by_session
+SCN-S-037:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestListTraces::test_list_traces_respects_limit
+SCN-S-038:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestGetToolStats::test_get_tool_stats_after_calls
+SCN-S-039:
+  status: service-gap
+  note: start_trace
+
+# test_long_term::TestAddEntity::test_add_entity_without_description
+SCN-S-040:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddEntity::test_add_entity_duplicate_name_different_type
+SCN-S-041:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddEntity::test_add_entity_special_characters_in_name
+SCN-S-042:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddEntity::test_add_entity_id_is_uuid
+SCN-S-043:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestAddPreference::test_add_preference_without_context
+SCN-S-044:
+  status: service-gap
+  note: add_preference
+
+# test_long_term::TestAddPreference::test_add_preference_long_text
+SCN-S-045:
+  status: service-gap
+  note: add_preference
+
+# test_long_term::TestAddPreference::test_add_preference_same_category_multiple
+SCN-S-046:
+  status: service-gap
+  note: add_preference
+
+# test_long_term::TestAddPreference::test_add_preference_id_is_uuid
+SCN-S-047:
+  status: service-gap
+  note: add_preference
+
+# test_long_term::TestAddFact::test_add_fact_special_characters
+SCN-S-048:
+  status: service-gap
+  note: add_fact
+
+# test_long_term::TestAddFact::test_add_fact_id_is_uuid
+SCN-S-049:
+  status: service-gap
+  note: add_fact
+
+# test_long_term::TestAddFact::test_add_fact_same_subject_multiple_facts
+SCN-S-050:
+  status: service-gap
+  note: add_fact
+
+# test_long_term::TestSearchEntities::test_search_entities_empty_database
+SCN-S-051:
+  status: client-gap
+  note: search_entities
+
+# test_long_term::TestSearchEntities::test_search_entities_no_match
+SCN-S-052:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestSearchPreferences::test_search_preferences_empty_database
+SCN-S-053:
+  status: service-gap
+  note: search_preferences
+
+# test_long_term::TestSearchPreferences::test_search_preferences_no_match
+SCN-S-054:
+  status: service-gap
+  note: add_preference
+
+# test_long_term::TestGetRelatedEntities::test_get_related_entities_with_type_filter
+SCN-S-055:
+  status: client-gap
+  note: add_entity
+
+# test_long_term::TestGetRelatedEntities::test_get_related_entities_multiple_relationships
+SCN-S-056:
+  status: client-gap
+  note: add_entity
+
+# test_reasoning::TestAddStep::test_add_step_observation_only
+SCN-S-057:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestAddStep::test_add_step_all_fields
+SCN-S-058:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestAddStep::test_add_many_steps_maintain_numbering
+SCN-S-059:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestRecordToolCall::test_record_tool_call_error_status
+SCN-S-060:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestRecordToolCall::test_record_tool_call_cancelled_status
+SCN-S-061:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestRecordToolCall::test_record_tool_call_pending_status
+SCN-S-062:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestRecordToolCall::test_record_multiple_tool_calls_per_step
+SCN-S-063:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestListTraces::test_list_traces_empty
+SCN-S-064:
+  status: service-gap
+  note: list_traces
+
+# test_reasoning::TestGetToolStats::test_get_tool_stats_multiple_tools
+SCN-S-065:
+  status: service-gap
+  note: start_trace
+
+# test_reasoning::TestGetToolStats::test_get_tool_stats_no_calls
+SCN-S-066:
+  status: service-gap
+  note: get_tool_stats
+
+# test_reasoning::TestGetToolStats::test_get_tool_stats_success_rate
+SCN-S-067:
+  status: service-gap
+  note: start_trace
