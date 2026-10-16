@@ -39,3 +39,17 @@ string values: numeric, boolean, null, array, or object values within metadata
 receive HTTP 501 naming the Service Gap before any service call. A non-object
 metadata field receives HTTP 400. The string-only metadata scenario can pass;
 the typed and nested metadata scenarios still require a service change.
+
+`record_tool_call` accepts an existing hosted Reasoning Step UUID as `step_id`.
+It translates the required `arguments` object and optional JSON `result` to the
+Java client's opaque input/output strings, and converts `duration_ms` to a
+`Duration`. Duration must be a non-negative integer; an omitted or null duration
+remains absent. All six statuses are supported, with `success` as the default.
+The response exposes the client-returned payloads as JSON values. A non-null
+`error` string receives HTTP 501 before writing because the hosted service has
+no separate tool-call error field; malformed arguments receive HTTP 400.
+
+The TCK task-trace lifecycle and `add_step` remain Service Gaps. Consequently,
+the Silver tool-call scenarios still stop at `start_trace`. To exercise the
+supported bridge operation directly, first obtain a step UUID using the Java
+client's `recordStep` operation on a hosted Conversation.

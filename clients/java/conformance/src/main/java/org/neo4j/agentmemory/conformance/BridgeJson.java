@@ -3,14 +3,19 @@ package org.neo4j.agentmemory.conformance;
 import org.neo4j.agentmemory.conversation.Conversation;
 import org.neo4j.agentmemory.conversation.Message;
 import org.neo4j.agentmemory.conversation.MessageRole;
+import org.neo4j.agentmemory.reasoning.NewToolCall;
+import org.neo4j.agentmemory.reasoning.ToolCall;
+import org.neo4j.agentmemory.reasoning.ToolCallStatus;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 final class BridgeJson {
     private final JsonMapper mapper = JsonMapper.builder().build();
@@ -42,6 +47,63 @@ final class BridgeJson {
             throw new InvalidArgument(name + " must be a string");
         }
         return value.asString();
+    }
+
+    UUID uuid(ObjectNode body, String name) {
+        var value = required(body, name);
+        try {
+            var id = UUID.fromString(value);
+            if (id.toString().equalsIgnoreCase(value)) return id;
+        } catch (IllegalArgumentException invalid) {
+            // Report invalid UUIDs through the bridge's argument-error boundary.
+        }
+        throw new InvalidArgument(name + " must be a UUID");
+    }
+
+    NewToolCall newToolCall(ObjectNode body) {
+        var arguments = body.get("arguments");
+        if (arguments == null || !arguments.isObject()) {
+            throw new InvalidArgument("arguments must be an object");
+        }
+        var builder = NewToolCall.builder(required(body, "tool_name"), arguments.toString());
+        var result = body.get("result");
+        if (result != null && !result.isNull()) builder.output(result.toString());
+        var status = body.get("status");
+        if (status != null && !status.isNull()) {
+            var found = false;
+            for (var candidate : ToolCallStatus.values()) {
+                if (status.isString() && candidate.name().toLowerCase(Locale.ROOT).equals(status.asString())) {
+                    builder.status(candidate);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) throw new InvalidArgument("unknown tool call status");
+        }
+        var duration = body.get("duration_ms");
+        if (duration != null && !duration.isNull()) {
+            if (!duration.isIntegralNumber() || !duration.canConvertToLong() || duration.asLong() < 0) {
+                throw new InvalidArgument("duration_ms must be a non-negative integer in milliseconds");
+            }
+            builder.duration(Duration.ofMillis(duration.asLong()));
+        }
+        var error = body.get("error");
+        if (error != null && !error.isNull()) {
+            if (!error.isString()) throw new InvalidArgument("error must be a string");
+            throw new BridgeMethods.Gap("service gap: tool call error has no hosted equivalent");
+        }
+        return builder.build();
+    }
+
+    ObjectNode toolCall(ToolCall call) {
+        var result = object().put("id", call.id().toString()).put("tool_name", call.toolName())
+                .put("status", call.status().name().toLowerCase(Locale.ROOT))
+                .putNull("error")
+                .set("arguments", mapper.readTree(call.input()))
+                .set("result", call.output() == null ? null : mapper.readTree(call.output()));
+        if (call.duration() == null) result.putNull("duration_ms");
+        else result.put("duration_ms", call.duration().toMillis());
+        return result;
     }
 
     MessageRole role(ObjectNode body) {

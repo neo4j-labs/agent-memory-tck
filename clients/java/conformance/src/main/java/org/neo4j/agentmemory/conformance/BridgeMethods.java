@@ -44,8 +44,14 @@ final class BridgeMethods {
             sessions.all(json.limit(body, 100)).forEach(c -> result.add(json.session(c)));
             return result;
         });
+        methods.put("record_tool_call", body -> {
+            var stepId = json.uuid(body, "step_id");
+            var call = json.newToolCall(body);
+            return json.toolCall(MemoryClient.await(client.recordToolCall(stepId, call),
+                    Duration.ofSeconds(20)));
+        });
         for (var name : List.of("search_messages", "add_entity", "search_entities", "get_entity_by_name",
-                "get_related_entities", "record_tool_call")) methods.put(name, clientGap(name));
+                "get_related_entities")) methods.put(name, clientGap(name));
         for (var name : List.of("delete_message", "add_preference", "add_fact", "search_preferences",
                 "start_trace", "add_step", "complete_trace", "get_trace_with_steps", "list_traces",
                 "get_tool_stats")) methods.put(name, serviceGap(name));

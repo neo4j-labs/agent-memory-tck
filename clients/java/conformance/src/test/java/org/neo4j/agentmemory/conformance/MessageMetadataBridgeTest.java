@@ -13,25 +13,17 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Exercises the public bridge protocol against a stub of the hosted service. */
 class MessageMetadataBridgeTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final HttpClient HTTP = HttpClient.newHttpClient();
     private static final String CONVERSATION_ID = "a2f55d70-838f-4c41-ae7d-dad30fd25720";
     private static final String MESSAGE = """
             {"id":"3b3af5b6-2bff-41fc-bdb2-c72e63822d47","role":"user","content":"hello",
@@ -41,48 +33,26 @@ class MessageMetadataBridgeTest {
     private static final AtomicInteger SERVICE_CALLS = new AtomicInteger();
     @TempDir static Path directory;
     private static HttpServer service;
-    private static Process bridge;
-    private static URI bridgeUri;
+    private static BridgeProcess bridge;
 
     @BeforeAll
     static void startBridge() throws Exception {
         service = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         service.createContext("/v1/", MessageMetadataBridgeTest::serve);
         service.start();
-        int port;
-        try (var socket = new ServerSocket(0)) {
-            port = socket.getLocalPort();
-        }
-        bridgeUri = URI.create("http://127.0.0.1:" + port);
-        var process = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                "-cp", System.getProperty("java.class.path"), ConformanceServer.class.getName());
-        process.environment().put("MEMORY_API_KEY", "test-key");
-        process.environment().put("MEMORY_ENDPOINT", "http://127.0.0.1:" + service.getAddress().getPort() + "/v1");
-        process.environment().put("TCK_BRIDGE_PORT", Integer.toString(port));
-        var log = directory.resolve("bridge.log");
-        bridge = process.redirectErrorStream(true).redirectOutput(log.toFile()).start();
-        var deadline = System.nanoTime() + SECONDS.toNanos(10);
-        while (bridge.isAlive() && System.nanoTime() < deadline) {
-            try {
-                if (call("setup", "{}").statusCode() == 200) return;
-            } catch (IOException starting) {
-                Thread.sleep(25);
-            }
-        }
-        throw new AssertionError("Bridge did not start: " + Files.readString(log));
+        bridge = new BridgeProcess("http://127.0.0.1:" + service.getAddress().getPort() + "/v1",
+                directory.resolve("bridge.log"));
     }
 
     @AfterAll
     static void stopBridge() throws Exception {
         try {
-            if (bridge != null) {
-                bridge.destroyForcibly();
-                assertThat(bridge.waitFor(5, SECONDS)).isTrue();
-            }
+            if (bridge != null) bridge.close();
         } finally {
             if (service != null) service.stop(0);
         }
     }
+
 
     @Test
     void forwardsStringMetadataAndReturnsServiceMetadataOnAddAndRead() throws Exception {
@@ -143,9 +113,7 @@ class MessageMetadataBridgeTest {
     }
 
     private static HttpResponse<String> call(String method, String body) throws Exception {
-        return HTTP.send(HttpRequest.newBuilder(bridgeUri.resolve("/" + method))
-                .timeout(Duration.ofSeconds(5)).header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+        return bridge.call(method, body);
     }
 
     private static void serve(HttpExchange exchange) throws IOException {
