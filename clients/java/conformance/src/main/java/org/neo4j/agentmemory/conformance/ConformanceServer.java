@@ -66,8 +66,7 @@ public final class ConformanceServer {
                     reason = failure.getClass().getSimpleName();
                 }
                 response = json.object().put("error", name + " failed: " + reason);
-                LOGGER.log(System.Logger.Level.WARNING, "Bridge method failed",
-                        redacted(failure, new IdentityHashMap<>()));
+                LOGGER.log(System.Logger.Level.WARNING, "Bridge method failed", failure);
             }
             respond(exchange, status, response, json);
         }
@@ -80,19 +79,6 @@ public final class ConformanceServer {
             failure = failure.getCause();
         }
         return false;
-    }
-
-    // Copy the diagnostic graph, retaining types and frames without arbitrary messages.
-    private static Throwable redacted(Throwable failure, IdentityHashMap<Throwable, Throwable> seen) {
-        if (seen.containsKey(failure)) return seen.get(failure);
-        var copy = new Throwable() {
-            @Override public String toString() { return failure.getClass().getName() + ": [redacted]"; }
-        };
-        seen.put(failure, copy);
-        copy.setStackTrace(failure.getStackTrace());
-        if (failure.getCause() != null) copy.initCause(redacted(failure.getCause(), seen));
-        for (var suppressed : failure.getSuppressed()) copy.addSuppressed(redacted(suppressed, seen));
-        return copy;
     }
 
     private static void respond(HttpExchange exchange, int status, JsonNode body, BridgeJson json)
