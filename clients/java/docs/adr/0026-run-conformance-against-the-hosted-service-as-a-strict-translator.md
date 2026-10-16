@@ -11,3 +11,9 @@ The server is a strict translator. It renames and reshapes values between the sn
 All TCK data belongs to one fixed TCK user. Every Conversation the server creates carries that user ID, and `clear_all_data` deletes that user's memory, which keeps runs safe in a shared workspace and makes clearing a single service operation. Each Session's name is recorded in its Conversation's metadata under `tck.session`, so the binding lives on the service, survives server restarts, and lets `list_sessions` translate Conversations back into Session names; the server keeps only a cache. A no-op clear, as the TypeScript REST transport has, was rejected because results would depend on test order.
 
 Because the hosted API has no equivalent for several Bronze and Silver Bridge Methods, such as message deletion, preferences, facts, and the TCK's Trace lifecycle, full Bronze or Silver compliance is out of reach by construction. Run the TCK directly against the conformance server and use its test results and shared compliance reporting, following the approach used by the other language clients. A Client Gap is planned client work, and a Service Gap lifts only when the service changes.
+
+The local CI job also runs the Java HTTP server in an explicit proxy mode against
+the Python reference bridge backed by Neo4j. This tests Java bridge HTTP
+forwarding and the TCK harness without requiring a hosted API key. Proxy mode
+does not validate the Java client, so hosted strict-translator results remain
+the Java client's conformance evidence.

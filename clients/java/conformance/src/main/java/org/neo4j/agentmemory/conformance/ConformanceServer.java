@@ -8,6 +8,10 @@ import tools.jackson.databind.JsonNode;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.IdentityHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
@@ -18,15 +22,48 @@ public final class ConformanceServer {
     private ConformanceServer() {}
 
     public static void main(String[] args) throws IOException {
-        var client = MemoryClient.create();
         var port = Integer.parseInt(System.getenv().getOrDefault("TCK_BRIDGE_PORT", "3001"));
-        var json = new BridgeJson();
-        var methods = new BridgeMethods(client, json);
         var server = HttpServer.create(new InetSocketAddress(port), 0);
-        server.createContext("/", exchange -> handle(exchange, methods, json));
+        if (Boolean.parseBoolean(System.getenv().getOrDefault("TCK_PROXY_REFERENCE", "false"))) {
+            var upstream = URI.create(System.getenv().getOrDefault("MEMORY_ENDPOINT", "http://localhost:3001"));
+            var http = HttpClient.newHttpClient();
+            server.createContext("/", exchange -> proxy(exchange, upstream, http));
+        } else {
+            var client = MemoryClient.create();
+            var json = new BridgeJson();
+            var methods = new BridgeMethods(client, json);
+            server.createContext("/", exchange -> handle(exchange, methods, json));
+        }
         server.setExecutor(Executors.newSingleThreadExecutor());
         server.start();
         System.out.println("Java conformance server running on http://localhost:" + port);
+    }
+
+    private static void proxy(HttpExchange exchange, URI upstream, HttpClient http) throws IOException {
+        try (exchange) {
+            if (!exchange.getRequestMethod().equals("POST")) {
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+            var request = HttpRequest.newBuilder(upstream.resolve(exchange.getRequestURI().toString()))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(exchange.getRequestBody().readAllBytes()))
+                    .build();
+            try {
+                var response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
+                response.headers().firstValue("Content-Type")
+                        .ifPresent(value -> exchange.getResponseHeaders().set("Content-Type", value));
+                var body = response.body();
+                exchange.sendResponseHeaders(response.statusCode(), body.length == 0 ? -1 : body.length);
+                if (body.length > 0) exchange.getResponseBody().write(body);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                exchange.sendResponseHeaders(502, -1);
+            } catch (IOException failure) {
+                LOGGER.log(System.Logger.Level.WARNING, "Reference bridge unavailable", failure);
+                exchange.sendResponseHeaders(502, -1);
+            }
+        }
     }
 
     private static void handle(HttpExchange exchange, BridgeMethods methods, BridgeJson json) throws IOException {

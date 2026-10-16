@@ -17,6 +17,20 @@ The equivalent launch command is:
 mvn -f clients/java/pom.xml -q -pl conformance -am compile exec:java
 ```
 
+For a local Neo4j TCK run, start `tck.bridge.reference_server` on port 3001,
+then start the Java server in proxy mode:
+
+```sh
+MEMORY_ENDPOINT=http://localhost:3001 TCK_BRIDGE_PORT=3002 \
+  TCK_PROXY_REFERENCE=true make conformance-java
+uv run pytest -m 'bronze or silver' --bridge-url http://localhost:3002 -v
+```
+
+Proxy mode forwards bridge requests to the Python reference adapter. It checks
+the Java server's HTTP forwarding and the reference implementation, but does not
+exercise the Java `MemoryClient`. Use the hosted mode above to measure the Java
+client itself.
+
 `MEMORY_API_KEY` must be a Workspace API key for the target workspace. `MEMORY_ENDPOINT` is optional and defaults to `https://memory.neo4jlabs.com/v1` when absent or blank. `TCK_BRIDGE_PORT` is optional and defaults to `3001`.
 
 **Every test deletes the `tck-java` user's memory in the target workspace.** Reserve that user for conformance runs. Sessions bind to that user's Conversations through the `tck.session` metadata key.

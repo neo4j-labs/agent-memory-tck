@@ -165,7 +165,7 @@ conformance-go: ## Start Go conformance server on :3001
 	@echo "Set MEMORY_ENDPOINT to your upstream service URL"
 	cd $(GO_DIR) && MEMORY_ENDPOINT=$${MEMORY_ENDPOINT:-http://localhost:7474} $(GO) run ./conformance
 
-conformance-java: ## Start Java conformance server on :3001 (hosted service)
+conformance-java: ## Start Java conformance server (hosted or reference bridge proxy)
 	cd clients/java && mvn -q -pl conformance -am compile exec:java
 
 conformance-python: ## Start Python reference bridge server on :3001
