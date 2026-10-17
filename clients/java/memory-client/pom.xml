@@ -160,6 +160,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.3</version>
                 <configuration>
+                    <failIfNoTests>true</failIfNoTests>
                     <forkCount>1</forkCount>
                     <!-- JUnit Pioneer's environment annotations require reflective access on Java 17. -->
                     <argLine>
@@ -189,10 +190,10 @@
                             </excludes>
                             <classpathDependencyExcludes>
                                 <classpathDependencyExclude>
-                                    org.springframework:spring-web
+                                    org.springframework:*
                                 </classpathDependencyExclude>
                                 <classpathDependencyExclude>
-                                    dev.langchain4j:langchain4j-http-client
+                                    dev.langchain4j:*
                                 </classpathDependencyExclude>
                             </classpathDependencyExcludes>
                             <reportsDirectory>
@@ -209,8 +210,7 @@
                             <groups>jackson2-only</groups>
                             <includes><include>**/JsonCodecSelectionTest.java</include></includes>
                             <classpathDependencyExcludes>
-                                <classpathDependencyExclude>tools.jackson.core:jackson-databind</classpathDependencyExclude>
-                                <classpathDependencyExclude>tools.jackson.core:jackson-core</classpathDependencyExclude>
+                                <classpathDependencyExclude>tools.jackson.core:*</classpathDependencyExclude>
                             </classpathDependencyExcludes>
                             <reportsDirectory>${project.build.directory}/surefire-reports-jackson2-only</reportsDirectory>
                         </configuration>
@@ -238,10 +238,8 @@
                             <groups>without-json-codecs</groups>
                             <includes><include>**/MissingJsonCodecTest.java</include></includes>
                             <classpathDependencyExcludes>
-                                <classpathDependencyExclude>tools.jackson.core:jackson-databind</classpathDependencyExclude>
-                                <classpathDependencyExclude>tools.jackson.core:jackson-core</classpathDependencyExclude>
-                                <classpathDependencyExclude>com.fasterxml.jackson.core:jackson-databind</classpathDependencyExclude>
-                                <classpathDependencyExclude>com.fasterxml.jackson.core:jackson-core</classpathDependencyExclude>
+                                <classpathDependencyExclude>tools.jackson.core:*</classpathDependencyExclude>
+                                <classpathDependencyExclude>com.fasterxml.jackson.core:*</classpathDependencyExclude>
                             </classpathDependencyExcludes>
                             <reportsDirectory>${project.build.directory}/surefire-reports-without-json-codecs</reportsDirectory>
                         </configuration>
