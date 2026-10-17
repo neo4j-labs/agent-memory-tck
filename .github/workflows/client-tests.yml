@@ -18,8 +18,31 @@ permissions:
   contents: read
 
 jobs:
+  prepare-e2e-workspace:
+    runs-on: ubuntu-latest
+    env:
+      MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test workspace preparation script
+        run: node --test .github/scripts/ensure-e2e-workspace.test.js
+      - name: Ensure E2E workspace is Active
+        if: env.MEMORY_API_KEY != ''
+        env:
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
+          MEMORY_ADMIN_API_KEY: ${{ secrets.MEMORY_ADMIN_API_KEY }}
+        run: node .github/scripts/ensure-e2e-workspace.js
+      - name: Skip workspace preparation when secrets are unavailable
+        if: env.MEMORY_API_KEY == ''
+        run: echo "MEMORY_API_KEY is unset; skipping workspace preparation."
+
   # ---------------- Python ----------------
   python-tests:
+    needs: prepare-e2e-workspace
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +75,7 @@ jobs:
 
   # ---------------- TypeScript ----------------
   typescript-tests:
+    needs: prepare-e2e-workspace
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -89,6 +113,7 @@ jobs:
 
   # ---------------- Go ----------------
   go-tests:
+    needs: prepare-e2e-workspace
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -116,6 +141,7 @@ jobs:
 
   # ---------------- C# ----------------
   csharp-tests:
+    needs: prepare-e2e-workspace
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -141,6 +167,7 @@ jobs:
 
   # ---------------- R ----------------
   rlang-tests:
+    needs: prepare-e2e-workspace
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
