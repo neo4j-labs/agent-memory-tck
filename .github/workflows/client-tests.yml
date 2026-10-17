@@ -1,6 +1,6 @@
 name: Client Tests
 
-# Per-client unit + integration tests (always run) and e2e tests (gated on
+# Per-client unit + integration tests and e2e tests (gated on
 # the MEMORY_API_KEY repo secret) for the six language SDKs.
 #
 # Forks and PRs without secret access still pass: every e2e test skips
@@ -11,15 +11,49 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    paths:
+      - 'clients/**'
 
-# Restrict the GITHUB_TOKEN to least privilege. Reading repo contents is
-# enough for these jobs — they only build and run tests.
+# Test jobs only need repository contents. The change detector gets
+# pull-request read access to list changed files.
 permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      typescript: ${{ steps.filter.outputs.typescript }}
+      java: ${{ steps.filter.outputs.java }}
+      go: ${{ steps.filter.outputs.go }}
+      csharp: ${{ steps.filter.outputs.csharp }}
+      rlang: ${{ steps.filter.outputs.rlang }}
+    steps:
+      - uses: dorny/paths-filter@v4
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'clients/python/**'
+            typescript:
+              - 'clients/typescript/**'
+            java:
+              - 'clients/java/**'
+            go:
+              - 'clients/go/**'
+            csharp:
+              - 'clients/csharp/**'
+            rlang:
+              - 'clients/rlang/**'
+
   # ---------------- Python ----------------
   python-tests:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +86,8 @@ jobs:
 
   # ---------------- TypeScript ----------------
   typescript-tests:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.typescript == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -89,6 +125,8 @@ jobs:
 
   # ---------------- Java ----------------
   java-tests:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.java == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -117,6 +155,8 @@ jobs:
 
   # ---------------- Go ----------------
   go-tests:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -144,6 +184,8 @@ jobs:
 
   # ---------------- C# ----------------
   csharp-tests:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.csharp == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -169,6 +211,8 @@ jobs:
 
   # ---------------- R ----------------
   rlang-tests:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.rlang == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
