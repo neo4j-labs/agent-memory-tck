@@ -26,7 +26,7 @@ import static org.neo4j.agentmemory.conversation.MessageRole.ASSISTANT;
 import static org.neo4j.agentmemory.conversation.MessageRole.USER;
 import static org.neo4j.agentmemory.conversation.NewMessage.assistant;
 import static org.neo4j.agentmemory.conversation.NewMessage.user;
-import static org.neo4j.agentmemory.testsupport.TestAwaitSupport.await;
+import static org.neo4j.agentmemory.MemoryClient.await;
 
 /**
  * Focused end-to-end tests against the live hosted Neo4j Agent Memory Service.
