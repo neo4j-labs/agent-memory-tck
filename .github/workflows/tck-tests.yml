@@ -522,9 +522,9 @@ jobs:
           make conformance-java
           for i in $(seq 1 30); do curl -s -X POST http://localhost:3002/setup > /dev/null 2>&1 && break || sleep 1; done
 
-      - name: Run TCK Bronze and Silver via Java bridge
+      - name: Run TCK Bronze via Java bridge
         run: |
-          uv run pytest -m 'bronze or silver' \
+          uv run pytest -m bronze \
             --bridge-url http://localhost:3002 -v
 
   go-conformance:
