@@ -48,8 +48,8 @@
                         <scmReleaseCommitComment>@{prefix} release @{releaseLabel}</scmReleaseCommitComment>
                         <scmDevelopmentCommitComment>@{prefix} prepare for next development iteration</scmDevelopmentCommitComment>
                         <releaseProfiles>release</releaseProfiles>
-                        <goals>package</goals>
-                        <arguments>-DskipTests</arguments>
+                        <!-- prepare already ran the tests; perform only packages and releases. -->
+                        <goals>package -DskipTests</goals>
                     </configuration>
                 </plugin>
                 <plugin>
