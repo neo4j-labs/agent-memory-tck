@@ -10,7 +10,12 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -18,20 +23,60 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.abort;
 
 public final class OpenApiContract {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
-    private static final String SPEC_JSON = readSpec();
-    private static final JsonNode SPEC = readJson(SPEC_JSON);
+    private static final String VENDORED = readVendored();
     private static final String TIMESTAMP = Instant.parse("2026-08-26T09:15:30Z").toString();
     private static final int MAX_DEPTH = 8;
-    private static final OpenApiInteractionValidator VALIDATOR =
-            OpenApiInteractionValidator.createForInlineApiSpecification(SPEC_JSON).build();
+    private static JsonNode spec;
+    private static OpenApiInteractionValidator validator;
+
+    static {
+        use(VENDORED);
+    }
 
     private OpenApiContract() {}
 
-    public static String spec() {
-        return SPEC_JSON;
+    /** The contract this repository vendors from the hosted service. */
+    public static String vendored() {
+        return VENDORED;
+    }
+
+    /** Validates and synthesizes against {@code document} for the rest of this JVM. */
+    public static void use(String document) {
+        JsonNode parsed;
+        try {
+            parsed = MAPPER.readTree(document);
+        } catch (JsonProcessingException notJson) {
+            parsed = MAPPER.missingNode();
+        }
+        if (!"2.0".equals(parsed.path("swagger").asText()) || !parsed.path("paths").isObject()) {
+            fail("the document is not a Swagger 2.0 contract: %.80s", document);
+        }
+        var built = OpenApiInteractionValidator.createForInlineApiSpecification(document).build();
+        spec = parsed;
+        validator = built;
+    }
+
+    /** The contract a service publishes, or an aborted test when it cannot be fetched. */
+    public static String published(URI location) throws InterruptedException {
+        var request = HttpRequest.newBuilder(location)
+                .timeout(Duration.ofSeconds(20))
+                .GET()
+                .build();
+        var http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+        HttpResponse<String> response;
+        try {
+            response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (IOException unreachable) {
+            return abort(location + " is unreachable: " + unreachable.getMessage());
+        }
+        if (response.statusCode() / 100 != 2) {
+            return abort(location + " returned " + response.statusCode());
+        }
+        return response.body();
     }
 
     /** A WireMock response for one operation: its declared status and a fully populated body. */
@@ -74,7 +119,7 @@ public final class OpenApiContract {
     public static void assertEveryExchangeMatchesTheContract() {
         for (var event : WireMock.getAllServeEvents()) {
             var request = event.getRequest();
-            var report = VALIDATOR.validate(
+            var report = validator.validate(
                     WireMockRequestResponseUtil.toRequest(request),
                     WireMockRequestResponseUtil.toResponse(event.getResponse()));
             assertThat(report.hasErrors())
@@ -172,13 +217,13 @@ public final class OpenApiContract {
             return schema;
         }
         var name = reference.asText().substring(reference.asText().lastIndexOf('/') + 1);
-        var definition = SPEC.get("definitions").get(name);
+        var definition = spec.get("definitions").get(name);
         assertThat(definition).as("unresolved definition '%s'", name).isNotNull();
         return definition;
     }
 
     private static JsonNode operation(String method, String path) {
-        var operation = SPEC.get("paths").path(path).get(method.toLowerCase(Locale.ROOT));
+        var operation = spec.get("paths").path(path).get(method.toLowerCase(Locale.ROOT));
         assertThat(operation).as("%s %s is not declared in the contract", method, path).isNotNull();
         return operation;
     }
@@ -210,7 +255,7 @@ public final class OpenApiContract {
     /** Match a concrete request URL back to the templated path that declares it. */
     private static String templateFor(String url) {
         var actual = url.split("\\?", 2)[0].split("/");
-        var candidates = SPEC.get("paths").fieldNames();
+        var candidates = spec.get("paths").fieldNames();
         while (candidates.hasNext()) {
             var candidate = candidates.next();
             var template = candidate.split("/");
@@ -239,7 +284,7 @@ public final class OpenApiContract {
         }
     }
 
-    private static String readSpec() {
+    private static String readVendored() {
         try (var stream = OpenApiContract.class.getResourceAsStream("/openapi.json")) {
             assertThat(stream).as("openapi.json is missing from the test classpath").isNotNull();
             return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
