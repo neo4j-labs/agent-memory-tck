@@ -2,7 +2,7 @@
 
 ## Design and implementation
 
-Use [GLOSSARY.md](../../CONTEXT.md) for shared domain language. Read the ADRs for every affected concern below and follow their supersession and refinement notes. Record durable design decisions in ADRs; plans and research remain ephemeral working notes.
+Use [GLOSSARY.md](GLOSSARY.md) for shared domain language. Read the ADRs for every affected concern below and follow their supersession and refinement notes. Record durable design decisions in ADRs; plans and research remain ephemeral working notes.
 
 ### API and concurrency
 
