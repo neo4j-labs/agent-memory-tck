@@ -288,3 +288,82 @@ event=operation.completed operation=listConversations callId=7 outcome=success d
 event=operation.started operation=getConversation callId=8
 event=operation.completed operation=getConversation callId=8 outcome=failure durationMs=9 status=404 phase=http errorType=MemoryServiceException
 ```
+
+## Releasing
+
+A merge to `main` touching `clients/java/memory-client/src/main` runs
+[Release Java client](../../.github/workflows/java-release.yml). The workflow
+reads `<revision>` from `clients/java/pom.xml`, removes `-SNAPSHOT`, verifies the
+build with Java 17, and releases `org.neo4j:agent-memory-client`. Starting from
+`0.1.0-SNAPSHOT`, it creates the annotated tag `java-v0.1.0` on the released
+commit, with message `agent-memory-client 0.1.0`, and commits
+`chore(java): prepare 0.1.1-SNAPSHOT` to `main` as `github-actions[bot]`.
+Subsequent releases follow the same patch increment rule. The tag and bump
+commit are pushed atomically. The bot push starts no further workflow runs;
+`main` must allow the workflow token to push these commits.
+
+The GitHub Release is titled `agent-memory-client X.Y.Z`, is not a prerelease,
+and attaches five assets:
+
+- `agent-memory-client-X.Y.Z.jar`
+- `agent-memory-client-X.Y.Z-sources.jar`
+- `agent-memory-client-X.Y.Z-javadoc.jar`
+- `agent-memory-client-X.Y.Z.pom` (the flattened POM)
+- `SHA256SUMS`
+
+Download all five into one directory and run `sha256sum -c SHA256SUMS` there.
+Release notes contain one line `- <subject> (<short sha>)` for each non-merge
+commit touching `clients/java` since the previous `java-v*` tag, excluding bump
+commits. With no previous tag, they include all such commits. The parent
+`org.neo4j:agent-memory-java` and `org.neo4j:agent-memory-conformance` are never
+released. Maven Central publication and signing happen outside this repository.
+
+For a minor or major release, open a pull request setting `<revision>` in
+`clients/java/pom.xml`, for example to `0.2.0-SNAPSHOT` or `1.0.0-SNAPSHOT`.
+The next qualifying source merge releases that version. Tests, dependencies,
+build configuration, and documentation alone do not trigger a release. To ship
+those changes without a source change, run **Release Java client** from the
+Actions tab on `main` with **force** checked. Use this after merging a
+revision-only pull request when an immediate minor or major release is needed.
+A manual run without `force` skips when main sources are unchanged since the
+previous `java-v*` tag; without a previous tag, it releases.
+
+The tagged POM still contains `-SNAPSHOT`. To rebuild version `0.1.0`, use a
+separate checkout of its tag and explicitly supply the released revision, from
+the repository root:
+
+```sh
+git switch --detach java-v0.1.0
+mvn -f clients/java/pom.xml verify -Drevision=0.1.0
+```
+
+The three jars are under `clients/java/memory-client/target`; the flattened POM
+is `clients/java/memory-client/target/.flattened-pom.xml`. Hosted integration
+tests skip without `MEMORY_API_KEY`. See [Recovery](#recovery) for interrupted
+runs and [ADR 0027](docs/adr/0027-release-from-the-pom-revision.md) for the version
+and publication decisions.
+
+### Recovery
+
+- **Push rejected because someone merged to `main` during the run:** nothing
+  was published, because the tag and bump push is atomic. The run triggered by
+  that merge releases. If the merge did not touch the source trigger path,
+  rerun **Release Java client** on `main`.
+- **`gh release create` failed after the push:** the tag and bump are already
+  on GitHub, and a normal rerun skips rather than repairing the missing
+  release. Rebuild the existing tag in a separate checkout with
+  `git checkout java-vX.Y.Z` followed by
+  `mvn -f clients/java/pom.xml -Drevision=X.Y.Z package -DskipTests`.
+  Copy the three jars into a clean asset directory, and copy
+  `clients/java/memory-client/target/.flattened-pom.xml` there as
+  `agent-memory-client-X.Y.Z.pom`. In that directory run
+  `sha256sum -- * > SHA256SUMS`. Recreate the notes from the previous `java-v*`
+  tag through the released tag (or all history through it for the first
+  release), using non-merge `clients/java` commits and excluding
+  `chore(java): prepare ` subjects. Create the release for the existing tag
+  with the same title, notes, and five assets, using:
+
+  ```sh
+  gh release create java-vX.Y.Z <asset-directory>/* --verify-tag \
+    --title "agent-memory-client X.Y.Z" --notes-file <notes-file>
+  ```

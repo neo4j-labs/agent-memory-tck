@@ -30,6 +30,10 @@ For HTTP changes, follow [0013](docs/adr/0013-validate-traffic-against-published
 
 For logging configuration, severity, or events: [application-owned JDK logging (0019)](docs/adr/0019-use-application-owned-jdk-logging.md), [caller-owned failure severity (0020)](docs/adr/0020-leave-operation-failure-severity-to-callers.md), [operation observations and content exclusion (0021)](docs/adr/0021-observe-operations-without-exposing-content.md).
 
+### Build and release
+
+- **Versions and releases:** [POM-owned revision and source-triggered GitHub Releases (0027)](docs/adr/0027-release-from-the-pom-revision.md).
+
 ## Verification and delivery
 
 For client changes, run `mvn -f clients/java/pom.xml -pl memory-client -am test` from the repository root.
