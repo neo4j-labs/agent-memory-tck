@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.neo4j</groupId>
@@ -12,13 +10,12 @@
     <name>Neo4j Agent Memory Java</name>
 
     <!-- maven-release-plugin tags and pushes through this; the client declares its own scm for Central. -->
-    <scm child.scm.connection.inherit.append.path="false"
-         child.scm.developerConnection.inherit.append.path="false"
-         child.scm.url.inherit.append.path="false">
+    <scm child.scm.connection.inherit.append.path="false" child.scm.developerConnection.inherit.append.path="false" child.scm.url.inherit.append.path="false">
         <connection>scm:git:https://github.com/neo4j-labs/agent-memory-tck.git</connection>
         <developerConnection>scm:git:https://github.com/neo4j-labs/agent-memory-tck.git</developerConnection>
         <url>https://github.com/neo4j-labs/agent-memory-tck</url>
-    </scm>
+      <tag>y</tag>
+  </scm>
 
     <modules>
         <module>memory-client</module>
@@ -26,7 +23,7 @@
     </modules>
 
     <properties>
-        <revision>0.1.0-SNAPSHOT</revision>
+        <revision>y</revision>
         <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
