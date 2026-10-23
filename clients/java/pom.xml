@@ -6,7 +6,7 @@
 
     <groupId>org.neo4j</groupId>
     <artifactId>agent-memory-java</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
 
     <name>Neo4j Agent Memory Java</name>
@@ -17,6 +17,7 @@
     </modules>
 
     <properties>
+        <revision>0.1.0-SNAPSHOT</revision>
         <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>

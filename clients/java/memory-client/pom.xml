@@ -7,12 +7,34 @@
     <parent>
         <groupId>org.neo4j</groupId>
         <artifactId>agent-memory-java</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>agent-memory-client</artifactId>
     <name>Neo4j Agent Memory Client</name>
+    <description>Java client for the hosted Neo4j Agent Memory Service.</description>
+    <url>https://github.com/neo4j-labs/agent-memory-tck/tree/main/clients/java</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <organization>Neo4j Labs</organization>
+            <organizationUrl>https://neo4j.com/labs/agent-memory/</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/neo4j-labs/agent-memory-tck</url>
+        <connection>scm:git:https://github.com/neo4j-labs/agent-memory-tck.git</connection>
+        <developerConnection>scm:git:git@github.com:neo4j-labs/agent-memory-tck.git</developerConnection>
+    </scm>
 
     <properties>
         <assertj.version>3.27.7</assertj.version>
@@ -256,6 +278,22 @@
                             <goal>integration-test</goal>
                             <goal>verify</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.8.0</version>
+                <configuration>
+                    <flattenMode>ossrh</flattenMode>
+                    <outputDirectory>${project.build.directory}</outputDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals><goal>flatten</goal></goals>
                     </execution>
                 </executions>
             </plugin>
