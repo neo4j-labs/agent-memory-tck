@@ -324,4 +324,93 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <!-- Activated by maven-release-plugin's release:perform on the tagged checkout. -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jreleaser</groupId>
+                        <artifactId>jreleaser-maven-plugin</artifactId>
+                        <version>1.26.0</version>
+                        <inherited>false</inherited>
+                        <configuration>
+                            <gitRootSearch>true</gitRootSearch>
+                            <jreleaser>
+                                <project>
+                                    <name>agent-memory-client</name>
+                                    <description>${project.description}</description>
+                                    <authors>
+                                        <author>Neo4j Labs</author>
+                                    </authors>
+                                    <license>Apache-2.0</license>
+                                    <copyright>Neo4j</copyright>
+                                </project>
+                                <release>
+                                    <github>
+                                        <owner>neo4j-labs</owner>
+                                        <name>agent-memory-tck</name>
+                                        <tagName>java-v{{projectVersion}}</tagName>
+                                        <releaseName>agent-memory-client {{projectVersion}}</releaseName>
+                                        <skipTag>true</skipTag>
+                                        <changelog>
+                                            <formatted>ALWAYS</formatted>
+                                            <format>- {{commitTitle}} ({{commitShortHash}})</format>
+                                            <content>{{changelogChanges}}</content>
+                                            <skipMergeCommits>true</skipMergeCommits>
+                                            <contributors>
+                                                <enabled>false</enabled>
+                                            </contributors>
+                                            <paths>
+                                                <path>clients/java</path>
+                                            </paths>
+                                            <labelers>
+                                                <labeler>
+                                                    <label>bump</label>
+                                                    <title>regex:^chore\(java\): (release|prepare) </title>
+                                                </labeler>
+                                            </labelers>
+                                            <excludeLabels>
+                                                <excludeLabel>bump</excludeLabel>
+                                            </excludeLabels>
+                                        </changelog>
+                                    </github>
+                                </release>
+                                <checksum>
+                                    <name>SHA256SUMS</name>
+                                </checksum>
+                                <files>
+                                    <artifacts>
+                                        <artifact>
+                                            <path>target/agent-memory-client-{{projectVersion}}.jar</path>
+                                        </artifact>
+                                        <artifact>
+                                            <path>target/agent-memory-client-{{projectVersion}}-sources.jar</path>
+                                        </artifact>
+                                        <artifact>
+                                            <path>target/agent-memory-client-{{projectVersion}}-javadoc.jar</path>
+                                        </artifact>
+                                        <artifact>
+                                            <path>target/.flattened-pom.xml</path>
+                                            <transform>agent-memory-client-{{projectVersion}}.pom</transform>
+                                        </artifact>
+                                    </artifacts>
+                                </files>
+                            </jreleaser>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>release</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>release</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

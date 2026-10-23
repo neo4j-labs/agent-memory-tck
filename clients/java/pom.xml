@@ -11,6 +11,15 @@
 
     <name>Neo4j Agent Memory Java</name>
 
+    <!-- maven-release-plugin tags and pushes through this; the client declares its own scm for Central. -->
+    <scm child.scm.connection.inherit.append.path="false"
+         child.scm.developerConnection.inherit.append.path="false"
+         child.scm.url.inherit.append.path="false">
+        <connection>scm:git:https://github.com/neo4j-labs/agent-memory-tck.git</connection>
+        <developerConnection>scm:git:https://github.com/neo4j-labs/agent-memory-tck.git</developerConnection>
+        <url>https://github.com/neo4j-labs/agent-memory-tck</url>
+    </scm>
+
     <modules>
         <module>memory-client</module>
         <module>conformance</module>
@@ -27,6 +36,22 @@
     <build>
         <pluginManagement>
             <plugins>
+                <!-- Releases are run by .github/workflows/java-release.yml; see ADR 0027. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-release-plugin</artifactId>
+                    <version>3.3.1</version>
+                    <configuration>
+                        <autoVersionSubmodules>true</autoVersionSubmodules>
+                        <tagNameFormat>java-v@{project.version}</tagNameFormat>
+                        <scmCommentPrefix>chore(java):</scmCommentPrefix>
+                        <scmReleaseCommitComment>@{prefix} release @{releaseLabel}</scmReleaseCommitComment>
+                        <scmDevelopmentCommitComment>@{prefix} prepare for next development iteration</scmDevelopmentCommitComment>
+                        <releaseProfiles>release</releaseProfiles>
+                        <goals>package</goals>
+                        <arguments>-DskipTests</arguments>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>

@@ -2,22 +2,19 @@ name: Release Java client
 
 # Releases org.neo4j:agent-memory-client as a GitHub Release whenever a merge
 # to main changes the client's main sources (clients/java ADR 0027). The
-# `revision` property in clients/java/pom.xml owns the version: the workflow
-# tags the released commit java-vX.Y.Z and commits the next patch SNAPSHOT
-# to main. Maven Central publication happens outside this repository.
+# `revision` property in clients/java/pom.xml owns the version.
+# maven-release-plugin tags the released commit java-vX.Y.Z and commits the
+# next patch SNAPSHOT to main; JReleaser creates the GitHub Release from the
+# tag (clients/java/memory-client/pom.xml, `release` profile). Maven Central
+# publication happens outside this repository.
 on:
   push:
     branches: [main]
     paths:
       - 'clients/java/memory-client/src/main/**'
   workflow_dispatch:
-    inputs:
-      force:
-        description: Release even if the client's main sources are unchanged since the last release
-        type: boolean
-        default: false
 
-# Pushes the tag and the next-SNAPSHOT commit, and creates the release.
+# Pushes the release and bump commits and the tag, and creates the release.
 permissions:
   contents: write
 
@@ -46,94 +43,11 @@ jobs:
           cache: maven
           cache-dependency-path: clients/java/**/pom.xml
 
-      - name: Decide the release
-        id: decide
-        env:
-          FORCE: ${{ inputs.force }}
-        run: |
-          revision="$(sed -n 's:^ *<revision>\(.*\)</revision> *$:\1:p' clients/java/pom.xml)"
-          if ! [[ "$revision" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)-SNAPSHOT$ ]]; then
-            echo "::error::clients/java/pom.xml must hold one <revision>X.Y.Z-SNAPSHOT</revision>, found '${revision}'"
-            exit 1
-          fi
-          version="${revision%-SNAPSHOT}"
-          next="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))-SNAPSHOT"
-          tag="java-v${version}"
-          previous="$(git describe --tags --abbrev=0 --match 'java-v*' 2>/dev/null || true)"
-
-          release=true
-          if [ "$FORCE" != "true" ] && [ -n "$previous" ] \
-              && git diff --quiet "$previous" HEAD -- clients/java/memory-client/src/main; then
-            release=false
-            echo "No changes under clients/java/memory-client/src/main since ${previous}; nothing to release."
-          elif git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-            echo "::error::${tag} already exists; move <revision> in clients/java/pom.xml past it"
-            exit 1
-          fi
-
-          {
-            echo "release=${release}"
-            echo "version=${version}"
-            echo "next=${next}"
-            echo "tag=${tag}"
-            echo "previous=${previous}"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Verify
-        if: steps.decide.outputs.release == 'true'
+      - name: Release
         working-directory: clients/java
         env:
-          VERSION: ${{ steps.decide.outputs.version }}
-        run: mvn -B verify -Drevision="$VERSION"
-
-      - name: Collect release assets and notes
-        if: steps.decide.outputs.release == 'true'
-        env:
-          VERSION: ${{ steps.decide.outputs.version }}
-          PREVIOUS: ${{ steps.decide.outputs.previous }}
-        run: |
-          dist="$RUNNER_TEMP/dist"
-          target=clients/java/memory-client/target
-          base="agent-memory-client-${VERSION}"
-          mkdir -p "$dist"
-          cp "$target/${base}.jar" "$target/${base}-sources.jar" "$target/${base}-javadoc.jar" "$dist/"
-          cp "$target/.flattened-pom.xml" "$dist/${base}.pom"
-          (cd "$dist" && sha256sum -- * > SHA256SUMS)
-
-          range=HEAD
-          if [ -n "$PREVIOUS" ]; then range="${PREVIOUS}..HEAD"; fi
-          git log --no-merges --invert-grep --grep='^chore(java): prepare ' \
-            --format='- %s (%h)' "$range" -- clients/java > "$RUNNER_TEMP/notes.md"
-
-      # The tag and the bump land together or not at all; a lost race with a
-      # concurrent merge fails here and the run triggered by that merge releases.
-      - name: Tag the release and commit the next SNAPSHOT
-        if: steps.decide.outputs.release == 'true'
-        env:
-          VERSION: ${{ steps.decide.outputs.version }}
-          NEXT: ${{ steps.decide.outputs.next }}
-          TAG: ${{ steps.decide.outputs.tag }}
+          JRELEASER_GITHUB_TOKEN: ${{ github.token }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git tag -a "$TAG" -m "agent-memory-client ${VERSION}"
-          sed -i "s:<revision>${VERSION}-SNAPSHOT</revision>:<revision>${NEXT}</revision>:" clients/java/pom.xml
-          if git diff --quiet -- clients/java/pom.xml; then
-            echo "::error::failed to set <revision>${NEXT}</revision> in clients/java/pom.xml"
-            exit 1
-          fi
-          git add clients/java/pom.xml
-          git commit -m "chore(java): prepare ${NEXT}"
-          git push --atomic origin HEAD:main "refs/tags/${TAG}"
-
-      - name: Create the GitHub Release
-        if: steps.decide.outputs.release == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.decide.outputs.version }}
-          TAG: ${{ steps.decide.outputs.tag }}
-        run: |
-          gh release create "$TAG" "$RUNNER_TEMP"/dist/* \
-            --verify-tag \
-            --title "agent-memory-client ${VERSION}" \
-            --notes-file "$RUNNER_TEMP/notes.md"
+          mvn -B release:prepare release:perform
