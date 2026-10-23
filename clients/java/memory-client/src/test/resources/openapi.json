@@ -1,6 +1,35 @@
 {
   "basePath": "/",
   "definitions": {
+    "authissuer.OAuthGrant": {
+      "properties": {
+        "clientId": {
+          "type": "string"
+        },
+        "clientName": {
+          "type": "string"
+        },
+        "grantedAt": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "redirectUri": {
+          "type": "string"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "workspaceId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "gin.H": {
       "additionalProperties": {},
       "type": "object"
@@ -247,6 +276,38 @@
         },
         "version": {
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.CompleteTraceRequest": {
+      "properties": {
+        "errorKind": {
+          "description": "ErrorKind is an indexable error category, such as timeout or no_results.",
+          "example": "no_results",
+          "type": "string"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "format": "float64",
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "outcome": {
+          "example": "Refund previewed; customer confirmed",
+          "type": "string"
+        },
+        "relatedEntityIds": {
+          "description": "RelatedEntityIDs are entities the run touched, recorded from its last step.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "success": {
+          "example": true,
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -715,6 +776,9 @@
     },
     "handlers.ExpandRequest": {
       "properties": {
+        "depth": {
+          "type": "integer"
+        },
         "loadedIds": {
           "items": {
             "type": "string"
@@ -864,6 +928,17 @@
         "keys": {
           "items": {
             "$ref": "#/definitions/handlers.APIKey"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.ListOAuthGrantsResponse": {
+      "properties": {
+        "grants": {
+          "items": {
+            "$ref": "#/definitions/authissuer.OAuthGrant"
           },
           "type": "array"
         }
@@ -1172,6 +1247,13 @@
         },
         "result": {
           "type": "string"
+        },
+        "stepNumber": {
+          "type": "integer"
+        },
+        "traceId": {
+          "description": "TraceID and StepNumber are set for a step recorded under a trace.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -1237,6 +1319,13 @@
           "type": "string"
         },
         "result": {
+          "type": "string"
+        },
+        "stepNumber": {
+          "type": "integer"
+        },
+        "traceId": {
+          "description": "TraceID and StepNumber are present when the step was recorded under a trace.",
           "type": "string"
         }
       },
@@ -1356,11 +1445,148 @@
       },
       "type": "object"
     },
+    "handlers.SearchStepsRequest": {
+      "properties": {
+        "limit": {
+          "example": 10,
+          "type": "integer"
+        },
+        "minScore": {
+          "example": 0.7,
+          "type": "number"
+        },
+        "query": {
+          "example": "preview the refund",
+          "type": "string"
+        },
+        "successOnly": {
+          "description": "SuccessOnly keeps steps of traces whose client reported success; a step\nrecorded without a trace has no outcome and is excluded under it.",
+          "type": "boolean"
+        },
+        "userId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.SimilarTracesRequest": {
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "limit": {
+          "example": 5,
+          "type": "integer"
+        },
+        "minScore": {
+          "description": "MinScore drops vector hits below it, 0 to 1; omitted keeps every hit.",
+          "example": 0.7,
+          "type": "number"
+        },
+        "query": {
+          "example": "return an order",
+          "type": "string"
+        },
+        "successOnly": {
+          "description": "SuccessOnly keeps traces whose client reported success.",
+          "type": "boolean"
+        },
+        "userId": {
+          "description": "UserID and ConversationID narrow the traces searched by exact match.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.SimilarTracesResponse": {
+      "properties": {
+        "searchType": {
+          "example": "vector",
+          "type": "string"
+        },
+        "traces": {
+          "items": {
+            "$ref": "#/definitions/handlers.TraceDetailResponse"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "handlers.StatusResponse": {
       "properties": {
         "status": {
           "example": "success",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.StepHitResponse": {
+      "properties": {
+        "actionTaken": {
+          "type": "string"
+        },
+        "conversationId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        },
+        "score": {
+          "type": "number"
+        },
+        "stepNumber": {
+          "type": "integer"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "task": {
+          "description": "Task, Outcome and Success are the step's trace's; absent for a step recorded without one.",
+          "type": "string"
+        },
+        "toolCalls": {
+          "items": {
+            "$ref": "#/definitions/handlers.TraceToolCallResponse"
+          },
+          "type": "array"
+        },
+        "traceId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.StepSearchResponse": {
+      "properties": {
+        "searchType": {
+          "example": "vector",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/definitions/handlers.StepHitResponse"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -1440,6 +1666,9 @@
         "durationMs": {
           "type": "integer"
         },
+        "error": {
+          "type": "string"
+        },
         "id": {
           "type": "string"
         },
@@ -1453,6 +1682,243 @@
           "type": "string"
         },
         "stepId": {
+          "type": "string"
+        },
+        "toolName": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.ToolStatResponse": {
+      "properties": {
+        "avgDurationMs": {
+          "type": "number"
+        },
+        "failedCalls": {
+          "type": "integer"
+        },
+        "lastUsedAt": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "successRate": {
+          "type": "number"
+        },
+        "successfulCalls": {
+          "type": "integer"
+        },
+        "totalCalls": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.ToolStatsResponse": {
+      "properties": {
+        "tools": {
+          "items": {
+            "$ref": "#/definitions/handlers.ToolStatResponse"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.TraceDetailResponse": {
+      "properties": {
+        "completedAt": {
+          "type": "string"
+        },
+        "conversationId": {
+          "type": "string"
+        },
+        "errorKind": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "format": "float64",
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "outcome": {
+          "description": "Outcome, Success and CompletedAt are null until the trace is completed.",
+          "type": "string"
+        },
+        "score": {
+          "description": "Score is the similarity a search ranked the trace by; absent elsewhere.",
+          "type": "number"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "steps": {
+          "description": "Steps in step order, each with its tool calls in time order; empty, never null.",
+          "items": {
+            "$ref": "#/definitions/handlers.TraceStepResponse"
+          },
+          "type": "array"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "task": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "userId": {
+          "description": "UserID is the conversation's user; absent for a shared conversation.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.TraceListResponse": {
+      "properties": {
+        "hasMore": {
+          "type": "boolean"
+        },
+        "traces": {
+          "items": {
+            "$ref": "#/definitions/handlers.TraceResponse"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.TraceResponse": {
+      "properties": {
+        "completedAt": {
+          "type": "string"
+        },
+        "conversationId": {
+          "type": "string"
+        },
+        "errorKind": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "format": "float64",
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "outcome": {
+          "description": "Outcome, Success and CompletedAt are null until the trace is completed.",
+          "type": "string"
+        },
+        "score": {
+          "description": "Score is the similarity a search ranked the trace by; absent elsewhere.",
+          "type": "number"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "task": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "userId": {
+          "description": "UserID is the conversation's user; absent for a shared conversation.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.TraceStepResponse": {
+      "properties": {
+        "actionTaken": {
+          "type": "string"
+        },
+        "conversationId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "reasoning": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        },
+        "stepNumber": {
+          "type": "integer"
+        },
+        "toolCalls": {
+          "items": {
+            "$ref": "#/definitions/handlers.TraceToolCallResponse"
+          },
+          "type": "array"
+        },
+        "traceId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.TraceToolCallResponse": {
+      "properties": {
+        "createdAt": {
+          "type": "string"
+        },
+        "durationMs": {
+          "type": "integer"
+        },
+        "error": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "input": {
+          "type": "string"
+        },
+        "output": {
+          "description": "Output is carried by GET /v1/reasoning/traces/{traceId}, not by a search.",
+          "type": "string"
+        },
+        "status": {
           "type": "string"
         },
         "toolName": {
@@ -1516,6 +1982,10 @@
           "example": 4,
           "type": "integer"
         },
+        "reasoningTraces": {
+          "example": 3,
+          "type": "integer"
+        },
         "reflections": {
           "example": 1,
           "type": "integer"
@@ -1549,8 +2019,35 @@
       },
       "type": "object"
     },
+    "handlers.WorkspaceAcceptInvitationRequest": {
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.WorkspaceAcceptInvitationResponse": {
+      "properties": {
+        "invitation": {
+          "$ref": "#/definitions/handlers.WorkspaceInvitation"
+        },
+        "status": {
+          "example": "accepted",
+          "type": "string"
+        },
+        "workspace_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "handlers.WorkspaceAddMemberRequest": {
       "properties": {
+        "email": {
+          "example": "ivy@example.com",
+          "type": "string"
+        },
         "role": {
           "enum": [
             "admin",
@@ -1588,11 +2085,6 @@
         "relationships": {
           "example": 3410,
           "type": "integer"
-        },
-        "takenAt": {
-          "description": "When the data was captured. The same as createdAt, except for a\nsnapshot imported from a backup taken before the managed-database pool.",
-          "example": "2026-10-01T03:00:00Z",
-          "type": "string"
         }
       },
       "type": "object"
@@ -1939,6 +2431,94 @@
         },
         "skipped": {
           "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.WorkspaceInvitation": {
+      "properties": {
+        "createdAt": {
+          "example": "2026-10-16T12:00:00Z",
+          "type": "string"
+        },
+        "email": {
+          "example": "ivy@example.com",
+          "type": "string"
+        },
+        "expiresAt": {
+          "example": "2026-10-23T12:00:00Z",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "invitedBy": {
+          "type": "string"
+        },
+        "invitedByName": {
+          "type": "string"
+        },
+        "inviteeUserId": {
+          "type": "string"
+        },
+        "role": {
+          "example": "developer",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "accepted",
+            "declined",
+            "revoked",
+            "expired"
+          ],
+          "example": "pending",
+          "type": "string"
+        },
+        "workspaceId": {
+          "type": "string"
+        },
+        "workspaceName": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.WorkspaceInvitationResponse": {
+      "properties": {
+        "invitation": {
+          "$ref": "#/definitions/handlers.WorkspaceInvitation"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.WorkspaceInvitationsResponse": {
+      "properties": {
+        "invitations": {
+          "items": {
+            "$ref": "#/definitions/handlers.WorkspaceInvitation"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "handlers.WorkspaceInviteResponse": {
+      "properties": {
+        "invitation": {
+          "$ref": "#/definitions/handlers.WorkspaceInvitation"
+        },
+        "invite_token": {
+          "type": "string"
+        },
+        "invite_url": {
+          "example": "https://memory.neo4jlabs.com/invite/3f9a…",
+          "type": "string"
+        },
+        "status": {
+          "example": "invited",
+          "type": "string"
         }
       },
       "type": "object"
@@ -2510,6 +3090,33 @@
       ],
       "type": "object"
     },
+    "handlers.createTraceRequest": {
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "task": {
+          "description": "Task is what the run set out to do, in the caller's words.",
+          "example": "Return everything from order ORD-6014",
+          "type": "string"
+        },
+        "triggeredByMessageId": {
+          "description": "TriggeredByMessageID links the trace to the message that initiated it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "conversationId",
+        "task"
+      ],
+      "type": "object"
+    },
     "handlers.entityFeedbackRequest": {
       "properties": {
         "confirmed": {
@@ -2755,6 +3362,17 @@
       },
       "type": "object"
     },
+    "handlers.linkTraceMessageRequest": {
+      "properties": {
+        "messageId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "messageId"
+      ],
+      "type": "object"
+    },
     "handlers.mergeEntitiesRequest": {
       "properties": {
         "targetId": {
@@ -2806,18 +3424,28 @@
           "type": "string"
         },
         "conversationId": {
+          "description": "ConversationID is required unless TraceID names the trace, whose\nconversation the step then belongs to; both may be sent when they agree.",
           "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
         },
         "reasoning": {
           "type": "string"
         },
         "result": {
           "type": "string"
+        },
+        "traceId": {
+          "description": "TraceID hangs the step under a trace at the next step number.",
+          "type": "string"
         }
       },
       "required": [
         "actionTaken",
-        "conversationId",
         "reasoning"
       ],
       "type": "object"
@@ -2828,8 +3456,17 @@
           "example": 150,
           "type": "integer"
         },
+        "error": {
+          "description": "Error is the failure message of a call that did not succeed.",
+          "example": "upstream timed out",
+          "type": "string"
+        },
         "input": {
           "example": "{\"query\":\"project status\"}",
+          "type": "string"
+        },
+        "messageId": {
+          "description": "MessageID is the message that triggered the call.",
           "type": "string"
         },
         "output": {
@@ -2854,6 +3491,13 @@
         "toolName": {
           "example": "web_search",
           "type": "string"
+        },
+        "touchedEntityIds": {
+          "description": "TouchedEntityIDs are entities the call touched, recorded as TOUCHED edges\nfrom its step; an id that names no entity is skipped.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -2864,10 +3508,6 @@
     },
     "handlers.refreshRequest": {
       "properties": {
-        "client_id": {
-          "description": "ClientID binds the rotation to the originating client (RFC 9700 §4.14).\nRequired when the stored token has a ClientID; optional otherwise so\nfirst-party (non-OAuth) refresh callers continue to work.",
-          "type": "string"
-        },
         "refresh_token": {
           "type": "string"
         }
@@ -3702,7 +4342,7 @@
       "name": "Apache 2.0"
     },
     "title": "NAMS Memory API",
-    "version": "1.4.0"
+    "version": "2.0.0"
   },
   "paths": {
     "/.well-known/jwks.json": {
@@ -3755,7 +4395,7 @@
     },
     "/v1/auth/api-keys": {
       "get": {
-        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nList API keys owned by the authenticated user. Raw key values are never returned - only metadata (ID, label, created/revoked/expiry timestamps). Auth: requires a user token or an Admin API key (workspace:admin); workspace-bound data keys are rejected with 403.",
+        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nList API keys owned by the authenticated user. Raw key values are never returned - only metadata (ID, label, created/revoked/expiry timestamps). Auth: requires a user token or an Admin API key (workspace:admin); workspace-bound data keys and MCP OAuth tokens are rejected with 403.",
         "produces": [
           "application/json"
         ],
@@ -3799,7 +4439,7 @@
         "consumes": [
           "application/json"
         ],
-        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nGenerate a new API key owned by the authenticated user. The category selects the key's privilege and binding: \"workspace\" requires a workspaceId and produces a data-plane key bound to that workspace (scopes derived server-side, never workspace:admin); \"admin\" forbids workspaceId and produces an account-wide key with full scopes. Category defaults to \"admin\" when omitted. The raw key is returned once and also stored encrypted-at-rest for later reveal; it is bcrypt-validated on every request. Auth: requires a user token or an Admin API key (workspace:admin); workspace-bound data keys are rejected with 403.",
+        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nGenerate a new API key owned by the authenticated user. The category selects the key's privilege and binding: \"workspace\" requires a workspaceId and produces a data-plane key bound to that workspace (scopes derived server-side, never workspace:admin); \"admin\" forbids workspaceId and produces an account-wide key with full scopes. Category defaults to \"admin\" when omitted. The raw key is returned once and also stored encrypted-at-rest for later reveal; it is bcrypt-validated on every request. Auth: requires a user token or an Admin API key (workspace:admin); workspace-bound data keys and MCP OAuth tokens are rejected with 403.",
         "parameters": [
           {
             "description": "Label, category, and optional workspaceId",
@@ -3859,7 +4499,7 @@
     },
     "/v1/auth/api-keys/{id}": {
       "delete": {
-        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nRevoke an API key by ID. The key is immediately invalidated - any active JWTs issued from it are blocklisted. This action is irreversible. Owner-only: only the user who owns the key can revoke it. Non-owners receive 404 (indistinguishable from a missing key) to prevent key-id enumeration. Auth: requires a user token or an Admin API key (workspace:admin); workspace-bound data keys are rejected with 403.",
+        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nRevoke an API key by ID. The key is immediately invalidated - any active JWTs issued from it are blocklisted. This action is irreversible. Owner-only: only the user who owns the key can revoke it. Non-owners receive 404 (indistinguishable from a missing key) to prevent key-id enumeration. Auth: requires a user token or an Admin API key (workspace:admin); workspace-bound data keys and MCP OAuth tokens are rejected with 403.",
         "parameters": [
           {
             "description": "API key ID",
@@ -3917,7 +4557,7 @@
     },
     "/v1/auth/api-keys/{id}/reveal": {
       "get": {
-        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nReturns the decrypted raw API key value for keys created with encrypted storage. Owner-only: only the user who owns the key can reveal it. Non-owners receive 404 (indistinguishable from a missing key) to prevent credential disclosure and key-id enumeration. Returns 410 if the key was revoked or predates encrypted storage. Auth: requires a user token or an Admin API key (workspace:admin); workspace-bound data keys are rejected with 403.",
+        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nReturns the decrypted raw API key value for keys created with encrypted storage. Owner-only: only the user who owns the key can reveal it. Non-owners receive 404 (indistinguishable from a missing key) to prevent credential disclosure and key-id enumeration. Returns 403 if the key grants a scope the calling credential does not hold (an Auth0 session is not limited this way), and 410 if the key was revoked or predates encrypted storage. Auth: requires a user token or an Admin API key (workspace:admin); workspace-bound data keys and MCP OAuth tokens are rejected with 403.",
         "parameters": [
           {
             "description": "API key ID",
@@ -3944,7 +4584,7 @@
             }
           },
           "403": {
-            "description": "Requires a user token or an Admin API key",
+            "description": "Requires a user token or an Admin API key, or the key is wider than the credential",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -3981,7 +4621,7 @@
     },
     "/v1/auth/api-keys/{id}/rotate": {
       "post": {
-        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nMint a new API key inheriting the old key's label and scopes, and atomically revoke the old one. The new raw key is returned exactly once in the response (and is also persisted encrypted-at-rest so it can be revealed again later). Owner-only: only the user who owns the key can rotate it. Non-owners receive 404 (indistinguishable from a missing key) to prevent key-id enumeration. Auth: requires a user token or an Admin API key (workspace:admin); workspace-bound data keys are rejected with 403.",
+        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nMint a new API key inheriting the old key's label and scopes, and atomically revoke the old one. The new raw key is returned exactly once in the response (and is also persisted encrypted-at-rest so it can be revealed again later). Owner-only: only the user who owns the key can rotate it. Non-owners receive 404 (indistinguishable from a missing key) to prevent key-id enumeration. Returns 403 if the key grants a scope the calling credential does not hold (an Auth0 session is not limited this way), and 410 if the key is revoked or expired. Auth: requires a user token or an Admin API key (workspace:admin); workspace-bound data keys and MCP OAuth tokens are rejected with 403.",
         "parameters": [
           {
             "description": "API key ID to rotate",
@@ -4008,7 +4648,7 @@
             }
           },
           "403": {
-            "description": "Requires a user token or an Admin API key",
+            "description": "Requires a user token or an Admin API key, or the key is wider than the credential",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -4020,7 +4660,7 @@
             }
           },
           "410": {
-            "description": "Key is already revoked",
+            "description": "Key is revoked or expired",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -4093,6 +4733,89 @@
           }
         },
         "summary": "Exchange Auth0 token for NAMS JWTs",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/v1/auth/oauth-grants": {
+      "get": {
+        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nList the MCP applications the user approved on the consent page, with the workspace and scopes of each approval. Auth: requires a console session; API keys and MCP OAuth tokens are rejected with 403.",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/handlers.ListOAuthGrantsResponse"
+            }
+          },
+          "403": {
+            "description": "Requires a console session",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List connected MCP applications",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/v1/auth/oauth-grants/{clientId}": {
+      "delete": {
+        "description": "**Auth service base URL:** `https://memory.neo4jlabs.com`\n\nDelete the user's approval of an MCP application. Its refresh tokens stop working, and it must ask for consent again. Access tokens it already holds stay valid until they expire (at most one hour). Auth: requires a console session; API keys and MCP OAuth tokens are rejected with 403.",
+        "parameters": [
+          {
+            "description": "OAuth client ID",
+            "in": "path",
+            "name": "clientId",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Requires a console session",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "No approval for this application",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Disconnect an MCP application",
         "tags": [
           "Auth"
         ]
@@ -6084,7 +6807,7 @@
         "consumes": [
           "application/json"
         ],
-        "description": "Returns the 1-hop neighborhood of a node (any memory label: Entity, Message, Conversation, Observation, Reflection, AgentStep, ToolCall) plus the complete, canonical-resolved set of relationships among the resulting node set (the new neighbors together with loadedIds), for the Memory Browser. Omitting loadedIds is the same as sending an empty list. Provenance edges (MENTIONS/INFLUENCED, with the paired EXTRACTED_FROM metadata collapsed in) are included; merge plumbing (MERGED_REL/SAME_AS) is excluded. New neighbors are capped at 200, with truncation metadata rather than a silent drop. With userId, a node outside that user's memory expands to nothing, and only nodes in that user's memory (their entities, and their conversations with what those hold) are returned.",
+        "description": "Returns a node's neighborhood across all memory labels (Entity, Message, Conversation, Observation, Reflection, AgentStep, ToolCall, ReasoningTrace, Tool), plus the complete canonical-resolved relationships among the resulting nodes and loadedIds. Optional depth is 1..3 (default 1); selection views use 3 to include connected short-term, long-term, and reasoning memory. Paths traverse only memory nodes and exclude merge plumbing (MERGED_REL/SAME_AS). New neighbors are capped at 200, nearest first and then most recently updated, with truncation metadata. Omitting loadedIds is the same as an empty list. Provenance edges are included, with paired EXTRACTED_FROM metadata collapsed onto MENTIONS/INFLUENCED. With userId, the anchor, every intermediate node, and returned nodes must belong to that user.",
         "parameters": [
           {
             "description": "nodeId to expand and the currently-loaded node ids",
@@ -6107,7 +6830,7 @@
             }
           },
           "400": {
-            "description": "Missing workspace_id or nodeId, or loadedIds exceeds cap",
+            "description": "Missing workspace_id or nodeId, depth outside 1..3, or loadedIds exceeds cap",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -6145,6 +6868,120 @@
         "summary": "Expand a graph node",
         "tags": [
           "Entities"
+        ]
+      }
+    },
+    "/v1/invitations/accept": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "Join the workspace of the invitation that the invite token belongs to, with the invited role. Any signed-in user who holds the token can accept it, once. Requires a user token; an API key is refused.",
+        "parameters": [
+          {
+            "description": "Invite token",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceAcceptInvitationRequest"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceAcceptInvitationResponse"
+            }
+          },
+          "400": {
+            "description": "token is required",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "user token required",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "invitation not found or no longer open",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Accept an invite link",
+        "tags": [
+          "Workspace"
+        ]
+      }
+    },
+    "/v1/invitations/lookup": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "Return the invitation the invite token belongs to without accepting it, so the holder can see the workspace, inviter and role before joining. Requires a user token; an API key is refused.",
+        "parameters": [
+          {
+            "description": "Invite token",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceAcceptInvitationRequest"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceInvitationResponse"
+            }
+          },
+          "400": {
+            "description": "token is required",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "user token required",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "invitation not found or no longer open",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Look up an invite link",
+        "tags": [
+          "Workspace"
         ]
       }
     },
@@ -7349,7 +8186,7 @@
         "consumes": [
           "application/json"
         ],
-        "description": "Record a reasoning step taken by an agent. Captures the agent's thought process (reasoning), the action it decided to take (actionTaken), and optionally the result.",
+        "description": "Record a reasoning step taken by an agent. Captures the agent's thought process (reasoning), the action it decided to take (actionTaken), and optionally the result. With traceId the step hangs under that trace at the next step number (stepNumber in the response) and its conversation is the trace's, so conversationId may be omitted; a conversationId that disagrees with the trace's is refused. Without traceId the step belongs to the conversation alone, as every step did before traces existed.",
         "parameters": [
           {
             "description": "Step details",
@@ -7366,19 +8203,19 @@
         ],
         "responses": {
           "201": {
-            "description": "Returns id, conversationId, reasoning, actionTaken, result",
+            "description": "Returns id, conversationId, reasoning, actionTaken, result, and traceId plus stepNumber under a trace",
             "schema": {
               "$ref": "#/definitions/handlers.RecordReasoningStepResponse"
             }
           },
           "400": {
-            "description": "Missing required fields",
+            "description": "Missing required fields, or a conversationId that disagrees with the trace",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
           "404": {
-            "description": "Conversation not found",
+            "description": "Conversation or trace not found",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -7419,12 +8256,81 @@
         ]
       }
     },
+    "/v1/reasoning/steps/search": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "Reasoning steps like the query, each with its trace's task and outcome beside it: past thoughts on similar problems, not just past tasks. Vector similarity over the steps' thought, action and observation when the embedding service answers (searchType vector, each step with its score), a case-insensitive text match over the same three fields otherwise. userId narrows the search to that user's conversations; successOnly keeps steps of traces that reported success, which excludes a step recorded without a trace; minScore drops vector hits below it. limit is 1-50, default 10.",
+        "parameters": [
+          {
+            "description": "query, optional userId, successOnly, minScore and limit",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/handlers.SearchStepsRequest"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns steps and searchType",
+            "schema": {
+              "$ref": "#/definitions/handlers.StepSearchResponse"
+            }
+          },
+          "400": {
+            "description": "Missing or too long query, invalid_limit, a minScore outside 0..1, or an unknown field",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Workspace database removed (database_unavailable), or workspace deprovisioned ({error: workspace_not_provisioned, status: deprovisioned}) - reprovision or update the external connection",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          },
+          "424": {
+            "description": "The workspace's external database failed the request (external_database_error) - only its owner can fix it: check that it is running and that the connection on the Database page is correct",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error (cypher_error or internal)",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "503": {
+            "description": "Workspace database unreachable (db_unreachable); also returned as {error: workspace_not_provisioned, status, statusMessage} while the workspace is pending/provisioning/error",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Search reasoning steps",
+        "tags": [
+          "Reasoning"
+        ]
+      }
+    },
     "/v1/reasoning/tool-calls": {
       "post": {
         "consumes": [
           "application/json"
         ],
-        "description": "Record a tool invocation made by an agent during a reasoning step. Optionally link to a step via stepId.\n\n`input` and `output` must be JSON-encoded strings, not objects. Pre-serialize structured payloads before sending (e.g. `\"input\": \"{\\\"query\\\":\\\"foo\\\"}\"`, not `\"input\": {\"query\":\"foo\"}`). The graph stores them as scalar string properties on the :ToolCall node.\n\nStatus values: `pending`, `success` (default), `failure`, `error`, `timeout`, `cancelled`. Legacy `completed`/`failed` are accepted and rewritten to `success`/`failure`.",
+        "description": "Record a tool invocation. input and output are JSON-encoded strings (not objects). status is one of pending, success (default), failure, error, timeout, cancelled; the legacy completed/failed are accepted and rewritten. Each call counts on its tool's registry node, which GET /v1/reasoning/tools/stats reads. stepId links the call to its reasoning step (a step that does not exist leaves it unlinked), messageId to the message that triggered it, and touchedEntityIds record the entities it touched as TOUCHED edges from the step.",
         "parameters": [
           {
             "description": "Tool call details",
@@ -7447,7 +8353,7 @@
             }
           },
           "400": {
-            "description": "Missing required fields",
+            "description": "Missing required fields, object-valued input/output, or an invalid status",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -7483,6 +8389,63 @@
           }
         ],
         "summary": "Record a tool call",
+        "tags": [
+          "Reasoning"
+        ]
+      }
+    },
+    "/v1/reasoning/tools/stats": {
+      "get": {
+        "description": "Per-tool counters kept as tool calls are recorded: total, successful (status success) and failed (failure, error, timeout) calls, the success rate, the average duration and the last use, most-called first. toolName narrows to one tool. Counters are monotonic: deleting a conversation does not decrement them.",
+        "parameters": [
+          {
+            "description": "Only this tool",
+            "in": "query",
+            "name": "toolName",
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns tools",
+            "schema": {
+              "$ref": "#/definitions/handlers.ToolStatsResponse"
+            }
+          },
+          "409": {
+            "description": "Workspace database removed (database_unavailable), or workspace deprovisioned ({error: workspace_not_provisioned, status: deprovisioned}) - reprovision or update the external connection",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          },
+          "424": {
+            "description": "The workspace's external database failed the request (external_database_error) - only its owner can fix it: check that it is running and that the connection on the Database page is correct",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error (cypher_error or internal)",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "503": {
+            "description": "Workspace database unreachable (db_unreachable); also returned as {error: workspace_not_provisioned, status, statusMessage} while the workspace is pending/provisioning/error",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get tool usage statistics",
         "tags": [
           "Reasoning"
         ]
@@ -7541,6 +8504,486 @@
           }
         ],
         "summary": "Get reasoning trace",
+        "tags": [
+          "Reasoning"
+        ]
+      }
+    },
+    "/v1/reasoning/traces": {
+      "get": {
+        "description": "Traces in the workspace, newest first by default. Filter to one conversation with conversationId, to one user's with userId (exact match), to those that reported success with successOnly=true, and to a startedAt window with since and until (RFC 3339). Order with orderBy (startedAt, completedAt) and orderDir (asc, desc). Page with limit (1-100, default 20) and offset; hasMore says whether another page follows.",
+        "parameters": [
+          {
+            "description": "Only this conversation's traces",
+            "in": "query",
+            "name": "conversationId",
+            "type": "string"
+          },
+          {
+            "description": "Only this user's traces (exact match)",
+            "in": "query",
+            "name": "userId",
+            "type": "string"
+          },
+          {
+            "description": "Only traces that reported success",
+            "in": "query",
+            "name": "successOnly",
+            "type": "boolean"
+          },
+          {
+            "description": "Traces started at or after this RFC 3339 time",
+            "in": "query",
+            "name": "since",
+            "type": "string"
+          },
+          {
+            "description": "Traces started at or before this RFC 3339 time",
+            "in": "query",
+            "name": "until",
+            "type": "string"
+          },
+          {
+            "description": "startedAt (default) or completedAt",
+            "in": "query",
+            "name": "orderBy",
+            "type": "string"
+          },
+          {
+            "description": "desc (default) or asc",
+            "in": "query",
+            "name": "orderDir",
+            "type": "string"
+          },
+          {
+            "description": "Page size, 1-100 (default 20)",
+            "in": "query",
+            "name": "limit",
+            "type": "integer"
+          },
+          {
+            "description": "Traces to skip (default 0)",
+            "in": "query",
+            "name": "offset",
+            "type": "integer"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns traces and hasMore",
+            "schema": {
+              "$ref": "#/definitions/handlers.TraceListResponse"
+            }
+          },
+          "400": {
+            "description": "A bad filter, order, limit or offset",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Workspace database removed (database_unavailable), or workspace deprovisioned ({error: workspace_not_provisioned, status: deprovisioned}) - reprovision or update the external connection",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          },
+          "424": {
+            "description": "The workspace's external database failed the request (external_database_error) - only its owner can fix it: check that it is running and that the connection on the Database page is correct",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error (cypher_error or internal)",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "503": {
+            "description": "Workspace database unreachable (db_unreachable); also returned as {error: workspace_not_provisioned, status, statusMessage} while the workspace is pending/provisioning/error",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List reasoning traces",
+        "tags": [
+          "Reasoning"
+        ]
+      },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "Start a trace for a task under a conversation. The task is embedded for similarity search when the embedding service answers; otherwise the trace is still found by text. The trace takes its conversation's userId, so user-scoped reads match it exactly. triggeredByMessageId links the trace to the message that initiated it; a message that does not exist leaves the trace unlinked. Record steps against the trace with POST /v1/reasoning/steps {traceId}, and finish it with POST /v1/reasoning/traces/{traceId}/complete.",
+        "parameters": [
+          {
+            "description": "conversationId, task, optional metadata and triggeredByMessageId",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/handlers.createTraceRequest"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "201": {
+            "description": "The trace, started and not yet complete",
+            "schema": {
+              "$ref": "#/definitions/handlers.TraceResponse"
+            }
+          },
+          "400": {
+            "description": "Missing conversationId or task, a task over 2000 characters, metadata over its limit, or an unknown field",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Conversation not found",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Workspace database removed (database_unavailable), or workspace deprovisioned ({error: workspace_not_provisioned, status: deprovisioned}) - reprovision or update the external connection",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          },
+          "424": {
+            "description": "The workspace's external database failed the request (external_database_error) - only its owner can fix it: check that it is running and that the connection on the Database page is correct",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error (cypher_error or internal)",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "503": {
+            "description": "Workspace database unreachable (db_unreachable); also returned as {error: workspace_not_provisioned, status, statusMessage} while the workspace is pending/provisioning/error",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Start a reasoning trace",
+        "tags": [
+          "Reasoning"
+        ]
+      }
+    },
+    "/v1/reasoning/traces/similar": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "Past traces whose task is like the query, each with its steps and their tool calls, so an agent can recall how a similar task went before acting. Vector similarity over the traces' tasks when the embedding service answers (searchType vector, each trace with its score), a case-insensitive text match on the task otherwise (searchType text). userId and conversationId narrow the traces searched by exact match; successOnly keeps traces that reported success; minScore drops vector hits below it. limit is 1-20, default 5.",
+        "parameters": [
+          {
+            "description": "query, optional userId, conversationId, successOnly, minScore and limit",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/handlers.SimilarTracesRequest"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns traces and searchType",
+            "schema": {
+              "$ref": "#/definitions/handlers.SimilarTracesResponse"
+            }
+          },
+          "400": {
+            "description": "Missing or too long query, invalid_limit, a minScore outside 0..1, or an unknown field",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Workspace database removed (database_unavailable), or workspace deprovisioned ({error: workspace_not_provisioned, status: deprovisioned}) - reprovision or update the external connection",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          },
+          "424": {
+            "description": "The workspace's external database failed the request (external_database_error) - only its owner can fix it: check that it is running and that the connection on the Database page is correct",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error (cypher_error or internal)",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "503": {
+            "description": "Workspace database unreachable (db_unreachable); also returned as {error: workspace_not_provisioned, status, statusMessage} while the workspace is pending/provisioning/error",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Find traces like a task",
+        "tags": [
+          "Reasoning"
+        ]
+      }
+    },
+    "/v1/reasoning/traces/{traceId}": {
+      "get": {
+        "description": "The trace with its steps in step order, each with its tool calls in time order, tool output included.",
+        "parameters": [
+          {
+            "description": "Trace ID",
+            "in": "path",
+            "name": "traceId",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "The trace and its steps",
+            "schema": {
+              "$ref": "#/definitions/handlers.TraceDetailResponse"
+            }
+          },
+          "404": {
+            "description": "Trace not found",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Workspace database removed (database_unavailable), or workspace deprovisioned ({error: workspace_not_provisioned, status: deprovisioned}) - reprovision or update the external connection",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          },
+          "424": {
+            "description": "The workspace's external database failed the request (external_database_error) - only its owner can fix it: check that it is running and that the connection on the Database page is correct",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error (cypher_error or internal)",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "503": {
+            "description": "Workspace database unreachable (db_unreachable); also returned as {error: workspace_not_provisioned, status, statusMessage} while the workspace is pending/provisioning/error",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get a reasoning trace",
+        "tags": [
+          "Reasoning"
+        ]
+      }
+    },
+    "/v1/reasoning/traces/{traceId}/complete": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "Record how a trace ended and stamp completedAt. Any subset of outcome, success, errorKind and metrics may be sent; an omitted field is left unchanged and an empty body still marks the trace complete. relatedEntityIds are recorded as TOUCHED edges from the trace's last step, so an audit read reaches them in one hop. This is the client's own account of the run.",
+        "parameters": [
+          {
+            "description": "Trace ID",
+            "in": "path",
+            "name": "traceId",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "outcome, success, errorKind, metrics, relatedEntityIds",
+            "in": "body",
+            "name": "body",
+            "schema": {
+              "$ref": "#/definitions/handlers.CompleteTraceRequest"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "The completed trace",
+            "schema": {
+              "$ref": "#/definitions/handlers.TraceResponse"
+            }
+          },
+          "400": {
+            "description": "A text over its limit or an unknown field",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Trace not found",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Workspace database removed (database_unavailable), or workspace deprovisioned ({error: workspace_not_provisioned, status: deprovisioned}) - reprovision or update the external connection",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          },
+          "424": {
+            "description": "The workspace's external database failed the request (external_database_error) - only its owner can fix it: check that it is running and that the connection on the Database page is correct",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error (cypher_error or internal)",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "503": {
+            "description": "Workspace database unreachable (db_unreachable); also returned as {error: workspace_not_provisioned, status, statusMessage} while the workspace is pending/provisioning/error",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Complete a reasoning trace",
+        "tags": [
+          "Reasoning"
+        ]
+      }
+    },
+    "/v1/reasoning/traces/{traceId}/message": {
+      "put": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "Record the message that initiated a trace, for a trace started before the message was known. Idempotent.",
+        "parameters": [
+          {
+            "description": "Trace ID",
+            "in": "path",
+            "name": "traceId",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "messageId",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/handlers.linkTraceMessageRequest"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns traceId and messageId",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Missing messageId",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Trace or message not found",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Workspace database removed (database_unavailable), or workspace deprovisioned ({error: workspace_not_provisioned, status: deprovisioned}) - reprovision or update the external connection",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          },
+          "424": {
+            "description": "The workspace's external database failed the request (external_database_error) - only its owner can fix it: check that it is running and that the connection on the Database page is correct",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error (cypher_error or internal)",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantQueryErrorResponse"
+            }
+          },
+          "503": {
+            "description": "Workspace database unreachable (db_unreachable); also returned as {error: workspace_not_provisioned, status, statusMessage} while the workspace is pending/provisioning/error",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Link a trace to its initiating message",
         "tags": [
           "Reasoning"
         ]
@@ -8462,7 +9905,7 @@
     },
     "/v1/skills/runs": {
       "get": {
-        "description": "List the workspace's recent distillation and scan runs, newest first. Each row carries the same fields as GET /v1/skills/runs/{id}, plus kind and batchId. Requires skills:read.",
+        "description": "List the workspace's recent distillation and scan runs, newest first. Each row carries the same fields as GET /v1/skills/runs/{id}, plus kind, batchId and skillDeleted (true when the run's skill was deleted after the run). Requires skills:read.",
         "parameters": [
           {
             "description": "Max runs to return (1-100, default 20)",
@@ -8588,6 +10031,70 @@
       }
     },
     "/v1/skills/{id}": {
+      "delete": {
+        "description": "Permanently delete a skill of any status, draft or published, with all its versions. The memory the skill was distilled from is not changed, and its distillation runs stay in the activity list with skillDeleted set. A published skill leaves the published feed; copies already downloaded are not affected. Returns 409 skill_has_callers while another skill's procedure calls it, and 409 distillation_in_progress while a distillation run for it is still in flight. Requires skills:write.",
+        "parameters": [
+          {
+            "description": "Skill ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "{status: deleted, skillId}",
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          },
+          "404": {
+            "description": "skill not found",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "{code: skill_has_callers, callers: [{id, name}]} or {code: distillation_in_progress, runIds}; also the workspace database removed (database_unavailable) or deprovisioned (workspace_not_provisioned)",
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          },
+          "424": {
+            "description": "The workspace's external database failed the request - only its owner can fix it: check that it is running and that the connection on the Database page is correct",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "503": {
+            "description": "Workspace database unreachable (db_unreachable); also returned as {error: workspace_not_provisioned, status, statusMessage} while the workspace is pending/provisioning/error",
+            "schema": {
+              "$ref": "#/definitions/handlers.TenantUnavailableResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete a skill",
+        "tags": [
+          "Skills"
+        ]
+      },
       "get": {
         "description": "A skill, its rendered SKILL.md and its version history. The response adds attested and coherenceCommunities (the number of step communities the distiller detected), and each versions[] entry carries attested and reviewFeedback. Requires skills:read.",
         "parameters": [
@@ -9097,6 +10604,129 @@
         ]
       }
     },
+    "/v1/users/me/invitations": {
+      "get": {
+        "description": "Return the invitations the authenticated user can accept: those addressed to the user's Auth0 subject or verified email, still pending and not expired, for workspaces the user is not yet a member of.",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceInvitationsResponse"
+            }
+          },
+          "401": {
+            "description": "no user identity",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List my invitations",
+        "tags": [
+          "Workspace"
+        ]
+      }
+    },
+    "/v1/users/me/invitations/{invitationId}/accept": {
+      "post": {
+        "description": "Join the workspace with the invited role. The invitation must be addressed to the caller's Auth0 subject or verified email. Accepting never changes the role of an existing member. Requires a user token; an API key is refused.",
+        "parameters": [
+          {
+            "description": "Invitation ID",
+            "in": "path",
+            "name": "invitationId",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceAcceptInvitationResponse"
+            }
+          },
+          "403": {
+            "description": "user token required",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "invitation not found or no longer open",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Accept an invitation",
+        "tags": [
+          "Workspace"
+        ]
+      }
+    },
+    "/v1/users/me/invitations/{invitationId}/decline": {
+      "post": {
+        "description": "Close an invitation addressed to the caller. Requires a user token.",
+        "parameters": [
+          {
+            "description": "Invitation ID",
+            "in": "path",
+            "name": "invitationId",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceStatusResponse"
+            }
+          },
+          "403": {
+            "description": "user token required",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "invitation not found or no longer open",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Decline an invitation",
+        "tags": [
+          "Workspace"
+        ]
+      }
+    },
     "/v1/users/me/workspaces": {
       "get": {
         "description": "List the workspaces the authenticated user is a member of. A workspace-bound API key returns only its bound workspace; an admin key or user token returns all. Requires no workspace:admin scope.",
@@ -9123,6 +10753,58 @@
           }
         ],
         "summary": "List my workspaces",
+        "tags": [
+          "Workspace"
+        ]
+      }
+    },
+    "/v1/users/me/workspaces/{workspaceId}": {
+      "delete": {
+        "description": "Remove the caller's own membership. Any member can leave; the last owner cannot. Requires a user token.",
+        "parameters": [
+          {
+            "description": "Workspace ID",
+            "in": "path",
+            "name": "workspaceId",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceStatusResponse"
+            }
+          },
+          "400": {
+            "description": "the last owner cannot leave",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "user token required",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "not a member of this workspace",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Leave a workspace",
         "tags": [
           "Workspace"
         ]
@@ -9162,7 +10844,7 @@
             }
           },
           "400": {
-            "description": "cannot delete your only workspace",
+            "description": "cannot delete the only workspace you own",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9387,7 +11069,7 @@
             }
           },
           "400": {
-            "description": "invalid mode or connection",
+            "description": "invalid mode or connection, or external_target_not_allowed (a host that serves this service's managed databases)",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9416,6 +11098,12 @@
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
+          "429": {
+            "description": "too_many_attempts (external connection attempts are limited per user)",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
           "502": {
             "description": "external database schema init failed",
             "schema": {
@@ -9423,7 +11111,7 @@
             }
           },
           "503": {
-            "description": "switched to managed, but provisioning did not finish (retry); workspace_limit_unavailable; or external_target_busy (another request is adopting that database; retry)",
+            "description": "switched to managed, but provisioning did not finish (retry); workspace_limit_unavailable; external_target_busy (another request is adopting that database; retry); or external_target_unverified (retry)",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9494,7 +11182,7 @@
             }
           },
           "400": {
-            "description": "targetMode is required",
+            "description": "targetMode is required, or external_target_not_allowed",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9517,8 +11205,14 @@
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
           },
+          "429": {
+            "description": "too_many_attempts",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
           "503": {
-            "description": "workspace_limit_unavailable or external_target_busy (retry)",
+            "description": "workspace_limit_unavailable, external_target_busy or external_target_unverified (retry)",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9563,7 +11257,19 @@
             }
           },
           "400": {
-            "description": "targetMode is required",
+            "description": "targetMode is required, or external_target_not_allowed",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "429": {
+            "description": "too_many_attempts",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "503": {
+            "description": "external_target_unverified (retry)",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9714,7 +11420,7 @@
         "consumes": [
           "application/json"
         ],
-        "description": "Test reachability of an external Neo4j connection without storing anything. The URI is SSRF-validated. uri, username and password are required; a blank database resolves to the instance's home database. A connection that fails returns 200 with success false; a rejected URI returns 400.",
+        "description": "Test reachability of an external Neo4j connection without storing anything. The URI is SSRF-validated. uri, username and password are required; a blank database resolves to the instance's home database. A connection that fails returns 200 with success false; a rejected URI returns 400. A host that serves this service's managed databases is refused with 400 external_target_not_allowed. Connection attempts to external databases (this test, the switch to external and the copy preflight and start) are limited per user; past the limit they return 429 too_many_attempts. Requires a user token whose workspace role is owner or admin.",
         "parameters": [
           {
             "description": "External connection to test",
@@ -9737,9 +11443,27 @@
             }
           },
           "400": {
-            "description": "invalid uri",
+            "description": "invalid uri, or external_target_not_allowed",
             "schema": {
-              "$ref": "#/definitions/handlers.WorkspaceTestConnectionResponse"
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "insufficient workspace role, or not a user token",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "429": {
+            "description": "too_many_attempts",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "503": {
+            "description": "external_target_unverified (retry)",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
             }
           }
         },
@@ -9749,6 +11473,83 @@
           }
         ],
         "summary": "Test an external database connection",
+        "tags": [
+          "Workspace"
+        ]
+      }
+    },
+    "/v1/workspace/invitations": {
+      "get": {
+        "description": "Return the workspace's open invitations, newest first. An invitation past its expiry has status expired. Requires a user token whose workspace role is owner or admin.",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceInvitationsResponse"
+            }
+          },
+          "403": {
+            "description": "insufficient workspace role",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List workspace invitations",
+        "tags": [
+          "Workspace"
+        ]
+      }
+    },
+    "/v1/workspace/invitations/{invitationId}": {
+      "delete": {
+        "description": "Close a pending invitation so it can no longer be accepted. Requires a user token whose workspace role is owner or admin.",
+        "parameters": [
+          {
+            "description": "Invitation ID",
+            "in": "path",
+            "name": "invitationId",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceStatusResponse"
+            }
+          },
+          "403": {
+            "description": "insufficient workspace role",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "invitation not found",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Revoke an invitation",
         "tags": [
           "Workspace"
         ]
@@ -9788,10 +11589,10 @@
         "consumes": [
           "application/json"
         ],
-        "description": "Add a user to the workspace, or change an existing member's role. Requires a user token whose workspace role is owner or admin. Only an owner can change another owner's role, and the last owner cannot be demoted.",
+        "description": "Invite a user to the workspace by email or Auth0 subject (user_id), or change an existing member's role. A user who is not a member becomes one only by accepting the invitation, so this call never adds a member directly. The answer is the same whether or not the invitee has an account.\nAn email invitation can be accepted by a user whose Auth0 email is that address and verified; a user_id invitation by that user. Either can also be accepted with invite_token, by any signed-in user who holds it, so send the token only to the invitee. Inviting the same target again replaces the earlier invitation. Invitations expire after 7 days.\nRequires a user token whose workspace role is owner or admin. Only an owner can change another owner's role, and the last owner cannot be demoted.",
         "parameters": [
           {
-            "description": "User and role",
+            "description": "Exactly one of email or user_id, and a role",
             "in": "body",
             "name": "body",
             "required": true,
@@ -9804,14 +11605,20 @@
           "application/json"
         ],
         "responses": {
-          "201": {
-            "description": "Created",
+          "200": {
+            "description": "an existing member's role was changed",
             "schema": {
               "$ref": "#/definitions/handlers.WorkspaceStatusResponse"
             }
           },
+          "201": {
+            "description": "an invitation was created",
+            "schema": {
+              "$ref": "#/definitions/handlers.WorkspaceInviteResponse"
+            }
+          },
           "400": {
-            "description": "user_id and role are required, or role is not admin, developer or viewer",
+            "description": "role is required and must be admin, developer or viewer; give exactly one of email or user_id",
             "schema": {
               "$ref": "#/definitions/handlers.ErrorResponse"
             }
@@ -9828,7 +11635,7 @@
             "BearerAuth": []
           }
         ],
-        "summary": "Add a workspace member",
+        "summary": "Invite a workspace member",
         "tags": [
           "Workspace"
         ]
