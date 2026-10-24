@@ -1,0 +1,3 @@
+# Keep agent workflow orchestration outside the core client
+
+The core Java client exposes the NAMS primitives needed to create conversations, search prior memory, persist message exchanges, and record or retrieve reasoning traces, but it does not enforce the agent lifecycle that orders those operations or decide which tasks are complex enough to trace. Reasoning content is supplied explicitly by applications and treated as opaque; the core neither obtains it directly from a model nor interprets whether it is a chain of thought or a summary. Agent and framework integrations own that orchestration and content selection because they know response boundaries, model capabilities, and tool execution context, while the core remains a reusable asynchronous NAMS client.
