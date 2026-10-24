@@ -58,3 +58,4 @@ results.json
 .env
 .env.local
 .env.*.local
+.devcontainer
