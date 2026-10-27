@@ -303,9 +303,10 @@ type EntityProvenance struct {
 
 // CypherResult is the response from POST /v1/query.
 type CypherResult struct {
-	Columns []string                 `json:"columns"`
-	Rows    [][]interface{}          `json:"rows"`
-	Stats   map[string]interface{}   `json:"stats,omitempty"`
+	Columns []string `json:"columns"`
+	// Rows contains one object per record, keyed by the original Cypher column aliases.
+	Rows  []map[string]interface{} `json:"rows"`
+	Stats map[string]interface{}   `json:"stats,omitempty"`
 }
 
 // APIKey represents an API key (with optional plaintext at creation time).

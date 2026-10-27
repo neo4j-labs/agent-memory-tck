@@ -126,6 +126,17 @@ http.ListenAndServe(":8080", nil)
 | `ListTraces(ctx, opts...)` | List traces |
 | `GetToolStats(ctx, toolName)` | Tool statistics |
 
+### Query (hosted REST API)
+
+`client.Query.Cypher(ctx, memory.CypherInput{Cypher: "RETURN 0 AS total"})`
+returns columns, rows, and query statistics. Each row is a
+`map[string]interface{}` keyed by the original Cypher column aliases; read
+`result.Rows[0]["total"]`. Nested map keys are also preserved.
+
+Migration: `CypherResult.Rows` is now `[]map[string]interface{}` instead of
+`[][]interface{}`. Replace positional column access with alias keys. JSON
+numbers decode as `float64`.
+
 ## TCK Compliance
 
 ```bash

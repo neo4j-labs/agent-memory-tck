@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -197,13 +198,13 @@ func TestRestSetEntityFeedback(t *testing.T) {
 func TestRestCypherQuery(t *testing.T) {
 	h := &recordingHandler{
 		t: t, status: 200,
-		respJSON: `{"columns":["name"],"rows":[["Alice"]],"stats":{"queryTime":3}}`,
+		respJSON: `{"columns":["total"],"rows":[{"total":0}],"stats":{"queryTime":3}}`,
 	}
 	c, srv := newRestClient(t, h)
 	defer srv.Close()
 
 	res, err := c.Query.Cypher(context.Background(), memory.CypherInput{
-		Cypher: "MATCH (n) RETURN count(n) AS name",
+		Cypher: "MATCH (n) RETURN count(n) AS total",
 		Params: map[string]interface{}{"n": 1},
 	})
 	if err != nil {
@@ -212,8 +213,43 @@ func TestRestCypherQuery(t *testing.T) {
 	if !strings.HasSuffix(h.path, "/query") {
 		t.Errorf("path = %s, want /query suffix", h.path)
 	}
-	if len(res.Columns) != 1 || res.Columns[0] != "name" {
-		t.Errorf("columns = %v, want [name]", res.Columns)
+	if !reflect.DeepEqual(res.Columns, []string{"total"}) {
+		t.Errorf("columns = %v, want [total]", res.Columns)
+	}
+	if want := []map[string]interface{}{{"total": float64(0)}}; !reflect.DeepEqual(res.Rows, want) {
+		t.Errorf("rows = %#v, want %#v", res.Rows, want)
+	}
+}
+
+func TestRestCypherQueryPreservesColumnAliases(t *testing.T) {
+	h := &recordingHandler{
+		t: t, status: 200,
+		respJSON: `{"columns":["TotalCount","details"],"rows":[{"TotalCount":7,"details":{"displayName":"Alice","nestedValues":[{"SomeKey":true}]}}],"stats":{"queryTime":3}}`,
+	}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	res, err := c.Query.Cypher(context.Background(), memory.CypherInput{
+		Cypher: "RETURN 7 AS TotalCount, {displayName: 'Alice', nestedValues: [{SomeKey: true}]} AS details",
+	})
+	if err != nil {
+		t.Fatalf("Cypher: %v", err)
+	}
+	if !reflect.DeepEqual(res.Columns, []string{"TotalCount", "details"}) {
+		t.Errorf("columns = %v, want [TotalCount details]", res.Columns)
+	}
+	want := []map[string]interface{}{{
+		"TotalCount": float64(7),
+		"details": map[string]interface{}{
+			"displayName":  "Alice",
+			"nestedValues": []interface{}{map[string]interface{}{"SomeKey": true}},
+		},
+	}}
+	if !reflect.DeepEqual(res.Rows, want) {
+		t.Errorf("rows = %#v, want %#v", res.Rows, want)
+	}
+	if res.Stats["query_time"] != float64(3) {
+		t.Errorf("query_time = %v, want 3", res.Stats["query_time"])
 	}
 }
 

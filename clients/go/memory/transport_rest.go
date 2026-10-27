@@ -446,6 +446,15 @@ func (t *restTransport) Call(ctx context.Context, method string, params map[stri
 		raw = route.shape(raw, camel)
 	}
 	snake := camelToSnake(raw)
+	if method == "cypher_query" {
+		// Cypher rows are caller-defined data. Preserve column aliases and
+		// nested map keys while still normalizing the response envelope/stats.
+		if envelope, ok := raw.(map[string]interface{}); ok {
+			if rows, exists := envelope["rows"]; exists {
+				snake.(map[string]interface{})["rows"] = rows
+			}
+		}
+	}
 
 	// Re-marshal/unmarshal to convert into the typed struct the caller passed.
 	buf, err := json.Marshal(snake)
