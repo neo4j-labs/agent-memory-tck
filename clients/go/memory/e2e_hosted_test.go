@@ -222,7 +222,7 @@ func TestE2ECreateReturnsIDsAndUserID(t *testing.T) {
 	uid := e2eUserID(t, "create")
 	conv, err := c.ShortTerm.CreateConversation(context.Background(), memory.CreateConversationParams{
 		UserID:   uid,
-		Metadata: map[string]interface{}{"source": "e2e", "seq": 1},
+		Metadata: map[string]interface{}{"source": "e2e", "seq": "1"},
 	})
 	if err != nil {
 		t.Fatalf("CreateConversation: %v", err)
