@@ -349,9 +349,21 @@ class ReferenceAdapter(BaseAdapter):
     ) -> list[TCKEntity]:
         results = await self._client.long_term.get_related_entities(
             entity_id,
-            relationship_types=[relationship_type] if relationship_type else None,
             depth=depth,
         )
+        if relationship_type:
+            # SDK result.data() drops relationship properties; project the stored
+            # type explicitly instead of filtering on the physical RELATED_TO label.
+            rows = await self._client._client.execute_read(
+                """
+                MATCH (:Entity {id: $entity_id})-[r:RELATED_TO]-(other:Entity)
+                WHERE r.type = $relationship_type
+                RETURN other.id AS entity_id
+                """,
+                {"entity_id": str(entity_id), "relationship_type": relationship_type},
+            )
+            matching_ids = {UUID(row["entity_id"]) for row in rows}
+            results = [(e, rel) for e, rel in results if e.id in matching_ids]
         return [
             TCKEntity(
                 id=e.id,
