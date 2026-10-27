@@ -489,7 +489,6 @@ jobs:
       NEO4J_PASSWORD: testpassword
       MEMORY_ENDPOINT: http://localhost:3001
       TCK_BRIDGE_PORT: '3002'
-      TCK_PROXY_REFERENCE: 'true'
 
     steps:
       - uses: actions/checkout@v4
@@ -519,6 +518,8 @@ jobs:
           sleep 5
 
       - name: Start Java conformance server
+        env:
+          TCK_PROXY_REFERENCE: 'true'
         run: |
           make conformance-java
           for i in $(seq 1 30); do curl -s -X POST http://localhost:3002/setup > /dev/null 2>&1 && break || sleep 1; done
