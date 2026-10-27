@@ -217,17 +217,38 @@ class TestRecordToolCall:
         trace = await adapter.start_trace(SESSION_A, TRACE_TASK)
         step = await adapter.add_step(trace.id, action="multi_tool")
 
-        tc1 = await adapter.record_tool_call(step.id, "tool_a", {"x": 1}, duration_ms=100)
-        tc2 = await adapter.record_tool_call(step.id, "tool_b", {"y": 2}, duration_ms=200)
+        tc1 = await adapter.record_tool_call(
+            step.id, "tool_a", {"x": 1}, result={"found": ["Alice"]}, duration_ms=100
+        )
+        tc2 = await adapter.record_tool_call(
+            step.id,
+            "tool_b",
+            {"y": 2},
+            status=ToolCallStatus.ERROR,
+            duration_ms=200,
+            error="lookup failed",
+        )
         assert tc1.id != tc2.id
         assert tc1.tool_name == "tool_a"
         assert tc2.tool_name == "tool_b"
+
+        other_step = await adapter.add_step(trace.id, action="separate_tool")
+        tc3 = await adapter.record_tool_call(other_step.id, "tool_c", {"z": 3}, result=False)
+        empty_step = await adapter.add_step(trace.id, thought="No tool needed")
+        other_trace = await adapter.start_trace(SESSION_B, "Unrelated trace")
+        unrelated_step = await adapter.add_step(other_trace.id, action="unrelated")
+        await adapter.record_tool_call(unrelated_step.id, "unrelated_tool", {})
 
         # Verify both are in the step's tool calls
         full_trace = await adapter.get_trace_with_steps(trace.id)
         assert full_trace is not None
         step_calls = full_trace.steps[0].tool_calls
         assert len(step_calls) == 2
+        assert {tc.id: tc for tc in step_calls} == {tc1.id: tc1, tc2.id: tc2}
+        assert full_trace.steps[1].id == other_step.id
+        assert full_trace.steps[1].tool_calls == [tc3]
+        assert full_trace.steps[2].id == empty_step.id
+        assert full_trace.steps[2].tool_calls == []
 
 
 @pytest.mark.silver

@@ -9,6 +9,7 @@ Install with: pip install neo4j-agent-memory-tck[reference]
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime, timezone
 from typing import Any
@@ -508,6 +509,31 @@ class ReferenceAdapter(BaseAdapter):
         trace = await self._client.reasoning.get_trace_with_steps(trace_id)
         if trace is None:
             return None
+        # The SDK writes USES_TOOL edges but hydrates using a ToolCall.step_id
+        # property it does not persist. Read the actual edges to retain ownership.
+        rows = await self._client._client.execute_read(
+            """
+            MATCH (:ReasoningTrace {id: $trace_id})-[:HAS_STEP]->(rs:ReasoningStep)
+                  -[:USES_TOOL]->(tc:ToolCall)
+            RETURN rs.id AS step_id, tc
+            ORDER BY rs.step_number, tc.timestamp, tc.id
+            """,
+            {"trace_id": str(trace_id)},
+        )
+        tool_calls_by_step: dict[UUID, list[TCKToolCall]] = {}
+        for row in rows:
+            tc = row["tc"]
+            tool_calls_by_step.setdefault(UUID(row["step_id"]), []).append(
+                TCKToolCall(
+                    id=UUID(tc["id"]),
+                    tool_name=tc["tool_name"],
+                    arguments=json.loads(tc.get("arguments") or "{}"),
+                    result=json.loads(tc["result"]) if tc.get("result") is not None else None,
+                    status=ToolCallStatus(tc["status"]),
+                    duration_ms=tc.get("duration_ms"),
+                    error=tc.get("error"),
+                )
+            )
         steps = [
             TCKReasoningStep(
                 id=s.id,
@@ -516,20 +542,7 @@ class ReferenceAdapter(BaseAdapter):
                 thought=s.thought,
                 action=s.action,
                 observation=s.observation,
-                tool_calls=[
-                    TCKToolCall(
-                        id=tc.id,
-                        tool_name=tc.tool_name,
-                        arguments=tc.arguments or {},
-                        result=tc.result,
-                        status=ToolCallStatus(
-                            tc.status.value if hasattr(tc.status, "value") else tc.status
-                        ),
-                        duration_ms=tc.duration_ms,
-                        error=tc.error,
-                    )
-                    for tc in (s.tool_calls or [])
-                ],
+                tool_calls=tool_calls_by_step.get(s.id, []),
             )
             for s in (trace.steps or [])
         ]
