@@ -494,6 +494,7 @@ export class RestTransport implements Transport {
     if (route.hasBody) {
       const bodyObj: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(camelParams)) {
+        if (method === "search_messages" && k !== "query" && k !== "limit") continue;
         if (!consumed.has(k) && v !== undefined && v !== null) {
           bodyObj[k] = v;
         }

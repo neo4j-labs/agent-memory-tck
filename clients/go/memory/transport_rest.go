@@ -366,6 +366,9 @@ func (t *restTransport) Call(ctx context.Context, method string, params map[stri
 	if route.hasBody {
 		body := map[string]interface{}{}
 		for k, v := range camel {
+			if method == "search_messages" && k != "query" && k != "limit" {
+				continue
+			}
 			if !consumed[k] && v != nil {
 				body[k] = v
 			}

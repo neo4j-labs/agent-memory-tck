@@ -364,6 +364,8 @@ class RestTransport(Transport):
             body_obj = {
                 k: v for k, v in camel.items() if k not in consumed and v is not None
             }
+            if method == "search_messages":
+                body_obj = {k: v for k, v in body_obj.items() if k in ("query", "limit")}
 
         url = f"{self._endpoint}{path}"
         if query:

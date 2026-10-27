@@ -26,6 +26,25 @@ function newClient(opts?: Partial<{ apiKey: string }>): MemoryClient {
 }
 
 describe("RestTransport — short-term", () => {
+  it("searchMessages sends only supported body fields to the conversation route", async () => {
+    let observedBody: unknown = null;
+    server.use(
+      http.post(`${ENDPOINT}/conversations/conv-42/search`, async ({ request }) => {
+        observedBody = await request.json();
+        return HttpResponse.json({ messages: [] });
+      }),
+    );
+
+    const client = newClient();
+    const messages = await client.shortTerm.searchMessages("Nobel", {
+      sessionId: "conv-42", limit: 5, threshold: 0.25,
+    });
+    await client.close();
+
+    expect(messages).toEqual([]);
+    expect(observedBody).toEqual({ query: "Nobel", limit: 5 });
+  });
+
   it("createConversation POSTs camelCase body and parses response", async () => {
     let observedAuth: string | null = null;
     let observedBody: unknown = null;

@@ -64,6 +64,10 @@ class _ShortTerm:
         self, query: str, *, session_id: str | None = None,
         limit: int = 10, threshold: float = 0.7,
     ) -> list[Message]:
+        """Search messages; threshold applies only to the bridge transport.
+
+        The hosted REST API requires session_id and supports query and limit.
+        """
         d = await self._t.request("search_messages", {
             "query": query, "session_id": session_id,
             "limit": limit, "threshold": threshold,

@@ -6,6 +6,8 @@ request, headers, body, and parse the response back into typed dataclasses.
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -123,6 +125,22 @@ async def test_search_entities_unwraps_envelope(client: MemoryClient):
     entities = await client.long_term.search_entities("alice")
     assert len(entities) == 1
     assert entities[0].name == "Alice"
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_search_messages_sends_only_supported_body(client: MemoryClient):
+    route = respx.post(f"{ENDPOINT}/conversations/conv-42/search").mock(
+        return_value=httpx.Response(200, json={"messages": []})
+    )
+
+    messages = await client.short_term.search_messages(
+        "Nobel", session_id="conv-42", limit=5, threshold=0.25
+    )
+
+    assert messages == []
+    assert route.call_count == 1
+    assert json.loads(route.calls[0].request.content) == {"query": "Nobel", "limit": 5}
 
 
 @pytest.mark.integration

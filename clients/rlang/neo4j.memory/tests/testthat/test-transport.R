@@ -35,3 +35,20 @@ test_that("HttpTransport request errors on unreachable server", {
   transport <- HttpTransport$new("http://localhost:59999", timeout = 1)
   expect_error(transport$request("setup"))
 })
+
+test_that("REST message search sends only supported body fields to the conversation route", {
+  observed <- NULL
+  transport <- RestTransport$new("https://memory.test/v1")
+  client <- ShortTermMemory$new(transport)
+
+  results <- httr2::with_mocked_responses(function(req) {
+    observed <<- req
+    httr2::response(headers = list(`content-type` = "application/json"),
+      body = charToRaw('{"messages":[]}'))
+  }, client$search_messages("Nobel", session_id = "conv-42", limit = 5L, threshold = 0.25))
+
+  expect_equal(observed$method, "POST")
+  expect_equal(observed$url, "https://memory.test/v1/conversations/conv-42/search")
+  expect_equal(observed$body$data, list(query = "Nobel", limit = 5L))
+  expect_equal(results, list())
+})

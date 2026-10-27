@@ -92,6 +92,31 @@ func TestRestCreateConversation(t *testing.T) {
 	}
 }
 
+func TestRestSearchMessagesSupportedBody(t *testing.T) {
+	h := &recordingHandler{t: t, status: 200, respJSON: `{"messages":[]}`}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	messages, err := c.ShortTerm.SearchMessages(context.Background(), "Nobel",
+		memory.WithSessionID("conv-42"), memory.WithSearchLimit(5), memory.WithThreshold(0.25))
+	if err != nil {
+		t.Fatalf("SearchMessages: %v", err)
+	}
+	if h.method != http.MethodPost || h.path != "/v1/conversations/conv-42/search" {
+		t.Fatalf("request = %s %s, want POST /v1/conversations/conv-42/search", h.method, h.path)
+	}
+	var body map[string]interface{}
+	if err := json.Unmarshal(h.body, &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if len(body) != 2 || body["query"] != "Nobel" || body["limit"] != float64(5) {
+		t.Errorf("body = %v, want query=Nobel and limit=5 only", body)
+	}
+	if messages == nil || len(messages) != 0 {
+		t.Errorf("messages = %v, want non-nil empty slice", messages)
+	}
+}
+
 func TestRestGetContextSubstitutesPath(t *testing.T) {
 	h := &recordingHandler{
 		t: t, status: 200,

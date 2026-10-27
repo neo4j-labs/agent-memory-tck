@@ -70,6 +70,7 @@ func WithLimit(n int) func(*GetConversationParams) {
 }
 
 // SearchMessages searches messages by semantic similarity.
+// Hosted REST requires WithSessionID and supports query and limit only.
 func (s *ShortTermMemory) SearchMessages(ctx context.Context, query string, opts ...func(*SearchMessagesParams)) ([]Message, error) {
 	p := SearchMessagesParams{limit: 10, threshold: 0.7}
 	for _, o := range opts {
@@ -111,7 +112,8 @@ func WithSearchLimit(n int) func(*SearchMessagesParams) {
 	return func(p *SearchMessagesParams) { p.limit = n }
 }
 
-// WithThreshold sets the similarity threshold for search.
+// WithThreshold sets the similarity threshold for bridge search.
+// Hosted REST ignores this option.
 func WithThreshold(t float64) func(*SearchMessagesParams) {
 	return func(p *SearchMessagesParams) { p.threshold = t }
 }

@@ -94,6 +94,9 @@ RestTransport <- R6::R6Class("RestTransport",
 
       if (isTRUE(route$has_body)) {
         body <- camel[setdiff(names(camel), consumed)]
+        if (identical(method, "search_messages")) {
+          body <- body[intersect(names(body), c("query", "limit"))]
+        }
         req <- req |>
           httr2::req_headers("Content-Type" = "application/json") |>
           httr2::req_body_json(body, auto_unbox = TRUE)

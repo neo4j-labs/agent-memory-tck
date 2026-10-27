@@ -25,6 +25,7 @@ ShortTermMemory <- R6::R6Class("ShortTermMemory",
       parse_conversation(result)
     },
 
+    # Hosted REST requires session_id; threshold applies only to bridge search.
     search_messages = function(query, session_id = NULL, limit = 10L, threshold = 0.7) {
       result <- private$transport$request("search_messages", list(
         query = query,

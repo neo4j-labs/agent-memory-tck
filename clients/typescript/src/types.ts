@@ -347,8 +347,10 @@ export interface GetConversationOptions {
 }
 
 export interface SearchMessagesOptions {
+  /** Conversation ID; required by the hosted REST API. */
   sessionId?: string;
   limit?: number;
+  /** Similarity threshold for BridgeTransport only; ignored by hosted REST. */
   threshold?: number;
 }
 
