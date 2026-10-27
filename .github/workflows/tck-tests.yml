@@ -423,8 +423,11 @@ jobs:
 
   hosted-smoke:
     # Gated on the MEMORY_API_KEY repo secret. Skipped on forks / when unset.
+    # The `secrets` context is not allowed in job-level `if`, so the hosted
+    # steps check the key through `env` instead.
     runs-on: ubuntu-latest
-    if: ${{ secrets.MEMORY_API_KEY != '' }}
+    env:
+      MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -440,16 +443,14 @@ jobs:
           (cd clients/python && uv sync --extra dev)
 
       - name: Probe hosted service
-        env:
-          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
+        if: env.MEMORY_API_KEY != ''
         run: |
           curl -fsS -H "Authorization: Bearer $MEMORY_API_KEY" \
             https://memory.neo4jlabs.com/v1/conversations >/dev/null
           echo "hosted service reachable"
 
       - name: Smoke-test Python client against hosted service
-        env:
-          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
+        if: env.MEMORY_API_KEY != ''
         run: |
           cd clients/python
           uv run python -c "
