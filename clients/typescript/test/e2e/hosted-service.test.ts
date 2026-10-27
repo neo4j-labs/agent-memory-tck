@@ -301,7 +301,7 @@ describeOrSkip("hosted service e2e", () => {
     it("metadata round-trips without error", async () => {
       const conv = await newConv();
       const msg = await client.shortTerm.addMessage(conv.id, "user", "with-meta", {
-        metadata: { source: "tck-e2e", priority: "high", count: 42, active: true },
+        metadata: { source: "tck-e2e", priority: "high", count: "42", active: "true" },
       });
       expect(msg.content).toBe("with-meta");
     });

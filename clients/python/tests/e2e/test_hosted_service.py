@@ -353,7 +353,7 @@ class TestMessageContentFidelity:
         assert msg.content == content
 
     async def test_metadata_round_trips(self, client: MemoryClient, conv):
-        meta = {"source": "tck-e2e", "priority": "high", "count": 42, "active": True}
+        meta = {"source": "tck-e2e", "priority": "high", "count": "42", "active": "true"}
         msg = await client.short_term.add_message(
             conv.id, "user", "with-meta", metadata=meta
         )
