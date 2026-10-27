@@ -67,6 +67,7 @@ interface ServerMessage {
   role: string;
   content: string;
   metadata?: Record<string, unknown>;
+  createdAt?: string;
 }
 
 interface ServerState {
@@ -192,6 +193,27 @@ describe("Neo4jSessionStorage — synthetic-message storage", () => {
     expect(messages).toHaveLength(1);
   });
 
+  it("replays real messages chronologically from newest-first hosted history", async () => {
+    const state: ServerState = {
+      messages: [
+        {
+          id: "m3", role: "user", createdAt: "2026-05-16T00:02:00Z",
+          content: encodeBlobContent("__strands_state__:", {
+            snapshotId: "s1", isLatest: true, savedAt: "2026-05-16T00:02:00Z", snapshot: snap(),
+          }),
+        },
+        { id: "m2", role: "assistant", content: "hi", createdAt: "2026-05-16T00:01:00Z" },
+        { id: "m1", role: "user", content: "hello", createdAt: "2026-05-16T00:00:00Z" },
+      ],
+    };
+    mountConversationHandlers(state);
+    const loaded = await newStorage().loadSnapshot({ location: LOCATION });
+    expect(loaded!.data.messages).toEqual([
+      { role: "user", content: [{ text: "hello" }] },
+      { role: "assistant", content: [{ text: "hi" }] },
+    ]);
+  });
+
   it("loadSnapshot honors an explicit snapshotId", async () => {
     const state: ServerState = { messages: [] };
     mountConversationHandlers(state);
@@ -249,6 +271,71 @@ describe("Neo4jSessionStorage — synthetic-message storage", () => {
     ).toEqual(["c", "d"]);
   });
 
+  it("lists newest-first hosted history in saved order with pagination and repeated IDs", async () => {
+    const state: ServerState = {
+      messages: [
+        ["s2", "2026-05-16T00:03:00Z"],
+        ["s3", "2026-05-16T00:02:00Z"],
+        ["s2", "2026-05-16T00:01:00Z"],
+        ["s1", "2026-05-16T00:00:00Z"],
+      ].map(([snapshotId, savedAt], index) => ({
+        id: `m${index}`,
+        role: "user",
+        content: encodeBlobContent("__strands_state__:", {
+          snapshotId, savedAt, isLatest: true, snapshot: snap(),
+        }),
+      })),
+    };
+    mountConversationHandlers(state);
+    const storage = newStorage();
+
+    expect(await storage.listSnapshotIds({ location: LOCATION })).toEqual(["s1", "s2", "s3"]);
+    expect(await storage.listSnapshotIds({ location: LOCATION, limit: 2 })).toEqual(["s1", "s2"]);
+    expect(await storage.listSnapshotIds({ location: LOCATION, startAfter: "s1", limit: 2 }))
+      .toEqual(["s2", "s3"]);
+    expect(await storage.listSnapshotIds({ location: LOCATION, startAfter: "s3", limit: 2 }))
+      .toEqual([]);
+  });
+
+  it.each([
+    { name: "chronological legacy", dates: ["2026-05-16T00:00:00Z", "2026-05-16T00:01:00Z"], ids: ["s0", "s1"] },
+    { name: "equal", dates: ["2026-05-16T00:00:00Z", "2026-05-16T00:00:00Z"], ids: ["s0", "s1"] },
+    { name: "missing", dates: [undefined, undefined], ids: ["s0", "s1"] },
+    { name: "invalid", dates: ["x", "invalid"], ids: ["s0", "s1"] },
+    {
+      name: "mixed dated and legacy",
+      dates: ["2026-05-16T00:02:00Z", undefined, "2026-05-16T00:00:00Z", "invalid", "2026-05-16T00:01:00Z"],
+      ids: ["s2", "s1", "s4", "s3", "s0"],
+    },
+  ])("preserves stable snapshot and manifest ordering for $name timestamps", async ({ dates, ids }) => {
+    const state: ServerState = {
+      messages: dates.flatMap((savedAt, index) => [
+        {
+          id: `state${index}`, role: "user",
+          content: encodeBlobContent("__strands_state__:", {
+            snapshotId: `s${index}`, savedAt, isLatest: true,
+            snapshot: snap({ agentState: { tag: `s${index}` } }),
+          }),
+        },
+        {
+          id: `manifest${index}`, role: "user",
+          content: encodeBlobContent("__strands_manifest__:", {
+            scopeId: "a1", savedAt,
+            manifest: { schemaVersion: "1.0", updatedAt: `s${index}` },
+          }),
+        },
+      ]),
+    };
+    mountConversationHandlers(state);
+    const storage = newStorage();
+
+    expect(await storage.listSnapshotIds({ location: LOCATION })).toEqual(ids);
+    expect((await storage.loadSnapshot({ location: LOCATION }))!.data).toMatchObject({ tag: ids.at(-1) });
+    expect(await storage.loadManifest({ location: LOCATION })).toEqual({
+      schemaVersion: "1.0", updatedAt: ids.at(-1),
+    });
+  });
+
   it("deleteSession issues DELETE /conversations/:id", async () => {
     let deleted = false;
     server.use(
@@ -260,6 +347,26 @@ describe("Neo4jSessionStorage — synthetic-message storage", () => {
     const storage = newStorage();
     await storage.deleteSession({ sessionId: SESSION_ID });
     expect(deleted).toBe(true);
+  });
+
+  it("loads the newest manifest for the requested scope from newest-first history", async () => {
+    const state: ServerState = {
+      messages: [
+        { scopeId: "other-agent", savedAt: "2026-05-16T00:03:00Z" },
+        { scopeId: "a1", savedAt: "2026-05-16T00:02:00Z" },
+        { scopeId: "a1", savedAt: "2026-05-16T00:01:00Z" },
+      ].map(({ scopeId, savedAt }, index) => ({
+        id: `m${index}`,
+        role: "user",
+        content: encodeBlobContent("__strands_manifest__:", {
+          scopeId, savedAt, manifest: { schemaVersion: "1.0", updatedAt: savedAt },
+        }),
+      })),
+    };
+    mountConversationHandlers(state);
+    expect(await newStorage().loadManifest({ location: LOCATION })).toEqual({
+      schemaVersion: "1.0", updatedAt: "2026-05-16T00:02:00Z",
+    });
   });
 
   it("manifest round-trip via a synthetic user message", async () => {
@@ -352,6 +459,38 @@ describe("Neo4jSessionStorage — idempotency + error surface", () => {
 
     const loaded = await storage.loadSnapshot({ location: LOCATION, snapshotId: "s1" });
     expect((loaded!.data as Record<string, unknown>).version).toBe(2);
+  });
+
+  it.each([true, false])("selects newest revisions from newest-first histories (latest flags: %s)", async (hasLatest) => {
+    const state: ServerState = {
+      messages: [
+        { snapshotId: "s1", version: 1, savedAt: "2026-05-16T00:00:00Z", isLatest: hasLatest },
+        { snapshotId: "s2", version: 2, savedAt: "2026-05-16T00:01:00Z", isLatest: hasLatest },
+        { snapshotId: "s1", version: 3, savedAt: "2026-05-16T00:02:00Z", isLatest: hasLatest },
+        { snapshotId: "s3", version: 4, savedAt: "2026-05-16T00:03:00Z", isLatest: false },
+      ].reverse().map(({ version, ...blob }, index) => ({
+        id: `m${index}`,
+        role: "user",
+        content: encodeBlobContent("__strands_state__:", {
+          ...blob, snapshot: { ...snap(), data: { version } },
+        }),
+      })),
+    };
+    mountConversationHandlers(state);
+    const storage = newStorage();
+
+    const explicit = await storage.loadSnapshot({ location: LOCATION, snapshotId: "s1" });
+    expect(explicit!.data).toMatchObject({ version: 3 });
+    const latest = await storage.loadSnapshot({ location: LOCATION });
+    expect(latest!.data).toMatchObject({ version: hasLatest ? 3 : 4 });
+
+    // Re-saving the current revision must not append a duplicate marker.
+    await storage.saveSnapshot({
+      location: LOCATION, snapshotId: "s1", isLatest: hasLatest, snapshot: explicit!,
+    });
+    expect(state.messages).toHaveLength(4);
+    const reloaded = await storage.loadSnapshot({ location: LOCATION, snapshotId: "s1" });
+    expect(reloaded!.data).toMatchObject({ version: 3 });
   });
 
   it("auth failure on read propagates AuthenticationError with requestId", async () => {

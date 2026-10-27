@@ -217,7 +217,7 @@ interface StrandsStateBlob {
   isLatest: boolean;
   /** Snapshot data with messages stripped. */
   snapshot: Snapshot;
-  /** Wall-clock save time (ISO 8601). Tie-breaker for "latest" elections. */
+  /** Wall-clock save time (ISO 8601), used to order stored revisions. */
   savedAt: string;
 }
 
@@ -344,9 +344,10 @@ export class Neo4jSessionStorage implements SnapshotStorage {
     // Re-hydrate the snapshot: combine the stored data/appData with the
     // current conversation messages (filtered to drop our synthetic
     // markers so Strands doesn't replay them).
-    const realMessages = conv.messages
-      .filter((m) => !isSyntheticStrandsMessage(m))
-      .map(toStrandsMessage);
+    const realMessages = chronological(
+      conv.messages.filter((m) => !isSyntheticStrandsMessage(m)),
+      (message) => message.timestamp,
+    ).map(toStrandsMessage);
     return mergeMessagesIntoSnapshot(blob.snapshot, realMessages);
   }
 
@@ -407,7 +408,7 @@ export class Neo4jSessionStorage implements SnapshotStorage {
 
   /**
    * Scan a conversation's message list and parse any state markers into
-   * blobs, in original order. Matches on the content prefix alone for
+   * blobs, in chronological save order. Matches on the content prefix alone for
    * resilience against role normalization on the service side.
    */
   private readStateBlobs(
@@ -418,7 +419,7 @@ export class Neo4jSessionStorage implements SnapshotStorage {
       const blob = decodeBlob<StrandsStateBlob>(msg.content, STATE_PREFIX);
       if (blob) blobs.push(blob);
     }
-    return blobs;
+    return chronological(blobs, (blob) => blob.savedAt);
   }
 
   /** Same idea, for manifest markers. */
@@ -430,7 +431,7 @@ export class Neo4jSessionStorage implements SnapshotStorage {
       const blob = decodeBlob<StrandsManifestBlob>(msg.content, MANIFEST_PREFIX);
       if (blob) blobs.push(blob);
     }
-    return blobs;
+    return chronological(blobs, (blob) => blob.savedAt);
   }
 
   /**
@@ -815,6 +816,21 @@ function sameStateBlob(a: StrandsStateBlob, b: StrandsStateBlob): boolean {
     a.isLatest === b.isLatest &&
     jsonLikeEqual(a.snapshot, b.snapshot)
   );
+}
+
+/**
+ * Sort dated entries oldest first. Undated/invalid entries keep their input
+ * slots because their chronology is unknown; equal dates retain input order.
+ * Sorting only finite timestamps keeps the comparator transitive.
+ */
+function chronological<T>(items: T[], timestamp: (item: T) => string | undefined): T[] {
+  const dated = items.map((item) => ({ item, time: Date.parse(timestamp(item) ?? "") }))
+    .filter(({ time }) => Number.isFinite(time))
+    .sort((a, b) => a.time - b.time);
+  let next = 0;
+  return items.map((item) => Number.isFinite(Date.parse(timestamp(item) ?? ""))
+    ? dated[next++]!.item
+    : item);
 }
 
 function findLastStateBlobForSnapshotId(
