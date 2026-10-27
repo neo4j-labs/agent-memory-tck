@@ -355,7 +355,8 @@ class ReferenceAdapter(BaseAdapter):
         if relationship_type:
             # SDK result.data() drops relationship properties; project the stored
             # type explicitly instead of filtering on the physical RELATED_TO label.
-            rows = await self._client._client.execute_read(
+            client: Any = self._client
+            rows = await client._client.execute_read(
                 """
                 MATCH (:Entity {id: $entity_id})-[r:RELATED_TO]-(other:Entity)
                 WHERE r.type = $relationship_type
@@ -511,7 +512,8 @@ class ReferenceAdapter(BaseAdapter):
             return None
         # The SDK writes USES_TOOL edges but hydrates using a ToolCall.step_id
         # property it does not persist. Read the actual edges to retain ownership.
-        rows = await self._client._client.execute_read(
+        client: Any = self._client
+        rows = await client._client.execute_read(
             """
             MATCH (:ReasoningTrace {id: $trace_id})-[:HAS_STEP]->(rs:ReasoningStep)
                   -[:USES_TOOL]->(tc:ToolCall)
