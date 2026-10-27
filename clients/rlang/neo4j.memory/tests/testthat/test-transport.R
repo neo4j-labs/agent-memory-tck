@@ -52,3 +52,40 @@ test_that("REST message search sends only supported body fields to the conversat
   expect_equal(observed$body$data, list(query = "Nobel", limit = 5L))
   expect_equal(results, list())
 })
+
+test_that("REST Cypher queries omit absent optional parameters", {
+  observed <- NULL
+  wire <- NULL
+  client <- MemoryClient$new(endpoint = "https://memory.test/v1")
+
+  result <- httr2::with_mocked_responses(function(req) {
+    observed <<- req
+    wire <<- capture.output(httr2::req_dry_run(req))
+    httr2::response(headers = list(`content-type` = "application/json"),
+      body = charToRaw('{"columns":["total"],"rows":[{"total":1}]}'))
+  }, client$query$cypher("RETURN 1 AS total"))
+
+  expect_equal(observed$method, "POST")
+  expect_equal(observed$url, "https://memory.test/v1/query")
+  expect_identical(tail(wire, 1), '{"cypher":"RETURN 1 AS total"}')
+  expect_equal(result$rows, list(list(total = 1)))
+})
+
+test_that("REST Cypher queries send named parameters as an object", {
+  observed <- NULL
+  wire <- NULL
+  client <- MemoryClient$new(endpoint = "https://memory.test/v1")
+
+  result <- httr2::with_mocked_responses(function(req) {
+    observed <<- req
+    wire <<- capture.output(httr2::req_dry_run(req))
+    httr2::response(headers = list(`content-type` = "application/json"),
+      body = charToRaw('{"columns":["label"],"rows":[{"label":"Alice"}]}'))
+  }, client$query$cypher("RETURN $label AS label", params = list(label = "Alice")))
+
+  expect_equal(observed$method, "POST")
+  expect_equal(observed$url, "https://memory.test/v1/query")
+  expect_identical(tail(wire, 1),
+    '{"cypher":"RETURN $label AS label","params":{"label":"Alice"}}')
+  expect_equal(result$rows, list(list(label = "Alice")))
+})

@@ -11,7 +11,7 @@ QueryConsole <- R6::R6Class("QueryConsole",
     cypher = function(cypher, params = NULL) {
       result <- private$transport$request("cypher_query", list(
         cypher = cypher,
-        params = if (is.null(params)) list() else params
+        params = params
       ))
       list(
         columns = if (is.null(result$columns)) list() else result$columns,
