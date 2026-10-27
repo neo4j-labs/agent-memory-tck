@@ -51,6 +51,61 @@ function noContent(res: ServerResponse): void {
   res.end();
 }
 
+/** Canonical model fields differ from the bridge wire format. */
+const wireFields: Record<string, string> = {
+  sessionId: "session_id",
+  conversationId: "conversation_id",
+  messageId: "message_id",
+  messageCount: "message_count",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+  workspaceId: "workspace_id",
+  userId: "user_id",
+  windowStart: "window_start",
+  windowEnd: "window_end",
+  recentMessages: "recent_messages",
+  canonicalName: "canonical_name",
+  sourceStage: "source_stage",
+  entityId: "entity_id",
+  sourceId: "source_id",
+  targetId: "target_id",
+  targetName: "target_name",
+  relationshipType: "relationship_type",
+  traceId: "trace_id",
+  stepId: "step_id",
+  stepNumber: "step_number",
+  startedAt: "started_at",
+  completedAt: "completed_at",
+  toolName: "tool_name",
+  toolCalls: "tool_calls",
+  durationMs: "duration_ms",
+  totalCalls: "total_calls",
+  successfulCalls: "successful_calls",
+  failedCalls: "failed_calls",
+  successRate: "success_rate",
+  avgDurationMs: "avg_duration_ms",
+  actionTaken: "action_taken",
+  influencedEntities: "influenced_entities",
+};
+
+// Descend only into collections of models. Metadata, arguments, results,
+// relationship properties, and query rows/stats contain opaque user keys.
+const modelCollections = new Set([
+  "messages", "reflections", "observations", "recentMessages", "relationships",
+  "mentions", "nodes", "edges", "steps", "toolCalls", "influencedEntities",
+]);
+
+function serializeModel(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(serializeModel);
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, field]) => [
+      Object.hasOwn(wireFields, key) ? wireFields[key] : key,
+      modelCollections.has(key) ? serializeModel(field) : field,
+    ]),
+  );
+}
+
 type Handler = (body: Record<string, unknown>) => Promise<unknown>;
 
 const handlers: Record<string, Handler> = {
@@ -287,7 +342,7 @@ const server = createServer(async (req, res) => {
     const body = await readBody(req);
     const result = await handler(body);
     if (result === undefined) noContent(res);
-    else jsonResponse(res, result);
+    else jsonResponse(res, serializeModel(result));
   } catch (error) {
     // The conformance server is a dev-only tool: log the full error
     // (including any stack) to stderr where the operator can read it, but
