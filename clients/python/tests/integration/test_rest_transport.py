@@ -53,8 +53,6 @@ async def test_create_conversation_request_and_parse(client: MemoryClient):
     request = route.calls[0].request
     assert request.headers["Authorization"] == "Bearer nams_test_key"
     assert request.headers["Content-Type"] == "application/json"
-    body = httpx._content.encode_request(request.content)  # type: ignore[attr-defined]
-    # Fall back to direct content read
     assert b"alice" in request.content
 
     assert conv.id == "conv-uuid-1"

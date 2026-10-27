@@ -12,8 +12,6 @@ Mark each test class with `@pytest.mark.platinum`.
 
 from __future__ import annotations
 
-from uuid import uuid4
-
 import pytest
 
 

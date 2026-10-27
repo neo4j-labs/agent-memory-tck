@@ -35,7 +35,6 @@ from tests.e2e._tck_provenance import (
     metadata_for as _tck_meta,
     provenance_reasoning,
     provenance_result,
-    run_info,
     tag_description,
 )
 
