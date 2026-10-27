@@ -126,10 +126,12 @@ class TestAddRelationship:
         alice = await adapter.add_entity(name="Alice", entity_type="PERSON")
         acme = await adapter.add_entity(name="Acme", entity_type="ORGANIZATION")
 
-        rel = await adapter.add_relationship(alice.id, acme.id, "WORKS_AT")
+        properties = {"department": "Engineering", "since": 2024}
+        rel = await adapter.add_relationship(alice.id, acme.id, "WORKS_AT", properties=properties)
         assert rel.source_id == alice.id
         assert rel.target_id == acme.id
         assert rel.relationship_type == "WORKS_AT"
+        assert rel.properties == properties
 
     async def test_add_relationship_bidirectional_traversal(self, adapter):
         """SPEC-5.2.2: Related entities MUST be discoverable from the source."""
