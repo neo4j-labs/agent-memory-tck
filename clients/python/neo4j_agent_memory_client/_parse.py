@@ -107,7 +107,9 @@ def parse_context(d: dict[str, Any]) -> ConversationContext:
     return ConversationContext(
         reflections=[parse_reflection(x) for x in d.get("reflections") or []],
         observations=[parse_observation(x) for x in d.get("observations") or []],
-        recent_messages=[m for m in (parse_message(x) for x in d.get("recent_messages") or []) if m],
+        recent_messages=[
+            m for m in (parse_message(x) for x in d.get("recent_messages") or []) if m
+        ],
     )
 
 
@@ -175,9 +177,7 @@ def parse_graph(d: dict[str, Any]) -> EntityGraph:
         target = str(e.get("target") or e.get("target_id") or "")
         edge_type = e.get("type") or e.get("predicate") or ""
         edge_id = str(e.get("id") or f"{source}-{edge_type}-{target}")
-        edges.append(
-            EntityGraphEdge(id=edge_id, source=source, target=target, type=edge_type)
-        )
+        edges.append(EntityGraphEdge(id=edge_id, source=source, target=target, type=edge_type))
     return EntityGraph(nodes=nodes, edges=edges)
 
 

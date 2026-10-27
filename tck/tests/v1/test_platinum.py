@@ -17,11 +17,13 @@ import pytest
 
 def _skip_if_unsupported(call):
     """Wrap a test call so NotImplementedError → pytest.skip, not failure."""
+
     async def runner(*args, **kwargs):
         try:
             return await call(*args, **kwargs)
         except NotImplementedError as e:
             pytest.skip(f"adapter does not implement Platinum tier: {e}")
+
     return runner
 
 
@@ -61,10 +63,8 @@ class TestConversationLifecycle:
         try:
             conv = await adapter.create_conversation(user_id="tck-bulk")
             from tck.adapters.base_adapter import TCKBulkMessageInput
-            inputs = [
-                TCKBulkMessageInput(role="user", content=f"msg-{i}")
-                for i in range(5)
-            ]
+
+            inputs = [TCKBulkMessageInput(role="user", content=f"msg-{i}") for i in range(5)]
             msgs = await adapter.bulk_add_messages(conv.id, inputs)
         except NotImplementedError:
             pytest.skip("Platinum: bulk_add_messages not supported")
@@ -107,9 +107,7 @@ class TestEntityFeedbackAndGraph:
         """SPEC-5.3.1: set_entity_feedback returns {id, updated}."""
         try:
             entity = await adapter.add_entity("Alice", "person", description="test")
-            result = await adapter.set_entity_feedback(
-                entity.id, user_score=0.9, confirmed=True
-            )
+            result = await adapter.set_entity_feedback(entity.id, user_score=0.9, confirmed=True)
         except NotImplementedError:
             pytest.skip("Platinum: set_entity_feedback not supported")
         assert hasattr(result, "id")
@@ -148,9 +146,7 @@ class TestReasoningProvenance:
         """SPEC-5.4.3: get_trace_by_conversation returns steps + tool calls."""
         try:
             conv = await adapter.create_conversation(user_id="tck-trace")
-            await adapter.record_step(
-                conversation_id=conv.id, reasoning="r", action_taken="a"
-            )
+            await adapter.record_step(conversation_id=conv.id, reasoning="r", action_taken="a")
             trace = await adapter.get_trace_by_conversation(conv.id)
         except NotImplementedError:
             pytest.skip("Platinum: get_trace_by_conversation not supported")
@@ -164,9 +160,7 @@ class TestCypherConsole:
     async def test_cypher_query_returns_columns_and_rows(self, adapter):
         """SPEC-5.5.1: cypher_query returns {columns, rows, stats}."""
         try:
-            result = await adapter.cypher_query(
-                "MATCH (n) RETURN count(n) AS total LIMIT 1"
-            )
+            result = await adapter.cypher_query("MATCH (n) RETURN count(n) AS total LIMIT 1")
         except NotImplementedError:
             pytest.skip("Platinum: cypher_query not supported")
         assert hasattr(result, "columns")

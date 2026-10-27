@@ -66,9 +66,11 @@ class MemoryToolset:
         async def memory_get_context(conversation_id: str) -> str:
             ctx = await c.short_term.get_context(conversation_id)
             return "\n".join(
-                ["Reflections: " + " ".join(r.content for r in ctx.reflections),
-                 "Observations: " + " ".join(o.content for o in ctx.observations),
-                 "Recent: " + " ".join(f"[{m.role}] {m.content}" for m in ctx.recent_messages)]
+                [
+                    "Reflections: " + " ".join(r.content for r in ctx.reflections),
+                    "Observations: " + " ".join(o.content for o in ctx.observations),
+                    "Recent: " + " ".join(f"[{m.role}] {m.content}" for m in ctx.recent_messages),
+                ]
             )
 
         async def memory_search_entities(query: str, limit: int = 10) -> list[str]:
@@ -79,7 +81,9 @@ class MemoryToolset:
             h = await c.long_term.get_entity_history(entity_id)
             return f"{len(h.mentions)} mentions"
 
-        async def memory_record_step(conversation_id: str, reasoning: str, action_taken: str) -> str:
+        async def memory_record_step(
+            conversation_id: str, reasoning: str, action_taken: str
+        ) -> str:
             s = await c.reasoning.record_step(
                 conversation_id=conversation_id,
                 reasoning=reasoning,
