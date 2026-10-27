@@ -18,7 +18,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "respx>=0.21",
     "python-dotenv>=1.0",
-    "ruff>=0.4",
+    "ruff==0.15.12",
 ]
 
 [project.urls]

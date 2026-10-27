@@ -29,7 +29,7 @@ bridge = [
     "aiohttp>=3.9.0",
 ]
 dev = [
-    "ruff>=0.3.0",
+    "ruff==0.15.12",
     "mypy>=1.8.0",
 ]
 
