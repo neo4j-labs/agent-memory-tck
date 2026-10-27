@@ -256,7 +256,7 @@ class TestConversationLifecycle:
         self, client: MemoryClient, conv_factory
     ):
         uid = _user_id("create")
-        c = await conv_factory(user_id=uid, metadata={"source": "e2e", "seq": 1})
+        c = await conv_factory(user_id=uid, metadata={"source": "e2e", "seq": "1"})
         assert c.id and len(c.id) >= 8
         assert c.user_id == uid
         # workspace_id is server-assigned
