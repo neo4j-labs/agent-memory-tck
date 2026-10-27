@@ -19,6 +19,8 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { MemoryClient } from "../src/client.js";
+import { BridgeTransport } from "../src/transport/bridge.js";
+import { RestTransport } from "../src/transport/rest.js";
 
 const PORT = parseInt(process.env["TCK_BRIDGE_PORT"] ?? "3001", 10);
 const UPSTREAM = process.env["MEMORY_ENDPOINT"] ?? process.env["NEO4J_URI"] ?? "";
@@ -31,7 +33,13 @@ if (!UPSTREAM) {
   process.exit(1);
 }
 
-const client = new MemoryClient({ endpoint: UPSTREAM, apiKey: API_KEY });
+// Own the transport at this boundary so lifecycle operations can use its
+// existing request capability. Match MemoryClient's automatic mode selection;
+// hosted REST retains its existing clear_all_data behavior.
+const transport = /\/v\d+\b/.test(UPSTREAM)
+  ? new RestTransport({ endpoint: UPSTREAM, apiKey: API_KEY })
+  : new BridgeTransport({ endpoint: UPSTREAM, apiKey: API_KEY });
+const client = new MemoryClient(transport);
 
 async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
@@ -112,7 +120,10 @@ const handlers: Record<string, Handler> = {
   // ---- Lifecycle --------------------------------------------------------
   setup: async () => ({ ok: true, protocol_version: "0.2.0" }),
   teardown: async () => undefined,
-  clear_all_data: async () => undefined,
+  clear_all_data: async () => {
+    await transport.request("clear_all_data", {});
+    return undefined;
+  },
 
   // ---- Short-Term Memory (Bronze) --------------------------------------
   add_message: async (body) =>
