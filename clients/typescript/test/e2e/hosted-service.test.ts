@@ -400,8 +400,9 @@ describeOrSkip("hosted service e2e", () => {
     it("listEntities with type filter", async () => {
       const ents = await client.longTerm.listEntities({ type: "person", limit: 5 });
       expect(Array.isArray(ents)).toBe(true);
+      // The filter is case-insensitive and extracted entities come back as "Person".
       for (const e of ents) {
-        expect(e.type).toBe("person");
+        expect(e.type.toLowerCase()).toBe("person");
       }
     });
 

@@ -566,8 +566,9 @@ func TestE2EListEntitiesWithTypeFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListEntities(person): %v", err)
 	}
+	// The filter is case-insensitive and extracted entities come back as "Person".
 	for _, e := range ents {
-		if e.Type != "person" {
+		if !strings.EqualFold(e.Type, "person") {
 			t.Errorf("non-person entity returned with type filter: %q", e.Type)
 		}
 	}
