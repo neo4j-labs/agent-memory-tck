@@ -259,7 +259,6 @@ describeOrSkip("hosted service e2e", () => {
       const results = await client.shortTerm.searchMessages("Nobel", {
         sessionId: conv.id,
         limit: 5,
-        threshold: 0.0,
       });
       expect(Array.isArray(results)).toBe(true);
     });

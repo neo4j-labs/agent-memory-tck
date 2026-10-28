@@ -16,6 +16,8 @@ import {
   SESSION_A,
   SESSION_B,
   SESSION_C,
+  SEARCH_QUERY,
+  UNRELATED_SEARCH_MESSAGE,
   CONVERSATION_MESSAGES,
   LONG_CONTENT,
   UNICODE_CONTENT,
@@ -478,7 +480,6 @@ describeOrSkip("Bronze Tier", () => {
 
       const results = await client.shortTerm.searchMessages("Python programming", {
         limit: 10,
-        threshold: 0.0,
       });
       expect(results.length).toBeGreaterThan(0);
       expect(results.some((r: Message) => r.content.includes("Python"))).toBe(true);
@@ -491,7 +492,6 @@ describeOrSkip("Bronze Tier", () => {
       const results = await client.shortTerm.searchMessages("Python", {
         sessionId: SESSION_A,
         limit: 10,
-        threshold: 0.0,
       });
       for (const msg of results) {
         expect(msg.content.includes("session A") || msg.content.includes("Python")).toBe(true);
@@ -504,18 +504,19 @@ describeOrSkip("Bronze Tier", () => {
       }
       const results = await client.shortTerm.searchMessages("Test message", {
         limit: 2,
-        threshold: 0.0,
       });
       expect(results.length).toBeLessThanOrEqual(2);
     });
 
     it("SPEC-2.3.4: no results returns empty list", async () => {
-      await client.shortTerm.addMessage(SESSION_A, "user", "The sky is blue");
-      const results = await client.shortTerm.searchMessages(
-        "quantum cryptography algorithms",
-        { limit: 10, threshold: 0.99 },
-      );
-      expect(Array.isArray(results)).toBe(true);
+      await client.shortTerm.addMessage(SESSION_A, "user", UNRELATED_SEARCH_MESSAGE);
+      const results = await client.shortTerm.searchMessages(SEARCH_QUERY, { limit: 10 });
+      expect(results).toEqual([]);
+
+      // An implementation that always returns [] must not pass this scenario.
+      const matching = await client.shortTerm.addMessage(SESSION_A, "user", SEARCH_QUERY);
+      const matches = await client.shortTerm.searchMessages(SEARCH_QUERY, { limit: 10 });
+      expect(matches.map((message) => message.id)).toEqual([matching.id]);
     });
 
     it("SPEC-2.3.5: limit=1 returns at most 1", async () => {
@@ -524,7 +525,6 @@ describeOrSkip("Bronze Tier", () => {
       }
       const results = await client.shortTerm.searchMessages("Searchable content", {
         limit: 1,
-        threshold: 0.0,
       });
       expect(results.length).toBeLessThanOrEqual(1);
     });
@@ -532,7 +532,6 @@ describeOrSkip("Bronze Tier", () => {
     it("SPEC-2.3.6: empty database returns empty list", async () => {
       const results = await client.shortTerm.searchMessages("anything", {
         limit: 10,
-        threshold: 0.0,
       });
       expect(results).toEqual([]);
     });
@@ -543,7 +542,6 @@ describeOrSkip("Bronze Tier", () => {
 
       const results = await client.shortTerm.searchMessages("Python topic", {
         limit: 10,
-        threshold: 0.0,
       });
       expect(results.length).toBeGreaterThanOrEqual(1);
     });

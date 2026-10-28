@@ -9,6 +9,10 @@ export const SESSION_A = "tck-session-alpha";
 export const SESSION_B = "tck-session-beta";
 export const SESSION_C = "tck-session-gamma";
 
+// MockEmbedder gives this pair orthogonal unit vectors in the reference bridge.
+export const SEARCH_QUERY = "quantum cryptography algorithms";
+export const UNRELATED_SEARCH_MESSAGE = "The sky is blue";
+
 export const LONG_CONTENT = "x".repeat(10_000);
 export const UNICODE_CONTENT = "Hello \u4e16\u754c \ud83c\udf0d \u00e9\u00e8\u00ea \u00fc\u00f6\u00e4 \u2603\ufe0f \u2764\ufe0f\u200d\ud83d\udd25";
 export const SPECIAL_CHARS_CONTENT = 'Line1\nLine2\tTabbed "quoted" \'single\' back\\slash';
