@@ -60,15 +60,14 @@ test_that("RestTransport returns the newest-first listing in insertion order", {
   expect_equal(vapply(conv$messages, `[[`, "", "content"), c("first", "second"))
 })
 
-test_that("RestTransport does not send threshold, which the service rejects", {
+test_that("search_messages omits threshold when unset", {
   rt <- RestTransport$new("https://memory.test/v1", api_key = "k")
   sent <- NULL
   httr2::local_mocked_responses(function(req) {
     sent <<- req$body$data
     httr2::response_json(body = list(messages = list()))
   })
-  rt$request("search_messages", list(query = "nobel", session_id = "conv-1",
-                                     limit = 10L, threshold = 0))
+  ShortTermMemory$new(rt)$search_messages("nobel", session_id = "conv-1")
   expect_equal(sent, list(query = "nobel", limit = 10L))
 })
 

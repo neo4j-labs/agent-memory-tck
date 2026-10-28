@@ -110,7 +110,7 @@ mcp_dispatch <- function(client, name, args) {
     "memory_add_messages" = mcp_dispatch_add_messages(client, args),
     "memory_get_context" = client$short_term$get_context(args$conversation_id),
     "memory_search_messages" = client$short_term$search_messages(
-      args$query, args$conversation_id, args$limit %||% 10L, 0.0),
+      args$query, args$conversation_id, args$limit %||% 10L),
     "memory_search_entities" = client$long_term$search_entities(
       args$query, args$limit %||% 10L, args$type),
     "memory_get_entity" = client$long_term$get_entity(args$entity_id),

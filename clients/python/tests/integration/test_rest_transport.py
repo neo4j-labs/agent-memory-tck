@@ -137,12 +137,12 @@ async def test_get_conversation_returns_newest_first_listing_in_insertion_order(
 
 @pytest.mark.integration
 @respx.mock
-async def test_search_messages_does_not_send_threshold(client: MemoryClient):
+async def test_search_messages_omits_unset_threshold(client: MemoryClient):
     route = respx.post(f"{ENDPOINT}/conversations/conv-1/search").mock(
         return_value=httpx.Response(200, json={"messages": []})
     )
 
-    await client.short_term.search_messages("nobel", session_id="conv-1", threshold=0.0)
+    await client.short_term.search_messages("nobel", session_id="conv-1")
     assert json.loads(route.calls[0].request.content) == {"query": "nobel", "limit": 10}
 
 

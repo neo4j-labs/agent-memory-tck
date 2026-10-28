@@ -233,7 +233,7 @@ public class HostedServiceTests : IClassFixture<HostedServiceFixture>, IAsyncLif
         await Client.ShortTerm.AddMessageAsync(conv.Id, MessageRole.User,
             "Marie Curie won the Nobel Prize in Physics in 1903.");
         var results = await Client.ShortTerm.SearchMessagesAsync(
-            "Nobel", conv.Id, limit: 5, threshold: 0.0);
+            "Nobel", conv.Id, limit: 5);
         Assert.NotNull(results);
     }
 

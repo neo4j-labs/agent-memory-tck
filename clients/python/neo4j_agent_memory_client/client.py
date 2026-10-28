@@ -75,7 +75,7 @@ class _ShortTerm:
         *,
         session_id: str | None = None,
         limit: int = 10,
-        threshold: float = 0.7,
+        threshold: float | None = None,
     ) -> list[Message]:
         d = await self._t.request(
             "search_messages",

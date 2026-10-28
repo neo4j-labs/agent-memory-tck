@@ -343,7 +343,6 @@ func TestE2ESearchMessagesReturnsArray(t *testing.T) {
 	results, err := c.ShortTerm.SearchMessages(context.Background(), "Nobel",
 		memory.WithSessionID(conv.ID),
 		memory.WithSearchLimit(5),
-		memory.WithThreshold(0.0),
 	)
 	if err != nil {
 		t.Fatalf("SearchMessages: %v", err)

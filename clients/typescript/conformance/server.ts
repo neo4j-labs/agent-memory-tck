@@ -94,7 +94,7 @@ const handlers: Record<string, Handler> = {
     client.shortTerm.searchMessages(body["query"] as string, {
       sessionId: body["session_id"] as string | undefined,
       limit: (body["limit"] as number) ?? 10,
-      threshold: (body["threshold"] as number) ?? 0.7,
+      threshold: body["threshold"] as number | undefined,
     }),
 
   list_sessions: async (body) =>

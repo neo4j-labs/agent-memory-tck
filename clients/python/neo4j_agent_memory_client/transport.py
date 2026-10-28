@@ -76,15 +76,7 @@ class BridgeTransport(Transport):
 
 
 class _Route:
-    __slots__ = (
-        "method",
-        "path",
-        "path_params",
-        "query_params",
-        "has_body",
-        "shape",
-        "ignored_params",
-    )
+    __slots__ = ("method", "path", "path_params", "query_params", "has_body", "shape")
 
     def __init__(
         self,
@@ -94,7 +86,6 @@ class _Route:
         query_params: tuple[str, ...] = (),
         has_body: bool = False,
         shape: Callable[[Any, dict[str, Any]], Any] | None = None,
-        ignored_params: tuple[str, ...] = (),
     ):
         self.method = method
         self.path = path
@@ -102,8 +93,6 @@ class _Route:
         self.query_params = query_params
         self.has_body = has_body
         self.shape = shape
-        # Bridge params the endpoint has no equivalent for; never sent.
-        self.ignored_params = ignored_params
 
 
 _NOOP = _Route("NOOP", "")
@@ -203,7 +192,6 @@ _ROUTES: dict[str, _Route] = {
         path_params=("sessionId",),
         has_body=True,
         shape=_shape_messages,
-        ignored_params=("threshold",),
     ),
     "clear_session": _Route("DELETE", "/conversations/{sessionId}", path_params=("sessionId",)),
     "delete_message": _UNSUPPORTED,
@@ -344,7 +332,7 @@ class RestTransport(Transport):
 
         original = params or {}
         camel = snake_to_camel(original)
-        consumed: set[str] = set(route.ignored_params)
+        consumed: set[str] = set()
 
         # Path params use camelCase placeholders (matching the route literal).
         path = route.path

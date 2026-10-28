@@ -212,13 +212,12 @@ func TestRestGetConversationInsertionOrder(t *testing.T) {
 	}
 }
 
-func TestRestSearchMessagesOmitsThreshold(t *testing.T) {
+func TestRestSearchMessagesOmitsUnsetThreshold(t *testing.T) {
 	h := &recordingHandler{t: t, status: 200, respJSON: `{"messages":[]}`}
 	c, srv := newRestClient(t, h)
 	defer srv.Close()
 
-	_, err := c.ShortTerm.SearchMessages(context.Background(), "nobel",
-		memory.WithSessionID("conv-1"), memory.WithThreshold(0))
+	_, err := c.ShortTerm.SearchMessages(context.Background(), "nobel", memory.WithSessionID("conv-1"))
 	if err != nil {
 		t.Fatalf("SearchMessages: %v", err)
 	}

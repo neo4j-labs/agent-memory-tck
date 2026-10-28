@@ -137,7 +137,7 @@ describe("RestTransport — short-term", () => {
     expect(conv.messages.map((m) => m.content)).toEqual(["first", "second"]);
   });
 
-  it("searchMessages does not send threshold, which the service rejects", async () => {
+  it("searchMessages omits threshold when unset", async () => {
     let observedBody: unknown = null;
     server.use(
       http.post(`${ENDPOINT}/conversations/conv-1/search`, async ({ request }) => {
@@ -147,7 +147,7 @@ describe("RestTransport — short-term", () => {
     );
 
     const client = newClient();
-    await client.shortTerm.searchMessages("nobel", { sessionId: "conv-1", threshold: 0 });
+    await client.shortTerm.searchMessages("nobel", { sessionId: "conv-1" });
     await client.close();
 
     expect(observedBody).toEqual({ query: "nobel", limit: 10 });

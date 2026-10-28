@@ -121,11 +121,11 @@ public class RestTransportTests
     }
 
     [Fact]
-    public async Task SearchMessages_DoesNotSendThreshold()
+    public async Task SearchMessages_OmitsUnsetThreshold()
     {
         var (handler, client) = NewClient(new StubResponse(HttpStatusCode.OK, "{\"messages\":[]}"));
 
-        await client.ShortTerm.SearchMessagesAsync("nobel", sessionId: "conv-1", threshold: 0);
+        await client.ShortTerm.SearchMessagesAsync("nobel", sessionId: "conv-1");
 
         Assert.DoesNotContain("threshold", handler.LastBody);
     }
