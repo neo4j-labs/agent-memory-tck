@@ -521,8 +521,23 @@ jobs:
           TCK_BRIDGE_PORT: '3002'
           TCK_PROXY_REFERENCE: 'true'
         run: |
-          make conformance-java
-          for i in $(seq 1 30); do curl -s -X POST http://localhost:3002/setup > /dev/null 2>&1 && break || sleep 1; done
+          make conformance-java > /tmp/java-conformance.log 2>&1 &
+          JAVA_PID=$!
+          for i in $(seq 1 60); do
+            if ! kill -0 "$JAVA_PID" 2>/dev/null; then
+              echo "Java conformance server exited during startup. Logs:"
+              cat /tmp/java-conformance.log
+              exit 1
+            fi
+            if curl --fail --silent --max-time 2 -X POST http://localhost:3002/setup > /dev/null 2>&1; then
+              echo "Java conformance server ready on port 3002"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Java conformance server did not become ready. Logs:"
+          cat /tmp/java-conformance.log
+          exit 1
 
       - name: Run TCK Bronze via Java bridge
         run: |
