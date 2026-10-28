@@ -134,6 +134,9 @@ type restRoute struct {
 var (
 	noopRoute        = &restRoute{}
 	unsupportedRoute = &restRoute{method: "UNSUPPORTED"}
+	// compositeRoute marks methods with no single REST endpoint — they are
+	// assembled from multiple hosted calls in callComposite.
+	compositeRoute = &restRoute{method: "COMPOSITE"}
 )
 
 var restRoutes = map[string]*restRoute{
@@ -198,10 +201,10 @@ var restRoutes = map[string]*restRoute{
 	"add_preference":           unsupportedRoute,
 	"add_fact":                 unsupportedRoute,
 	"search_preferences":       unsupportedRoute,
-	"get_entity_by_name":       unsupportedRoute,
-	"get_related_entities":     unsupportedRoute,
-	"add_relationship":         unsupportedRoute,
-	"merge_duplicate_entities": unsupportedRoute,
+	"get_entity_by_name":       {method: http.MethodGet, path: "/entities/by-name", queryParams: []string{"name", "type", "limit"}, shape: extractFirstEntity},
+	"get_related_entities":     compositeRoute,
+	"add_relationship":         {method: http.MethodPost, path: "/relationships", hasBody: true},
+	"merge_duplicate_entities": compositeRoute,
 	"start_trace":              unsupportedRoute,
 	"add_step":                 unsupportedRoute,
 	"record_tool_call":         {method: http.MethodPost, path: "/reasoning/tool-calls", hasBody: true},
@@ -248,6 +251,22 @@ func extractEntities(raw interface{}, _ map[string]interface{}) interface{} {
 		}
 	}
 	return raw
+}
+
+// extractFirstEntity unwraps GET /entities/by-name's ordered
+// {"entities": [...]} envelope to first-or-nil: the first element is the best
+// match; an empty list means "no match" and maps to a nil result, never an
+// error.
+func extractFirstEntity(raw interface{}, _ map[string]interface{}) interface{} {
+	m, ok := raw.(map[string]interface{})
+	if !ok {
+		return raw
+	}
+	entities, ok := m["entities"].([]interface{})
+	if !ok || len(entities) == 0 {
+		return nil
+	}
+	return entities[0]
 }
 
 func extractConversations(raw interface{}, _ map[string]interface{}) interface{} {
@@ -321,6 +340,9 @@ func (t *restTransport) Call(ctx context.Context, method string, params map[stri
 	}
 	if route == unsupportedRoute {
 		return &NotSupportedError{MemoryError{Message: fmt.Sprintf("method %q has no equivalent in the hosted REST API", method)}}
+	}
+	if route == compositeRoute {
+		return t.callComposite(ctx, method, params, result)
 	}
 
 	camel, _ := snakeToCamel(params).(map[string]interface{})
@@ -458,6 +480,116 @@ func (t *restTransport) Call(ctx context.Context, method string, params map[stri
 		return &MemoryError{Message: "failed to decode shaped response", Cause: err}
 	}
 	return nil
+}
+
+// callComposite dispatches methods that have no single REST endpoint and are
+// instead assembled from multiple hosted calls.
+func (t *restTransport) callComposite(ctx context.Context, method string, params map[string]interface{}, result interface{}) error {
+	switch method {
+	case "get_related_entities":
+		return t.getRelatedEntitiesComposite(ctx, params, result)
+	case "merge_duplicate_entities":
+		return t.mergeDuplicateEntitiesComposite(ctx, params, result)
+	}
+	return &NotSupportedError{MemoryError{Message: fmt.Sprintf("method %q has no composite handler", method)}}
+}
+
+// getRelatedEntitiesComposite maps GET /entities/{id}'s 1-hop relationships
+// list (relType/targetId/targetName/targetType, both directions) to entities,
+// filtering by relationship_type client-side. Depth > 1 has no hosted
+// equivalent.
+func (t *restTransport) getRelatedEntitiesComposite(ctx context.Context, params map[string]interface{}, result interface{}) error {
+	if depth, ok := intParam(params["depth"]); ok && depth > 1 {
+		return &NotSupportedError{MemoryError{Message: `method "get_related_entities" with depth > 1 has no equivalent in the hosted REST API`}}
+	}
+	var entity map[string]interface{}
+	if err := t.Call(ctx, "get_entity", map[string]interface{}{
+		"entity_id": params["entity_id"],
+	}, &entity); err != nil {
+		return err
+	}
+	relType, _ := params["relationship_type"].(string)
+	rels, _ := entity["relationships"].([]interface{})
+	out := make([]map[string]interface{}, 0, len(rels))
+	for _, r := range rels {
+		rm, _ := r.(map[string]interface{})
+		if rm == nil {
+			continue
+		}
+		if relType != "" {
+			if rt, _ := rm["rel_type"].(string); rt != relType {
+				continue
+			}
+		}
+		out = append(out, map[string]interface{}{
+			"id":   rm["target_id"],
+			"name": rm["target_name"],
+			"type": rm["target_type"],
+		})
+	}
+	return decodeInto(out, result)
+}
+
+// mergeDuplicateEntitiesComposite chains POST /entities/{id}/merge, an
+// optional PUT /entities/{id} rename (canonical_name), and a final GET so the
+// caller receives the surviving entity. The merge response's target_id is
+// canonical-resolved, so it wins over the caller-supplied one.
+func (t *restTransport) mergeDuplicateEntitiesComposite(ctx context.Context, params map[string]interface{}, result interface{}) error {
+	var merge struct {
+		Status   string `json:"status"`
+		SourceID string `json:"source_id"`
+		TargetID string `json:"target_id"`
+	}
+	if err := t.Call(ctx, "merge_entities", map[string]interface{}{
+		"source_id": params["source_id"],
+		"target_id": params["target_id"],
+	}, &merge); err != nil {
+		return err
+	}
+	targetID := merge.TargetID
+	if targetID == "" {
+		targetID, _ = params["target_id"].(string)
+	}
+	if name, _ := params["canonical_name"].(string); name != "" {
+		if err := t.Call(ctx, "update_entity", map[string]interface{}{
+			"entity_id": targetID,
+			"name":      name,
+		}, nil); err != nil {
+			return err
+		}
+	}
+	return t.Call(ctx, "get_entity", map[string]interface{}{"entity_id": targetID}, result)
+}
+
+// decodeInto round-trips a composite-built value through JSON into the typed
+// struct the caller passed (mirrors the tail of Call).
+func decodeInto(value interface{}, result interface{}) error {
+	if result == nil {
+		return nil
+	}
+	buf, err := json.Marshal(value)
+	if err != nil {
+		return &MemoryError{Message: "failed to re-marshal response", Cause: err}
+	}
+	if err := json.Unmarshal(buf, result); err != nil {
+		return &MemoryError{Message: "failed to decode shaped response", Cause: err}
+	}
+	return nil
+}
+
+// intParam coerces the numeric types a params map can carry into an int.
+func intParam(v interface{}) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int32:
+		return int(n), true
+	case int64:
+		return int(n), true
+	case float64:
+		return int(n), true
+	}
+	return 0, false
 }
 
 func (t *restTransport) applyHeaders(ctx context.Context, req *http.Request, hasBody bool) error {

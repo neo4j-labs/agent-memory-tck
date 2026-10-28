@@ -361,11 +361,19 @@ func handleGetToolStats(ctx context.Context, body map[string]interface{}) (inter
 }
 
 func handleAddRelationship(ctx context.Context, body map[string]interface{}) (interface{}, error) {
-	return client.LongTerm.AddRelationship(ctx, s(body, "source_id"), s(body, "target_id"), s(body, "relationship_type"))
+	opts := []func(*memory.AddRelationshipParams){}
+	if props := anyMap(body, "properties"); props != nil {
+		opts = append(opts, memory.WithRelProperties(props))
+	}
+	return client.LongTerm.AddRelationship(ctx, s(body, "source_id"), s(body, "target_id"), s(body, "relationship_type"), opts...)
 }
 
 func handleMergeDuplicateEntities(ctx context.Context, body map[string]interface{}) (interface{}, error) {
-	return client.LongTerm.MergeDuplicateEntities(ctx, s(body, "source_id"), s(body, "target_id"))
+	opts := []func(*memory.MergeDuplicateParams){}
+	if n := s(body, "canonical_name"); n != "" {
+		opts = append(opts, memory.WithCanonicalName(n))
+	}
+	return client.LongTerm.MergeDuplicateEntities(ctx, s(body, "source_id"), s(body, "target_id"), opts...)
 }
 
 func handleGetSimilarTraces(ctx context.Context, body map[string]interface{}) (interface{}, error) {

@@ -215,6 +215,231 @@ async def test_500_raises_transport_error(client: MemoryClient):
 
 
 @pytest.mark.integration
+@respx.mock
+async def test_add_relationship_posts_and_parses(client: MemoryClient):
+    route = respx.post(f"{ENDPOINT}/relationships").mock(
+        return_value=httpx.Response(
+            201,
+            json={
+                "id": "11111111-2222-3333-4444-555555555555",
+                "sourceId": "e-src",
+                "targetId": "e-tgt",
+                "relationshipType": "WORKS_AT",
+                "confidence": 1.0,
+                "created": True,
+            },
+        )
+    )
+
+    rel = await client.long_term.add_relationship("e-src", "e-tgt", "WORKS_AT")
+
+    assert route.called
+    body = json.loads(route.calls[0].request.content)
+    assert body == {
+        "sourceId": "e-src",
+        "targetId": "e-tgt",
+        "relationshipType": "WORKS_AT",
+    }
+    assert rel.id == "11111111-2222-3333-4444-555555555555"
+    assert rel.source_id == "e-src"
+    assert rel.target_id == "e-tgt"
+    assert rel.relationship_type == "WORKS_AT"
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_add_relationship_collapsed_type(client: MemoryClient):
+    # A type outside the workspace allowlist comes back as RELATED_TO with the
+    # original preserved as "predicate" — the client surfaces the written type.
+    respx.post(f"{ENDPOINT}/relationships").mock(
+        return_value=httpx.Response(
+            201,
+            json={
+                "id": "11111111-2222-3333-4444-555555555555",
+                "sourceId": "a",
+                "targetId": "b",
+                "relationshipType": "RELATED_TO",
+                "predicate": "located_at",
+                "confidence": 1.0,
+                "created": True,
+            },
+        )
+    )
+
+    rel = await client.long_term.add_relationship("a", "b", "LOCATED_AT")
+    assert rel.relationship_type == "RELATED_TO"
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_get_entity_by_name_found(client: MemoryClient):
+    route = respx.get(f"{ENDPOINT}/entities/by-name").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "entities": [
+                    {"id": "e1", "name": "Alice Johnson", "type": "person", "matchKind": "name"},
+                    {
+                        "id": "e2",
+                        "name": "Alice Johnson",
+                        "type": "organization",
+                        "matchKind": "alias",
+                    },
+                ]
+            },
+        )
+    )
+
+    entity = await client.long_term.get_entity_by_name("Alice Johnson")
+
+    assert route.called
+    assert route.calls[0].request.url.params["name"] == "Alice Johnson"
+    assert entity is not None
+    assert entity.id == "e1"  # first element is the best match
+    assert entity.name == "Alice Johnson"
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_get_entity_by_name_not_found_returns_none(client: MemoryClient):
+    respx.get(f"{ENDPOINT}/entities/by-name").mock(
+        return_value=httpx.Response(200, json={"entities": []})
+    )
+
+    entity = await client.long_term.get_entity_by_name("Nonexistent Entity")
+    assert entity is None
+
+
+_RELATED_ENTITY_JSON = {
+    "id": "e-alice",
+    "name": "Alice",
+    "type": "person",
+    "relationships": [
+        {"relType": "KNOWS", "targetId": "e-bob", "targetName": "Bob", "targetType": "person"},
+        {
+            "relType": "WORKS_AT",
+            "targetId": "e-acme",
+            "targetName": "Acme",
+            "targetType": "organization",
+        },
+    ],
+}
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_get_related_entities_maps_relationships(client: MemoryClient):
+    respx.get(f"{ENDPOINT}/entities/e-alice").mock(
+        return_value=httpx.Response(200, json=_RELATED_ENTITY_JSON)
+    )
+
+    related = await client.long_term.get_related_entities("e-alice")
+    assert [(e.id, e.name, e.type) for e in related] == [
+        ("e-bob", "Bob", "person"),
+        ("e-acme", "Acme", "organization"),
+    ]
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_get_related_entities_type_filter(client: MemoryClient):
+    respx.get(f"{ENDPOINT}/entities/e-alice").mock(
+        return_value=httpx.Response(200, json=_RELATED_ENTITY_JSON)
+    )
+
+    related = await client.long_term.get_related_entities("e-alice", relationship_type="WORKS_AT")
+    assert [e.name for e in related] == ["Acme"]
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_get_related_entities_empty(client: MemoryClient):
+    respx.get(f"{ENDPOINT}/entities/e-lonely").mock(
+        return_value=httpx.Response(
+            200, json={"id": "e-lonely", "name": "Lonely", "type": "person", "relationships": []}
+        )
+    )
+
+    related = await client.long_term.get_related_entities("e-lonely")
+    assert related == []
+
+
+@pytest.mark.integration
+async def test_get_related_entities_depth_not_supported():
+    c = MemoryClient(endpoint=ENDPOINT, api_key="k")
+    with pytest.raises(NotSupportedError):
+        await c.long_term.get_related_entities("e1", depth=2)
+    await c.close()
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_merge_duplicate_entities_merges_then_fetches(client: MemoryClient):
+    # The merge response's targetId ("e-canonical") wins over the
+    # caller-supplied one — it is canonical-resolved server-side.
+    merge_route = respx.post(f"{ENDPOINT}/entities/e-src/merge").mock(
+        return_value=httpx.Response(
+            200, json={"status": "merged", "sourceId": "e-src", "targetId": "e-canonical"}
+        )
+    )
+    get_route = respx.get(f"{ENDPOINT}/entities/e-canonical").mock(
+        return_value=httpx.Response(
+            200, json={"id": "e-canonical", "name": "Alice Johnson", "type": "person"}
+        )
+    )
+
+    merged = await client.long_term.merge_duplicate_entities("e-src", "e-tgt")
+
+    assert merge_route.called
+    assert get_route.called
+    assert merged.id == "e-canonical"
+    assert merged.name == "Alice Johnson"
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_merge_duplicate_entities_canonical_name(client: MemoryClient):
+    respx.post(f"{ENDPOINT}/entities/e-src/merge").mock(
+        return_value=httpx.Response(
+            200, json={"status": "merged", "sourceId": "e-src", "targetId": "e-canonical"}
+        )
+    )
+    rename_route = respx.put(f"{ENDPOINT}/entities/e-canonical").mock(
+        return_value=httpx.Response(200, json={"status": "updated"})
+    )
+    respx.get(f"{ENDPOINT}/entities/e-canonical").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": "e-canonical",
+                "name": "Alice J. Johnson",
+                "type": "person",
+                "relationships": [
+                    {
+                        "relType": "WORKS_AT",
+                        "targetId": "e-acme",
+                        "targetName": "Acme",
+                        "targetType": "organization",
+                    }
+                ],
+            },
+        )
+    )
+
+    merged = await client.long_term.merge_duplicate_entities(
+        "e-src", "e-tgt", canonical_name="Alice J. Johnson"
+    )
+
+    assert rename_route.called
+    assert b"Alice J. Johnson" in rename_route.calls[0].request.content
+    assert merged.name == "Alice J. Johnson"
+    # Hosted rel refs (no edge id, relType key) must parse without error.
+    assert merged.relationships is not None
+    assert merged.relationships[0].type == "WORKS_AT"
+    assert merged.relationships[0].target_id == "e-acme"
+
+
+@pytest.mark.integration
 async def test_legacy_method_unsupported_on_rest():
     c = MemoryClient(endpoint=ENDPOINT, api_key="k")
     with pytest.raises(NotSupportedError):

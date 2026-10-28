@@ -334,3 +334,242 @@ func intToStr(n int) string {
 		return "0"
 	}
 }
+
+func TestRestAddRelationship(t *testing.T) {
+	h := &recordingHandler{
+		t: t, status: 201,
+		respJSON: `{"id":"11111111-2222-3333-4444-555555555555","sourceId":"e-src","targetId":"e-tgt","relationshipType":"WORKS_AT","confidence":1,"created":true}`,
+	}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	rel, err := c.LongTerm.AddRelationship(context.Background(), "e-src", "e-tgt", "WORKS_AT")
+	if err != nil {
+		t.Fatalf("AddRelationship: %v", err)
+	}
+
+	if h.method != "POST" || !strings.HasSuffix(h.path, "/relationships") {
+		t.Errorf("request = %s %s, want POST .../relationships", h.method, h.path)
+	}
+	body := string(h.body)
+	for _, want := range []string{`"sourceId":"e-src"`, `"targetId":"e-tgt"`, `"relationshipType":"WORKS_AT"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %s; got %s", want, body)
+		}
+	}
+	if rel.ID != "11111111-2222-3333-4444-555555555555" {
+		t.Errorf("rel.ID = %q, want the response UUID", rel.ID)
+	}
+	if rel.SourceID != "e-src" || rel.TargetID != "e-tgt" || rel.RelationshipType != "WORKS_AT" {
+		t.Errorf("rel = %+v, want source/target/type round-trip", rel)
+	}
+}
+
+func TestRestAddRelationshipCollapsedType(t *testing.T) {
+	// A type outside the workspace allowlist comes back as RELATED_TO with the
+	// original preserved as "predicate" — the client surfaces the written type.
+	h := &recordingHandler{
+		t: t, status: 201,
+		respJSON: `{"id":"11111111-2222-3333-4444-555555555555","sourceId":"a","targetId":"b","relationshipType":"RELATED_TO","predicate":"located_at","confidence":1,"created":true}`,
+	}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	rel, err := c.LongTerm.AddRelationship(context.Background(), "a", "b", "LOCATED_AT")
+	if err != nil {
+		t.Fatalf("AddRelationship: %v", err)
+	}
+	if rel.RelationshipType != "RELATED_TO" {
+		t.Errorf("rel.RelationshipType = %q, want RELATED_TO (collapsed)", rel.RelationshipType)
+	}
+}
+
+func TestRestGetEntityByNameFound(t *testing.T) {
+	h := &recordingHandler{
+		t: t, status: 200,
+		respJSON: `{"entities":[{"id":"e1","name":"Alice Johnson","type":"person","matchKind":"name","createdAt":"2026-05-07T00:00:00Z"},{"id":"e2","name":"Alice Johnson","type":"organization","matchKind":"alias"}]}`,
+	}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	entity, err := c.LongTerm.GetEntityByName(context.Background(), "Alice Johnson")
+	if err != nil {
+		t.Fatalf("GetEntityByName: %v", err)
+	}
+	if h.method != "GET" || !strings.HasSuffix(h.path, "/entities/by-name") {
+		t.Errorf("request = %s %s, want GET .../entities/by-name", h.method, h.path)
+	}
+	if !strings.Contains(h.rawQuery, "name=Alice+Johnson") {
+		t.Errorf("query = %q, want name=Alice+Johnson", h.rawQuery)
+	}
+	if entity == nil {
+		t.Fatal("entity = nil, want the first (best) match")
+	}
+	if entity.ID != "e1" || entity.Name != "Alice Johnson" {
+		t.Errorf("entity = %+v, want first entity e1", entity)
+	}
+}
+
+func TestRestGetEntityByNameNotFound(t *testing.T) {
+	h := &recordingHandler{t: t, status: 200, respJSON: `{"entities":[]}`}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	entity, err := c.LongTerm.GetEntityByName(context.Background(), "Nonexistent Entity")
+	if err != nil {
+		t.Fatalf("GetEntityByName: %v", err)
+	}
+	if entity != nil {
+		t.Errorf("entity = %+v, want nil for empty match list", entity)
+	}
+}
+
+const relatedEntityJSON = `{
+	"id": "e-alice", "name": "Alice", "type": "person",
+	"relationships": [
+		{"relType":"KNOWS","targetId":"e-bob","targetName":"Bob","targetType":"person"},
+		{"relType":"WORKS_AT","targetId":"e-acme","targetName":"Acme","targetType":"organization"}
+	]
+}`
+
+func TestRestGetRelatedEntities(t *testing.T) {
+	h := &recordingHandler{t: t, status: 200, respJSON: relatedEntityJSON}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	related, err := c.LongTerm.GetRelatedEntities(context.Background(), "e-alice")
+	if err != nil {
+		t.Fatalf("GetRelatedEntities: %v", err)
+	}
+	if h.method != "GET" || !strings.HasSuffix(h.path, "/entities/e-alice") {
+		t.Errorf("request = %s %s, want GET .../entities/e-alice", h.method, h.path)
+	}
+	if len(related) != 2 {
+		t.Fatalf("len(related) = %d, want 2", len(related))
+	}
+	names := map[string]string{}
+	for _, e := range related {
+		names[e.Name] = e.Type
+	}
+	if names["Bob"] != "person" || names["Acme"] != "organization" {
+		t.Errorf("related = %v, want Bob/person and Acme/organization", names)
+	}
+	if related[0].ID != "e-bob" {
+		t.Errorf("related[0].ID = %q, want e-bob", related[0].ID)
+	}
+}
+
+func TestRestGetRelatedEntitiesTypeFilter(t *testing.T) {
+	h := &recordingHandler{t: t, status: 200, respJSON: relatedEntityJSON}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	related, err := c.LongTerm.GetRelatedEntities(context.Background(), "e-alice",
+		memory.WithRelType("WORKS_AT"))
+	if err != nil {
+		t.Fatalf("GetRelatedEntities: %v", err)
+	}
+	if len(related) != 1 || related[0].Name != "Acme" {
+		t.Errorf("related = %+v, want just Acme (WORKS_AT filter)", related)
+	}
+}
+
+func TestRestGetRelatedEntitiesEmpty(t *testing.T) {
+	h := &recordingHandler{
+		t: t, status: 200,
+		respJSON: `{"id":"e-lonely","name":"Lonely","type":"person","relationships":[]}`,
+	}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	related, err := c.LongTerm.GetRelatedEntities(context.Background(), "e-lonely")
+	if err != nil {
+		t.Fatalf("GetRelatedEntities: %v", err)
+	}
+	if len(related) != 0 {
+		t.Errorf("related = %+v, want empty slice", related)
+	}
+}
+
+func TestRestGetRelatedEntitiesDepthNotSupportedPublicAPI(t *testing.T) {
+	c, err := memory.New(
+		memory.WithEndpoint("https://example.com/v1"),
+		memory.WithAPIKey("k"),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	_, err = c.LongTerm.GetRelatedEntities(context.Background(), "e1", memory.WithDepth(2))
+	if err == nil {
+		t.Fatal("expected NotSupportedError for depth > 1")
+	}
+	var nse *memory.NotSupportedError
+	if !errors.As(err, &nse) {
+		t.Errorf("expected NotSupportedError, got %T: %v", err, err)
+	}
+}
+
+// mergeMux serves the three endpoints the merge_duplicate_entities composite
+// chains: POST /v1/entities/{src}/merge, PUT /v1/entities/{tgt}, and
+// GET /v1/entities/{tgt}. (Plain method/path switch — the module's go 1.21
+// directive disables ServeMux method patterns.)
+func mergeMux(t *testing.T, calls *[]string, entityName string) http.Handler {
+	t.Helper()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		key := r.Method + " " + r.URL.Path
+		switch key {
+		case "POST /v1/entities/e-src/merge":
+			*calls = append(*calls, "merge")
+			_, _ = w.Write([]byte(`{"status":"merged","sourceId":"e-src","targetId":"e-canonical"}`))
+		case "PUT /v1/entities/e-canonical":
+			*calls = append(*calls, "rename")
+			_, _ = w.Write([]byte(`{"status":"updated"}`))
+		case "GET /v1/entities/e-canonical":
+			*calls = append(*calls, "get")
+			_, _ = w.Write([]byte(`{"id":"e-canonical","name":"` + entityName + `","type":"person"}`))
+		default:
+			t.Errorf("unexpected request: %s", key)
+			w.WriteHeader(404)
+		}
+	})
+}
+
+func TestRestMergeDuplicateEntities(t *testing.T) {
+	var calls []string
+	c, srv := newRestClient(t, mergeMux(t, &calls, "Alice Johnson"))
+	defer srv.Close()
+
+	// Note the merge response's targetId ("e-canonical") wins over the
+	// caller-supplied one — it is canonical-resolved server-side.
+	merged, err := c.LongTerm.MergeDuplicateEntities(context.Background(), "e-src", "e-tgt")
+	if err != nil {
+		t.Fatalf("MergeDuplicateEntities: %v", err)
+	}
+	if merged.ID != "e-canonical" || merged.Name != "Alice Johnson" {
+		t.Errorf("merged = %+v, want the surviving entity e-canonical", merged)
+	}
+	want := []string{"merge", "get"}
+	if len(calls) != len(want) || calls[0] != want[0] || calls[1] != want[1] {
+		t.Errorf("calls = %v, want %v", calls, want)
+	}
+}
+
+func TestRestMergeDuplicateEntitiesCanonicalName(t *testing.T) {
+	var calls []string
+	c, srv := newRestClient(t, mergeMux(t, &calls, "Alice J. Johnson"))
+	defer srv.Close()
+
+	merged, err := c.LongTerm.MergeDuplicateEntities(context.Background(), "e-src", "e-tgt",
+		memory.WithCanonicalName("Alice J. Johnson"))
+	if err != nil {
+		t.Fatalf("MergeDuplicateEntities: %v", err)
+	}
+	if merged.Name != "Alice J. Johnson" {
+		t.Errorf("merged.Name = %q, want canonical name", merged.Name)
+	}
+	want := []string{"merge", "rename", "get"}
+	if len(calls) != 3 || calls[0] != want[0] || calls[1] != want[1] || calls[2] != want[2] {
+		t.Errorf("calls = %v, want %v", calls, want)
+	}
+}

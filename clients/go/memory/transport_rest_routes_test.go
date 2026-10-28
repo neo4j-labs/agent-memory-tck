@@ -13,6 +13,10 @@ func TestRestRouteTable(t *testing.T) {
 		"add_message", "get_conversation", "search_messages", "list_sessions",
 		"clear_session", "add_entity", "search_entities", "record_tool_call",
 
+		// Gold-tier entity-relationship methods (SPEC-3.6.x / 3.7.x / 5.2.x / 5.3.x)
+		"get_entity_by_name", "get_related_entities",
+		"add_relationship", "merge_duplicate_entities",
+
 		// Volume 5 / Platinum
 		"create_conversation", "list_conversations", "get_conversation_metadata",
 		"delete_conversation", "get_context", "bulk_add_messages",
@@ -38,8 +42,7 @@ func TestRestRouteTable(t *testing.T) {
 	}
 
 	for _, m := range []string{
-		"add_preference", "add_fact", "search_preferences", "get_entity_by_name",
-		"get_related_entities", "add_relationship", "merge_duplicate_entities",
+		"add_preference", "add_fact", "search_preferences",
 		"start_trace", "add_step", "complete_trace", "get_trace_with_steps",
 		"list_traces", "get_tool_stats", "get_similar_traces", "delete_message",
 	} {
@@ -51,6 +54,37 @@ func TestRestRouteTable(t *testing.T) {
 		if r != unsupportedRoute {
 			t.Errorf("expected %s to be unsupportedRoute", m)
 		}
+	}
+
+	// Gold-tier route shapes.
+	if r := restRoutes["get_entity_by_name"]; r.method != "GET" || r.path != "/entities/by-name" {
+		t.Errorf("get_entity_by_name route = %+v, want GET /entities/by-name", r)
+	}
+	if r := restRoutes["add_relationship"]; r.method != "POST" || r.path != "/relationships" || !r.hasBody {
+		t.Errorf("add_relationship route = %+v, want POST /relationships with body", r)
+	}
+	for _, m := range []string{"get_related_entities", "merge_duplicate_entities"} {
+		if restRoutes[m] != compositeRoute {
+			t.Errorf("expected %s to be compositeRoute", m)
+		}
+	}
+}
+
+func TestRestGetRelatedEntitiesDepthNotSupported(t *testing.T) {
+	// depth > 1 must fail before any network call — example.com is never hit.
+	rt := newRestTransport(Config{Endpoint: "https://example.com/v1", APIKey: "k"}, 0).(*restTransport)
+	var result []BaseEntity
+	err := rt.Call(context.Background(), "get_related_entities",
+		map[string]interface{}{"entity_id": "e1", "depth": 2}, &result)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var nse *NotSupportedError
+	if !errors.As(err, &nse) {
+		t.Errorf("expected NotSupportedError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "depth") {
+		t.Errorf("error should mention depth; got %q", err.Error())
 	}
 }
 
