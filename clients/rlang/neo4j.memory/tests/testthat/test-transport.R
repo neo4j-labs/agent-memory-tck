@@ -1,3 +1,10 @@
+capture_request_wire <- function(req) {
+  # Newer httr2 versions pretty-print JSON; preserve its wire representation.
+  previous <- options(httr2_pretty_json = FALSE)
+  on.exit(options(previous), add = TRUE)
+  capture.output(httr2::req_dry_run(req))
+}
+
 # --- HttpTransport construction ---
 
 test_that("HttpTransport strips trailing slashes from endpoint", {
@@ -60,7 +67,7 @@ test_that("REST Cypher queries omit absent optional parameters", {
 
   result <- httr2::with_mocked_responses(function(req) {
     observed <<- req
-    wire <<- capture.output(httr2::req_dry_run(req))
+    wire <<- capture_request_wire(req)
     httr2::response(headers = list(`content-type` = "application/json"),
       body = charToRaw('{"columns":["total"],"rows":[{"total":1}]}'))
   }, client$query$cypher("RETURN 1 AS total"))
@@ -78,7 +85,7 @@ test_that("REST Cypher queries omit explicit empty parameter lists", {
 
   result <- httr2::with_mocked_responses(function(req) {
     observed <<- req
-    wire <<- capture.output(httr2::req_dry_run(req))
+    wire <<- capture_request_wire(req)
     httr2::response(headers = list(`content-type` = "application/json"),
       body = charToRaw('{"columns":["total"],"rows":[{"total":1}]}'))
   }, client$query$cypher("RETURN 1 AS total", params = list()))
@@ -96,7 +103,7 @@ test_that("REST Cypher queries send named parameters as an object", {
 
   result <- httr2::with_mocked_responses(function(req) {
     observed <<- req
-    wire <<- capture.output(httr2::req_dry_run(req))
+    wire <<- capture_request_wire(req)
     httr2::response(headers = list(`content-type` = "application/json"),
       body = charToRaw('{"columns":["label"],"rows":[{"label":"Alice"}]}'))
   }, client$query$cypher("RETURN $label AS label", params = list(label = "Alice")))
