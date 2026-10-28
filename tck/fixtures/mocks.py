@@ -7,6 +7,10 @@ requiring external services (LLM providers, embedding APIs).
 import hashlib
 from typing import Protocol, runtime_checkable
 
+from tck.fixtures.data import SEARCH_QUERY, UNRELATED_SEARCH_MESSAGE
+
+_SEARCH_VECTOR_COMPONENTS = {SEARCH_QUERY: 0, UNRELATED_SEARCH_MESSAGE: 1}
+
 
 @runtime_checkable
 class Embedder(Protocol):
@@ -21,14 +25,17 @@ class Embedder(Protocol):
 
 
 class MockEmbedder:
-    """Deterministic embedder that generates reproducible embeddings from text hashes.
+    """Deterministic embedder with controlled vectors for the message-search fixture.
 
-    Uses SHA256 to produce consistent 1536-dimensional vectors.
-    The same text always produces the same embedding, making test
-    assertions deterministic and reproducible across environments.
+    SEARCH_QUERY and UNRELATED_SEARCH_MESSAGE use orthogonal unit vectors.
+    Their Neo4j cosine similarity is 0.5, below the default threshold of 0.7;
+    an identical query and message score 1.0. Other text uses SHA256 as before.
+    Vectors have 1536 dimensions by default and require at least two dimensions.
     """
 
     def __init__(self, dimensions: int = 1536):
+        if dimensions < 2:
+            raise ValueError("MockEmbedder requires at least two dimensions")
         self._dimensions = dimensions
 
     @property
@@ -36,7 +43,12 @@ class MockEmbedder:
         return self._dimensions
 
     async def embed(self, text: str) -> list[float]:
-        """Generate a deterministic embedding based on text hash."""
+        """Return a controlled search vector or a deterministic text-hash vector."""
+        if text in _SEARCH_VECTOR_COMPONENTS:
+            embedding = [0.0] * self._dimensions
+            embedding[_SEARCH_VECTOR_COMPONENTS[text]] = 1.0
+            return embedding
+
         h = hashlib.sha256(text.encode()).hexdigest()
         embedding = []
         for i in range(0, min(len(h), self._dimensions * 2), 2):

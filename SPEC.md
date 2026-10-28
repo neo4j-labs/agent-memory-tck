@@ -228,7 +228,7 @@ This document is the normative specification for the neo4j-agent-memory data mod
 - **SPEC-2.3.1**: `search_messages` MUST return messages matching the query.
 - **SPEC-2.3.2**: `search_messages` with `session_id` MUST only return messages from that session.
 - **SPEC-2.3.3**: `search_messages` MUST NOT return more results than `limit`.
-- **SPEC-2.3.4**: `search_messages` MUST return empty list when nothing matches at high threshold.
+- **SPEC-2.3.4**: `search_messages` MUST return an empty list when no message meets the default similarity threshold, with `threshold` omitted.
 - **SPEC-2.3.5**: `search_messages` with limit=1 MUST return at most 1 result.
 - **SPEC-2.3.6**: `search_messages` on empty database MUST return empty list.
 - **SPEC-2.3.7**: `search_messages` without session_id MUST search across all sessions.

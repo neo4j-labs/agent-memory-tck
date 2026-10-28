@@ -9,6 +9,10 @@ SESSION_A = "tck-session-alpha"
 SESSION_B = "tck-session-beta"
 SESSION_C = "tck-session-gamma"
 
+# Semantic search fixture pair: MockEmbedder gives these orthogonal unit vectors.
+SEARCH_QUERY = "quantum cryptography algorithms"
+UNRELATED_SEARCH_MESSAGE = "The sky is blue"
+
 # Edge-case test strings
 LONG_CONTENT = "x" * 10_000  # 10K character string
 UNICODE_CONTENT = "Hello \u4e16\u754c \U0001f30d \u00e9\u00e8\u00ea \u00fc\u00f6\u00e4 \u2603\ufe0f \u2764\ufe0f\u200d\U0001f525"

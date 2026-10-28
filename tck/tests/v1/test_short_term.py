@@ -15,11 +15,13 @@ from tck.fixtures.data import (
     EMPTY_CONTENT,
     LONG_CONTENT,
     NESTED_METADATA,
+    SEARCH_QUERY,
     SESSION_A,
     SESSION_B,
     SESSION_C,
     SPECIAL_CHARS_CONTENT,
     UNICODE_CONTENT,
+    UNRELATED_SEARCH_MESSAGE,
 )
 
 
@@ -259,7 +261,7 @@ class TestSearchMessages:
         await adapter.add_message(session_id, "user", "The weather is sunny today")
         await adapter.add_message(session_id, "user", "Python is great for data science")
 
-        results = await adapter.search_messages("Python programming", limit=10, threshold=0.0)
+        results = await adapter.search_messages("Python programming", limit=10)
         assert len(results) > 0
         contents = [r.content for r in results]
         assert any("Python" in c for c in contents)
@@ -269,9 +271,7 @@ class TestSearchMessages:
         await adapter.add_message(SESSION_A, "user", "Python in session A")
         await adapter.add_message(SESSION_B, "user", "Python in session B")
 
-        results = await adapter.search_messages(
-            "Python", session_id=SESSION_A, limit=10, threshold=0.0
-        )
+        results = await adapter.search_messages("Python", session_id=SESSION_A, limit=10)
         for msg in results:
             # All results should be from session A's content
             assert "session A" in msg.content or "Python" in msg.content
@@ -281,29 +281,32 @@ class TestSearchMessages:
         for i in range(5):
             await adapter.add_message(session_id, "user", f"Test message number {i}")
 
-        results = await adapter.search_messages("Test message", limit=2, threshold=0.0)
+        results = await adapter.search_messages("Test message", limit=2)
         assert len(results) <= 2
 
     async def test_search_messages_no_results(self, adapter, session_id):
-        """SPEC-2.3.4: search_messages MUST return empty list when nothing matches."""
-        await adapter.add_message(session_id, "user", "The sky is blue")
+        """SPEC-2.3.4: No matches at the default threshold MUST return an empty list."""
+        await adapter.add_message(session_id, "user", UNRELATED_SEARCH_MESSAGE)
 
-        results = await adapter.search_messages(
-            "quantum cryptography algorithms", limit=10, threshold=0.99
-        )
-        assert isinstance(results, list)
+        results = await adapter.search_messages(SEARCH_QUERY, limit=10)
+        assert results == []
+
+        # An implementation that always returns [] must not pass this scenario.
+        matching = await adapter.add_message(session_id, "user", SEARCH_QUERY)
+        results = await adapter.search_messages(SEARCH_QUERY, limit=10)
+        assert [message.id for message in results] == [matching.id]
 
     async def test_search_messages_limit_one(self, adapter, session_id):
         """SPEC-2.3.5: search_messages with limit=1 MUST return at most 1 result."""
         for i in range(5):
             await adapter.add_message(session_id, "user", f"Searchable content {i}")
 
-        results = await adapter.search_messages("Searchable content", limit=1, threshold=0.0)
+        results = await adapter.search_messages("Searchable content", limit=1)
         assert len(results) <= 1
 
     async def test_search_messages_empty_database(self, adapter):
         """SPEC-2.3.6: search_messages on empty database MUST return empty list."""
-        results = await adapter.search_messages("anything", limit=10, threshold=0.0)
+        results = await adapter.search_messages("anything", limit=10)
         assert results == []
 
     async def test_search_messages_across_sessions(self, adapter):
@@ -311,7 +314,7 @@ class TestSearchMessages:
         await adapter.add_message(SESSION_A, "user", "Alpha Python topic")
         await adapter.add_message(SESSION_B, "user", "Beta Python topic")
 
-        results = await adapter.search_messages("Python topic", limit=10, threshold=0.0)
+        results = await adapter.search_messages("Python topic", limit=10)
         assert len(results) >= 1
 
 

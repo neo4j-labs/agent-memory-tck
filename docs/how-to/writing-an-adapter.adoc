@@ -71,6 +71,15 @@ IMPORTANT: `clear_all_data` must be thorough. Any leftover data from a previous 
 
 === Critical Bronze Requirements
 
+For deterministic message-search tests, configure the backend with
+`tck.fixtures.mocks.MockEmbedder`, as the reference adapter does.
+For SPEC-2.3.4, it maps `quantum cryptography algorithms` and `The sky is blue`
+to orthogonal unit vectors: their Neo4j cosine similarity is `0.5`, below the
+default threshold of `0.7`. The test omits `threshold` and requires an empty list,
+then adds a message identical to the query and requires only that message.
+The fixed scores apply to this test embedder; a hosted service using its own
+embedder does not inherit them.
+
 * Messages must maintain **insertion order** (verified with up to 100 messages)
 * Message timestamps must be **monotonically non-decreasing**
 * Content fidelity: **unicode**, **emoji**, **10K+ character strings**, and **nested metadata** must round-trip exactly
