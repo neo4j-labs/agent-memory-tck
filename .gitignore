@@ -33,6 +33,10 @@ obj/
 *.suo
 *.nupkg
 
+# Java
+target/
+
+
 # IDE
 .idea/
 .vscode/
@@ -54,3 +58,4 @@ results.json
 .env
 .env.local
 .env.*.local
+.devcontainer

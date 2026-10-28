@@ -104,7 +104,7 @@ test_that("e2e: create returns id + user_id + workspace_id", {
   uid <- e2e_user_id_with("create")
   conv <- client$short_term$create_conversation(
     user_id = uid,
-    metadata = list(source = "e2e", seq = 1L)
+    metadata = list(source = "e2e", seq = "1")
   )
   on.exit(client$short_term$delete_conversation(conv$id))
   expect_true(nchar(conv$id) >= 8)

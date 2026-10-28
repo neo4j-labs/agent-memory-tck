@@ -196,7 +196,7 @@ describeOrSkip("hosted service e2e", () => {
   describe("Conversation lifecycle", () => {
     it("create returns uuid + user_id + workspace_id", async () => {
       const uid = userId("create");
-      const conv = await newConv({ userId: uid, metadata: { source: "e2e", seq: 1 } });
+      const conv = await newConv({ userId: uid, metadata: { source: "e2e", seq: "1" } });
       expect(conv.id.length).toBeGreaterThanOrEqual(8);
       expect(conv.userId).toBe(uid);
       expect(conv.workspaceId).toBeTruthy();
