@@ -487,8 +487,6 @@ jobs:
       NEO4J_URI: bolt://localhost:7687
       NEO4J_USERNAME: neo4j
       NEO4J_PASSWORD: testpassword
-      MEMORY_ENDPOINT: http://localhost:3001
-      TCK_BRIDGE_PORT: '3002'
 
     steps:
       - uses: actions/checkout@v4
@@ -519,6 +517,8 @@ jobs:
 
       - name: Start Java conformance server
         env:
+          MEMORY_ENDPOINT: http://localhost:3001
+          TCK_BRIDGE_PORT: '3002'
           TCK_PROXY_REFERENCE: 'true'
         run: |
           make conformance-java
