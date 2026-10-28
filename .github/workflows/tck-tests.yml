@@ -182,7 +182,11 @@ jobs:
             .libPaths(c(Sys.getenv('R_LIBS_USER'), .libPaths()))
             library(R6); library(httr2); library(jsonlite)
             for (f in list.files('R', full.names = TRUE)) source(f)
-            testthat::test_dir('tests/testthat', reporter = 'summary', stop_on_failure = TRUE)
+            # Hosted E2E runs in client-tests.yml with MEMORY_API_KEY;
+            # bridge integration runs in the rlang-conformance job below.
+            testthat::test_dir('tests/testthat', reporter = 'summary',
+              stop_on_failure = TRUE,
+              filter = '^(casing|transport-selection|mcp-tools|short-term|long-term|reasoning|models|memory-client|transport)$')
           "
 
   rlang-conformance:
