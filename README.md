@@ -110,13 +110,13 @@ Implement the `BaseAdapter` interface for your memory system:
 ```python
 from tck.adapters.base_adapter import BaseAdapter, TCKMessage
 
+
 class MyAdapter(BaseAdapter):
     async def setup(self) -> None: ...
     async def teardown(self) -> None: ...
     async def clear_all_data(self) -> None: ...
 
-    async def add_message(self, session_id, role, content, *, metadata=None) -> TCKMessage:
-        ...
+    async def add_message(self, session_id, role, content, *, metadata=None) -> TCKMessage: ...
 
     # ... implement remaining methods for your target tier (Platinum is opt-in)
 ```
@@ -126,6 +126,7 @@ class MyAdapter(BaseAdapter):
 ```python
 # conftest.py
 import pytest
+
 
 @pytest.fixture(scope="session")
 async def adapter():
@@ -246,6 +247,7 @@ Includes [ellmer integration](clients/rlang/neo4j.memory/R/integrations_ellmer.R
 import asyncio
 from neo4j_agent_memory_client import MemoryClient
 
+
 async def main():
     async with MemoryClient(
         endpoint="https://memory.neo4jlabs.com/v1",
@@ -254,6 +256,7 @@ async def main():
         conv = await client.short_term.create_conversation(user_id="alice")
         ctx = await client.short_term.get_context(conv.id)
         prov = await client.reasoning.get_entity_provenance(entity_id)
+
 
 asyncio.run(main())
 ```

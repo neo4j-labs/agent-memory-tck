@@ -43,16 +43,12 @@ async def test_create_conversation_request_and_parse(client: MemoryClient):
         )
     )
 
-    conv = await client.short_term.create_conversation(
-        user_id="alice", metadata={"source": "e2e"}
-    )
+    conv = await client.short_term.create_conversation(user_id="alice", metadata={"source": "e2e"})
 
     assert route.called
     request = route.calls[0].request
     assert request.headers["Authorization"] == "Bearer nams_test_key"
     assert request.headers["Content-Type"] == "application/json"
-    body = httpx._content.encode_request(request.content)  # type: ignore[attr-defined]
-    # Fall back to direct content read
     assert b"alice" in request.content
 
     assert conv.id == "conv-uuid-1"
@@ -68,10 +64,20 @@ async def test_path_params_substituted(client: MemoryClient):
             200,
             json={
                 "reflections": [
-                    {"id": "r1", "conversation_id": "conv-42", "content": "user values clarity", "created_at": "x"}
+                    {
+                        "id": "r1",
+                        "conversation_id": "conv-42",
+                        "content": "user values clarity",
+                        "created_at": "x",
+                    }
                 ],
                 "observations": [
-                    {"id": "o1", "conversation_id": "conv-42", "content": "long-form messages", "created_at": "x"}
+                    {
+                        "id": "o1",
+                        "conversation_id": "conv-42",
+                        "content": "long-form messages",
+                        "created_at": "x",
+                    }
                 ],
                 "recent_messages": [{"id": "m1", "role": "user", "content": "hello"}],
             },
@@ -112,11 +118,7 @@ async def test_search_entities_unwraps_envelope(client: MemoryClient):
     respx.post(f"{ENDPOINT}/entities/search").mock(
         return_value=httpx.Response(
             200,
-            json={
-                "entities": [
-                    {"id": "e1", "name": "Alice", "type": "person", "createdAt": "x"}
-                ]
-            },
+            json={"entities": [{"id": "e1", "name": "Alice", "type": "person", "createdAt": "x"}]},
         )
     )
 
@@ -132,9 +134,7 @@ async def test_set_entity_feedback_round_trip(client: MemoryClient):
         return_value=httpx.Response(200, json={"id": "e1", "updated": True})
     )
 
-    result = await client.long_term.set_entity_feedback(
-        "e1", user_score=0.95, confirmed=True
-    )
+    result = await client.long_term.set_entity_feedback("e1", user_score=0.95, confirmed=True)
     assert result.id == "e1"
     assert result.updated is True
 
@@ -149,9 +149,7 @@ async def test_cypher_query_passes_params(client: MemoryClient):
         )
     )
 
-    result = await client.query.cypher(
-        "MATCH (n:Entity) RETURN n.name AS name LIMIT $n", {"n": 1}
-    )
+    result = await client.query.cypher("MATCH (n:Entity) RETURN n.name AS name LIMIT $n", {"n": 1})
     assert route.called
     body = route.calls[0].request.content
     assert b"MATCH" in body
