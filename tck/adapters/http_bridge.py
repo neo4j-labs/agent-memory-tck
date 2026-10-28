@@ -339,7 +339,7 @@ class HTTPBridgeAdapter(BaseAdapter):
         *,
         session_id: str | None = None,
         limit: int = 10,
-        threshold: float = 0.7,
+        threshold: float | None = None,
     ) -> list[TCKMessage]:
         result = await self._call(
             "search_messages",
