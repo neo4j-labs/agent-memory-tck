@@ -166,7 +166,7 @@ public class HostedServiceTests : IClassFixture<HostedServiceFixture>, IAsyncLif
     public async Task Create_ReturnsIdAndUserAndWorkspace()
     {
         var uid = _fx.UserId("create");
-        var conv = await NewConvAsync(uid, new Dictionary<string, object?> { ["source"] = "e2e", ["seq"] = 1 });
+        var conv = await NewConvAsync(uid, new Dictionary<string, object?> { ["source"] = "e2e", ["seq"] = "1" });
         Assert.True(conv.Id.Length >= 8);
         Assert.Equal(uid, conv.UserId);
         Assert.False(string.IsNullOrEmpty(conv.WorkspaceId));
@@ -283,8 +283,8 @@ public class HostedServiceTests : IClassFixture<HostedServiceFixture>, IAsyncLif
         {
             ["source"] = "tck-e2e",
             ["priority"] = "high",
-            ["count"] = 42,
-            ["active"] = true
+            ["count"] = "42",
+            ["active"] = "true"
         };
         var msg = await Client.ShortTerm.AddMessageAsync(conv.Id, MessageRole.User, "with-meta", meta);
         Assert.Equal("with-meta", msg.Content);

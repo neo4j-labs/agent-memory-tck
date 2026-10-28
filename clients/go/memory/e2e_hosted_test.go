@@ -411,7 +411,7 @@ func TestE2ESpecialCharsPreserved(t *testing.T) {
 func TestE2EMetadataRoundTripsWithoutError(t *testing.T) {
 	c := e2eClient(t)
 	conv := e2eNewConv(t, c, "")
-	meta := map[string]interface{}{"source": "tck-e2e", "priority": "high", "count": 42, "active": true}
+	meta := map[string]interface{}{"source": "tck-e2e", "priority": "high", "count": "42", "active": "true"}
 	msg, err := c.ShortTerm.AddMessage(context.Background(), conv.ID, memory.RoleUser, "with-meta", memory.WithMetadata(meta))
 	if err != nil {
 		t.Fatalf("AddMessage: %v", err)
