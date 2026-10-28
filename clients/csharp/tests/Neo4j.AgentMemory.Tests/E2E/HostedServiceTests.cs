@@ -393,7 +393,8 @@ public class HostedServiceTests : IClassFixture<HostedServiceFixture>, IAsyncLif
     {
         var ents = await Client.LongTerm.ListEntitiesAsync(type: "person", limit: 5);
         Assert.NotNull(ents);
-        foreach (var e in ents) Assert.Equal("person", e.Type);
+        // The filter is case-insensitive and extracted entities come back as "Person".
+        foreach (var e in ents) Assert.Equal("person", e.Type, ignoreCase: true);
     }
 
     [SkippableFact]
