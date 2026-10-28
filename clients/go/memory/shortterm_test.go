@@ -247,7 +247,7 @@ func TestSearchMessages(t *testing.T) {
 		_, _ = c.ShortTerm.AddMessage(ctx, sessionA, memory.RoleUser, "I love programming in Python")
 		_, _ = c.ShortTerm.AddMessage(ctx, sessionA, memory.RoleUser, "The weather is sunny today")
 
-		results, err := c.ShortTerm.SearchMessages(ctx, "Python programming", memory.WithSearchLimit(10), memory.WithThreshold(0.0))
+		results, err := c.ShortTerm.SearchMessages(ctx, "Python programming", memory.WithSearchLimit(10))
 		mustNoErr(t, err)
 		if len(results) == 0 {
 			t.Fatal("expected at least one result")
@@ -259,7 +259,7 @@ func TestSearchMessages(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			_, _ = c.ShortTerm.AddMessage(ctx, sessionA, memory.RoleUser, fmt.Sprintf("Test message %d", i))
 		}
-		results, err := c.ShortTerm.SearchMessages(ctx, "Test message", memory.WithSearchLimit(2), memory.WithThreshold(0.0))
+		results, err := c.ShortTerm.SearchMessages(ctx, "Test message", memory.WithSearchLimit(2))
 		mustNoErr(t, err)
 		if len(results) > 2 {
 			t.Fatalf("expected at most 2 results, got %d", len(results))
@@ -268,7 +268,7 @@ func TestSearchMessages(t *testing.T) {
 
 	t.Run("SPEC-2.3.6 empty database", func(t *testing.T) {
 		cleanSessions(t, c)
-		results, err := c.ShortTerm.SearchMessages(ctx, "anything", memory.WithSearchLimit(10), memory.WithThreshold(0.0))
+		results, err := c.ShortTerm.SearchMessages(ctx, "anything", memory.WithSearchLimit(10))
 		mustNoErr(t, err)
 		assertLen(t, "results", len(results), 0)
 	})
