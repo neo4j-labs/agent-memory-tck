@@ -214,8 +214,11 @@ _ROUTES: dict[str, _Route] = {
     "add_fact": _UNSUPPORTED,
     "search_preferences": _UNSUPPORTED,
     "get_entity_by_name": _Route(
-        "GET", "/entities/by-name", query_params=("name", "type", "limit"),
-        shape=_shape_first_entity),
+        "GET",
+        "/entities/by-name",
+        query_params=("name", "type", "limit"),
+        shape=_shape_first_entity,
+    ),
     "get_related_entities": _COMPOSITE,
     "add_relationship": _Route("POST", "/relationships", has_body=True),
     "merge_duplicate_entities": _COMPOSITE,
@@ -438,9 +441,7 @@ class RestTransport(Transport):
                 "Method 'get_related_entities' with depth > 1 has no "
                 "equivalent in the hosted REST API"
             )
-        entity = await self.request(
-            "get_entity", {"entity_id": params.get("entity_id")}
-        ) or {}
+        entity = await self.request("get_entity", {"entity_id": params.get("entity_id")}) or {}
         rel_type = params.get("relationship_type")
         related: list[dict[str, Any]] = []
         for rel in entity.get("relationships") or []:
@@ -448,11 +449,13 @@ class RestTransport(Transport):
                 continue
             if rel_type and rel.get("rel_type") != rel_type:
                 continue
-            related.append({
-                "id": rel.get("target_id"),
-                "name": rel.get("target_name"),
-                "type": rel.get("target_type"),
-            })
+            related.append(
+                {
+                    "id": rel.get("target_id"),
+                    "name": rel.get("target_name"),
+                    "type": rel.get("target_type"),
+                }
+            )
         return related
 
     async def _merge_duplicate_entities(self, params: dict[str, Any]) -> Any:
@@ -460,16 +463,26 @@ class RestTransport(Transport):
         # (canonical_name), and a final GET so the caller receives the
         # surviving entity. The merge response's target_id is
         # canonical-resolved, so it wins over the caller-supplied one.
-        merged = await self.request("merge_entities", {
-            "source_id": params.get("source_id"),
-            "target_id": params.get("target_id"),
-        }) or {}
+        merged = (
+            await self.request(
+                "merge_entities",
+                {
+                    "source_id": params.get("source_id"),
+                    "target_id": params.get("target_id"),
+                },
+            )
+            or {}
+        )
         target_id = merged.get("target_id") or params.get("target_id")
         canonical_name = params.get("canonical_name")
         if canonical_name:
-            await self.request("update_entity", {
-                "entity_id": target_id, "name": canonical_name,
-            })
+            await self.request(
+                "update_entity",
+                {
+                    "entity_id": target_id,
+                    "name": canonical_name,
+                },
+            )
         return await self.request("get_entity", {"entity_id": target_id})
 
     async def _build_headers(self) -> dict[str, str]:

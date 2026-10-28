@@ -109,9 +109,7 @@ class TestRestTransportConstruction:
         # depth > 1 must fail before any network call — example is never hit.
         t = RestTransport("https://example/v1", api_key="nams_x")
         with pytest.raises(NotSupportedError, match="depth"):
-            await t.request(
-                "get_related_entities", {"entity_id": "e1", "depth": 2}
-            )
+            await t.request("get_related_entities", {"entity_id": "e1", "depth": 2})
         await t.close()
 
     async def test_noop_methods_return_none(self):

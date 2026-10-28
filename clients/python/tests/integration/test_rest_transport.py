@@ -279,7 +279,12 @@ async def test_get_entity_by_name_found(client: MemoryClient):
             json={
                 "entities": [
                     {"id": "e1", "name": "Alice Johnson", "type": "person", "matchKind": "name"},
-                    {"id": "e2", "name": "Alice Johnson", "type": "organization", "matchKind": "alias"},
+                    {
+                        "id": "e2",
+                        "name": "Alice Johnson",
+                        "type": "organization",
+                        "matchKind": "alias",
+                    },
                 ]
             },
         )
@@ -311,7 +316,12 @@ _RELATED_ENTITY_JSON = {
     "type": "person",
     "relationships": [
         {"relType": "KNOWS", "targetId": "e-bob", "targetName": "Bob", "targetType": "person"},
-        {"relType": "WORKS_AT", "targetId": "e-acme", "targetName": "Acme", "targetType": "organization"},
+        {
+            "relType": "WORKS_AT",
+            "targetId": "e-acme",
+            "targetName": "Acme",
+            "targetType": "organization",
+        },
     ],
 }
 
@@ -337,9 +347,7 @@ async def test_get_related_entities_type_filter(client: MemoryClient):
         return_value=httpx.Response(200, json=_RELATED_ENTITY_JSON)
     )
 
-    related = await client.long_term.get_related_entities(
-        "e-alice", relationship_type="WORKS_AT"
-    )
+    related = await client.long_term.get_related_entities("e-alice", relationship_type="WORKS_AT")
     assert [e.name for e in related] == ["Acme"]
 
 
@@ -407,7 +415,12 @@ async def test_merge_duplicate_entities_canonical_name(client: MemoryClient):
                 "name": "Alice J. Johnson",
                 "type": "person",
                 "relationships": [
-                    {"relType": "WORKS_AT", "targetId": "e-acme", "targetName": "Acme", "targetType": "organization"}
+                    {
+                        "relType": "WORKS_AT",
+                        "targetId": "e-acme",
+                        "targetName": "Acme",
+                        "targetType": "organization",
+                    }
                 ],
             },
         )
