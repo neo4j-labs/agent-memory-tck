@@ -112,18 +112,18 @@ test_that("search_messages returns empty list on NULL response", {
   expect_equal(results, list())
 })
 
-test_that("search_messages passes all parameters", {
+test_that("search_messages passes parameters with the default threshold", {
   mock <- MockTransport$new()
   mock$set_response("search_messages", list())
   st <- ShortTermMemory$new(mock)
 
-  st$search_messages("q", session_id = "s1", limit = 5L, threshold = 0.9)
+  st$search_messages("q", session_id = "s1", limit = 5L)
 
   call <- mock$last_call()
   expect_equal(call$params$query, "q")
   expect_equal(call$params$session_id, "s1")
   expect_equal(call$params$limit, 5L)
-  expect_equal(call$params$threshold, 0.9)
+  expect_equal(call$params$threshold, 0.7)
 })
 
 test_that("list_sessions returns list of session infos", {

@@ -169,7 +169,7 @@ test_that("e2e: searchMessages returns array", {
   client$short_term$add_message(conv$id, "user",
     "Marie Curie won the Nobel Prize in Physics in 1903.")
   results <- client$short_term$search_messages("Nobel",
-    session_id = conv$id, limit = 5L, threshold = 0.0)
+    session_id = conv$id, limit = 5L)
   expect_true(is.list(results))
 })
 
