@@ -323,7 +323,7 @@ class TestMessageBasics:
             conv.id, "user", "The recipe for sourdough requires a starter."
         )
         results = await client.short_term.search_messages(
-            "Nobel", session_id=conv.id, limit=5, threshold=0.0
+            "Nobel", session_id=conv.id, limit=5
         )
         assert isinstance(results, list)
 
