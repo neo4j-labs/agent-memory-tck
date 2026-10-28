@@ -312,7 +312,8 @@ test_that("e2e: listEntities with type filter", {
   client <- new_e2e_client()
   ents <- client$long_term$list_entities(type = "person", limit = 5L)
   expect_true(is.list(ents))
-  for (e in ents) expect_equal(e$type, "person")
+  # The filter is case-insensitive and extracted entities come back as "Person".
+  for (e in ents) expect_equal(tolower(e$type), "person")
 })
 
 test_that("e2e: getEntity round-trips", {

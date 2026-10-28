@@ -422,8 +422,9 @@ class TestEntityCRUD:
     async def test_list_entities_with_type_filter(self, client: MemoryClient):
         ents = await client.long_term.list_entities(type="person", limit=5)
         assert isinstance(ents, list)
+        # The filter is case-insensitive and extracted entities come back as "Person".
         for e in ents:
-            assert e.type == "person"
+            assert e.type.lower() == "person"
 
     async def test_get_entity_includes_relationships(self, client: MemoryClient, entity_factory):
         e = await entity_factory()
