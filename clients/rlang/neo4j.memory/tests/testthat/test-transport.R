@@ -71,6 +71,24 @@ test_that("REST Cypher queries omit absent optional parameters", {
   expect_equal(result$rows, list(list(total = 1)))
 })
 
+test_that("REST Cypher queries omit explicit empty parameter lists", {
+  observed <- NULL
+  wire <- NULL
+  client <- MemoryClient$new(endpoint = "https://memory.test/v1")
+
+  result <- httr2::with_mocked_responses(function(req) {
+    observed <<- req
+    wire <<- capture.output(httr2::req_dry_run(req))
+    httr2::response(headers = list(`content-type` = "application/json"),
+      body = charToRaw('{"columns":["total"],"rows":[{"total":1}]}'))
+  }, client$query$cypher("RETURN 1 AS total", params = list()))
+
+  expect_equal(observed$method, "POST")
+  expect_equal(observed$url, "https://memory.test/v1/query")
+  expect_identical(tail(wire, 1), '{"cypher":"RETURN 1 AS total"}')
+  expect_equal(result$rows, list(list(total = 1)))
+})
+
 test_that("REST Cypher queries send named parameters as an object", {
   observed <- NULL
   wire <- NULL

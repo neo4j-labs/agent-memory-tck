@@ -9,6 +9,7 @@ QueryConsole <- R6::R6Class("QueryConsole",
     },
 
     cypher = function(cypher, params = NULL) {
+      if (is.list(params) && length(params) == 0L) params <- NULL
       result <- private$transport$request("cypher_query", list(
         cypher = cypher,
         params = params
