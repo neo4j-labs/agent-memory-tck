@@ -118,6 +118,25 @@ describe("RestTransport — short-term", () => {
     expect(observedUserId).toBe("alice");
   });
 
+  it("getConversation returns the newest-first listing in insertion order", async () => {
+    server.use(
+      http.get(`${ENDPOINT}/conversations/conv-1/messages`, () =>
+        HttpResponse.json({
+          messages: [
+            { id: "m2", role: "assistant", content: "second", createdAt: "2026-05-07T00:00:01Z" },
+            { id: "m1", role: "user", content: "first", createdAt: "2026-05-07T00:00:00Z" },
+          ],
+        }),
+      ),
+    );
+
+    const client = newClient();
+    const conv = await client.shortTerm.getConversation("conv-1");
+    await client.close();
+
+    expect(conv.messages.map((m) => m.content)).toEqual(["first", "second"]);
+  });
+
   it("searchMessages does not send threshold, which the service rejects", async () => {
     let observedBody: unknown = null;
     server.use(

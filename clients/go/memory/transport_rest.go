@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 )
@@ -150,6 +151,10 @@ var restRoutes = map[string]*restRoute{
 				if msgs, ok := m["messages"]; ok {
 					messages = msgs
 				}
+			}
+			// The service lists newest first; the bridge contract is insertion order.
+			if list, ok := messages.([]interface{}); ok {
+				slices.Reverse(list)
 			}
 			return map[string]interface{}{
 				"id":         p["sessionId"],

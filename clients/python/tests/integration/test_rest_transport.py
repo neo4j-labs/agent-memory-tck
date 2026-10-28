@@ -116,6 +116,27 @@ async def test_list_conversations_unwraps_envelope(client: MemoryClient):
 
 @pytest.mark.integration
 @respx.mock
+async def test_get_conversation_returns_newest_first_listing_in_insertion_order(
+    client: MemoryClient,
+):
+    respx.get(f"{ENDPOINT}/conversations/conv-1/messages").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "messages": [
+                    {"id": "m2", "role": "assistant", "content": "second"},
+                    {"id": "m1", "role": "user", "content": "first"},
+                ]
+            },
+        )
+    )
+
+    conv = await client.short_term.get_conversation("conv-1")
+    assert [m.content for m in conv.messages] == ["first", "second"]
+
+
+@pytest.mark.integration
+@respx.mock
 async def test_search_messages_does_not_send_threshold(client: MemoryClient):
     route = respx.post(f"{ENDPOINT}/conversations/conv-1/search").mock(
         return_value=httpx.Response(200, json={"messages": []})

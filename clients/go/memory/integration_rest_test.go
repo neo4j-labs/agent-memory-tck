@@ -192,6 +192,23 @@ func TestRestCypherQuery(t *testing.T) {
 	}
 }
 
+func TestRestGetConversationInsertionOrder(t *testing.T) {
+	h := &recordingHandler{
+		t: t, status: 200,
+		respJSON: `{"messages":[{"id":"m2","role":"assistant","content":"second"},{"id":"m1","role":"user","content":"first"}]}`,
+	}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	conv, err := c.ShortTerm.GetConversation(context.Background(), "conv-1")
+	if err != nil {
+		t.Fatalf("GetConversation: %v", err)
+	}
+	if len(conv.Messages) != 2 || conv.Messages[0].Content != "first" || conv.Messages[1].Content != "second" {
+		t.Errorf("messages = %+v, want first then second", conv.Messages)
+	}
+}
+
 func TestRestSearchMessagesOmitsThreshold(t *testing.T) {
 	h := &recordingHandler{t: t, status: 200, respJSON: `{"messages":[]}`}
 	c, srv := newRestClient(t, h)

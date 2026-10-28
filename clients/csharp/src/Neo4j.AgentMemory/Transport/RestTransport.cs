@@ -70,6 +70,8 @@ public class RestTransport : ITransport, IDisposable
             {
                 object? messages = raw;
                 if (raw is IDictionary<string, object?> m && m.TryGetValue("messages", out var msgs)) messages = msgs;
+                // The service lists newest first; the bridge contract is insertion order.
+                if (messages is List<object?> list) messages = Enumerable.Reverse(list).ToList();
                 return new Dictionary<string, object?>
                 {
                     ["id"] = p["sessionId"],

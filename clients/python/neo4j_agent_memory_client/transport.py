@@ -156,6 +156,9 @@ def _shape_api_keys(raw: Any, _: dict[str, Any]) -> Any:
 
 def _shape_get_conversation(raw: Any, params: dict[str, Any]) -> dict[str, Any]:
     messages = raw["messages"] if isinstance(raw, dict) and "messages" in raw else raw
+    # The service lists newest first; the bridge contract is insertion order.
+    if isinstance(messages, list):
+        messages = messages[::-1]
     return {
         "id": params.get("sessionId"),
         "session_id": params.get("sessionId"),

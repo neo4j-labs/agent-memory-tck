@@ -108,6 +108,18 @@ public class RestTransportTests
     }
 
     [Fact]
+    public async Task GetConversation_ReturnsNewestFirstListingInInsertionOrder()
+    {
+        var (_, client) = NewClient(new StubResponse(
+            HttpStatusCode.OK,
+            "{\"messages\":[{\"id\":\"m2\",\"role\":\"assistant\",\"content\":\"second\"},{\"id\":\"m1\",\"role\":\"user\",\"content\":\"first\"}]}"));
+
+        var conv = await client.ShortTerm.GetConversationAsync("conv-1");
+
+        Assert.Equal(new[] { "first", "second" }, conv.Messages.Select(m => m.Content).ToArray());
+    }
+
+    [Fact]
     public async Task SearchMessages_DoesNotSendThreshold()
     {
         var (handler, client) = NewClient(new StubResponse(HttpStatusCode.OK, "{\"messages\":[]}"));

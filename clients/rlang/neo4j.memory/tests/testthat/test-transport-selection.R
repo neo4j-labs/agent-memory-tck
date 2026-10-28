@@ -48,6 +48,18 @@ test_that("RestTransport noop methods return NULL silently", {
   expect_null(rt$request("clear_all_data"))
 })
 
+test_that("RestTransport returns the newest-first listing in insertion order", {
+  rt <- RestTransport$new("https://memory.test/v1", api_key = "k")
+  httr2::local_mocked_responses(function(req) {
+    httr2::response_json(body = list(messages = list(
+      list(id = "m2", role = "assistant", content = "second"),
+      list(id = "m1", role = "user", content = "first")
+    )))
+  })
+  conv <- rt$request("get_conversation", list(session_id = "conv-1"))
+  expect_equal(vapply(conv$messages, `[[`, "", "content"), c("first", "second"))
+})
+
 test_that("RestTransport does not send threshold, which the service rejects", {
   rt <- RestTransport$new("https://memory.test/v1", api_key = "k")
   sent <- NULL
