@@ -172,7 +172,7 @@ jobs:
             lib <- Sys.getenv('R_LIBS_USER', '/usr/local/lib/R/site-library')
             dir.create(lib, recursive = TRUE, showWarnings = FALSE)
             .libPaths(c(lib, .libPaths()))
-            install.packages(c('testthat', 'httr2', 'R6', 'jsonlite'), lib = lib, repos = 'https://cloud.r-project.org/')
+            install.packages(c('testthat', 'httr2', 'httpuv', 'R6', 'jsonlite'), lib = lib, repos = 'https://cloud.r-project.org/')
           "
 
       - name: Run R unit tests

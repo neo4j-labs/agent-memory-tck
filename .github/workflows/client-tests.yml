@@ -230,20 +230,21 @@ jobs:
           sudo apt-get install -y libcurl4-openssl-dev libssl-dev libsodium-dev
       - name: Install R dependencies
         # setup-r-dependencies handles caching and reads Imports/Suggests
-        # from DESCRIPTION. We add testthat explicitly because it lives in
-        # Suggests but is required by the test runner.
+        # from DESCRIPTION. Explicit test dependencies include testthat and
+        # httpuv, which httr2::req_dry_run uses to capture serialized requests.
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
           working-directory: clients/rlang/neo4j.memory
           extra-packages: |
             any::testthat
             any::httr2
+            any::httpuv
             any::R6
             any::jsonlite
       - name: Verify packages installed
         run: |
           Rscript -e "
-            for (p in c('testthat', 'httr2', 'R6', 'jsonlite')) {
+            for (p in c('testthat', 'httr2', 'httpuv', 'R6', 'jsonlite')) {
               if (!requireNamespace(p, quietly = TRUE)) stop(paste('missing:', p))
             }
             cat('all R packages installed\n')
