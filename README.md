@@ -7,10 +7,11 @@
 [![Go 1.21+](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?logo=go)](https://go.dev/)
 [![.NET 8](https://img.shields.io/badge/.NET-8.0+-512bd4.svg?logo=dotnet)](https://dotnet.microsoft.com/)
 [![R 4.1+](https://img.shields.io/badge/R-4.1+-276DC3.svg?logo=r)](https://www.r-project.org/)
+[![Java 17+](https://img.shields.io/badge/Java-17+-ED8B00.svg)](https://openjdk.org/)
 
 Technology Compatibility Kit for [neo4j-agent-memory](https://github.com/neo4j-labs/agent-memory) implementations.
 
-The TCK provides a formal behavioral specification, **189 executable test scenarios**, and a compliance framework that enables any implementation — in any language — to verify conformance with the neo4j-agent-memory data model. It also ships TypeScript, Go, C#, R, and Python client libraries with framework integrations and a multi-agent reference demo.
+The TCK provides a formal behavioral specification, **189 executable test scenarios**, and a compliance framework that enables any implementation — in any language — to verify conformance with the neo4j-agent-memory data model. It also ships TypeScript, Go, C#, R, Python, and Java client libraries with framework integrations and a multi-agent reference demo.
 
 > **Neo4j Labs Project** — This project is maintained by Neo4j Labs as an experimental, community-supported project. It is not officially supported by Neo4j. For community support, use [GitHub Issues](https://github.com/neo4j-labs/agent-memory-tck/issues).
 
@@ -19,7 +20,7 @@ The TCK provides a formal behavioral specification, **189 executable test scenar
 
 ## Two Endpoint Families
 
-Every client speaks **two transports** behind one `MemoryClient` API:
+The TypeScript, Go, C#, R, and Python clients speak **two transports** behind one `MemoryClient` API:
 
 | Transport | Endpoint shape | Used for |
 |---|---|---|
@@ -38,6 +39,7 @@ agent-memory-tck/
   clients/csharp/       Neo4j.AgentMemory .NET package
   clients/rlang/        neo4j.memory R package (httr2 + R6)
   clients/python/       neo4j-agent-memory-client Python package (httpx + asyncio)
+  clients/java/         org.neo4j:agent-memory-client Java library (Java 17+)
   demo/                 6-agent polyglot demo (Python, TypeScript, Go, C#, R)
   docs/                 AsciiDoc documentation (Diataxis framework)
   SPEC.md               Normative specification (v1.0.0 + Volume 5)
@@ -47,12 +49,13 @@ agent-memory-tck/
 |-----------|-------------|
 | **TCK Specification** | 189 test scenarios across 4 compliance tiers, backed by `SPEC.md` |
 | **Scenario Registry** | 189 stable scenario IDs (`SCN-B-001`…`SCN-G-018`, `SCN-P-001`…`SCN-P-011`) with SPEC clause traceability |
-| **HTTP Bridge** | Cross-language conformance protocol — Python test suite validates TS, Go, C#, R, Python (or any) client |
+| **HTTP Bridge** | Cross-language conformance protocol — Python test suite validates TS, Go, C#, R, Python, Java (or any) client |
 | **TypeScript Client** | `@neo4j-labs/agent-memory` — `MemoryClient`, dual transport, Vercel AI middleware, LangChain JS, Mastra, 12-tool MCP |
 | **Go Client** | `memory` package — context-aware API, functional options, generic `Entity[T]`, dual transport, MCP handler |
 | **C# Client** | `Neo4j.AgentMemory` .NET 8 — async/await, dual transport, Semantic Kernel connector, MCP dispatcher |
 | **R Client** | `neo4j.memory` — R6 classes, httr2 transport, ellmer integration, plumber conformance server |
 | **Python Client** | `neo4j-agent-memory-client` — async, dual transport, LangGraph + PydanticAI integrations |
+| **Java Client** | `org.neo4j:agent-memory-client` — Java 17+, `CompletableFuture` API, hosted REST, configurable JDK / Spring / LangChain4j HTTP clients |
 | **Multi-Agent Demo** | Lenny (Python/PydanticAI), Scout (TS/Vercel AI), Forge (Go), Atlas (Python/LangGraph), Sage (C#/Semantic Kernel), Rune (R/ellmer) |
 | **Documentation** | AsciiDoc following the Diataxis framework — tutorials, how-to, reference, explanation |
 
@@ -110,13 +113,13 @@ Implement the `BaseAdapter` interface for your memory system:
 ```python
 from tck.adapters.base_adapter import BaseAdapter, TCKMessage
 
+
 class MyAdapter(BaseAdapter):
     async def setup(self) -> None: ...
     async def teardown(self) -> None: ...
     async def clear_all_data(self) -> None: ...
 
-    async def add_message(self, session_id, role, content, *, metadata=None) -> TCKMessage:
-        ...
+    async def add_message(self, session_id, role, content, *, metadata=None) -> TCKMessage: ...
 
     # ... implement remaining methods for your target tier (Platinum is opt-in)
 ```
@@ -126,6 +129,7 @@ class MyAdapter(BaseAdapter):
 ```python
 # conftest.py
 import pytest
+
 
 @pytest.fixture(scope="session")
 async def adapter():
@@ -246,6 +250,7 @@ Includes [ellmer integration](clients/rlang/neo4j.memory/R/integrations_ellmer.R
 import asyncio
 from neo4j_agent_memory_client import MemoryClient
 
+
 async def main():
     async with MemoryClient(
         endpoint="https://memory.neo4jlabs.com/v1",
@@ -255,10 +260,35 @@ async def main():
         ctx = await client.short_term.get_context(conv.id)
         prov = await client.reasoning.get_entity_provenance(entity_id)
 
+
 asyncio.run(main())
 ```
 
 Distinct from the `neo4j-agent-memory` PyPI package (which is the reference *adapter* used by the TCK). Includes [LangGraph](clients/python/neo4j_agent_memory_client/integrations/langgraph.py) and [PydanticAI](clients/python/neo4j_agent_memory_client/integrations/pydantic_ai.py) integrations. See the [Python README](clients/python/README.md).
+
+## Java Client
+
+Requires Java 17+ and Jackson 2 or 3 alongside `org.neo4j:agent-memory-client`. Set `MEMORY_API_KEY` to a Workspace API key.
+
+```java
+import org.neo4j.agentmemory.MemoryClient;
+import org.neo4j.agentmemory.MemoryClientConfiguration;
+import org.neo4j.agentmemory.conversation.CreateConversation;
+import org.neo4j.agentmemory.conversation.NewMessage;
+
+import static org.neo4j.agentmemory.MemoryClient.await;
+
+var client = MemoryClient.create(MemoryClientConfiguration.builder()
+    .baseUrl("https://memory.neo4jlabs.com/v1")
+    .apiKey(System.getenv("MEMORY_API_KEY"))
+    .build());
+
+var conv = await(client.createConversation(new CreateConversation("alice")));
+await(conv.addMessage(NewMessage.user("Alice works at Acme Corp.")));
+var ctx = await(conv.context()); // 3-tier context
+```
+
+Operations return `CompletableFuture`; `await` is the blocking convenience helper. Uses the JDK HTTP client by default, with optional Spring `RestClient` / `WebClient`, LangChain4j `HttpClient`, and custom transport support. See the [Java README](clients/java/README.md) for installation and configuration, and the [conformance server README](clients/java/conformance/README.md) for TCK testing.
 
 ## Framework Integrations
 
@@ -271,7 +301,7 @@ Distinct from the `neo4j-agent-memory` PyPI package (which is the reference *ada
 | PydanticAI | Python | `neo4j_agent_memory_client.integrations.pydantic_ai` |
 | Semantic Kernel | C# | `Neo4j.AgentMemory.Integrations.SemanticKernel` |
 | ellmer | R | `register_memory_tools()` |
-| MCP | All | `https://memory.neo4jlabs.com/mcp` (12 tools) — also exposable via each client's `mcp` module |
+| MCP | TypeScript, Go, C#, R, Python | `https://memory.neo4jlabs.com/mcp` (12 tools) — also exposable via each listed client's `mcp` module |
 
 See the [framework-integrations how-to](docs/how-to/framework-integrations.adoc) for end-to-end examples.
 

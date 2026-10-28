@@ -172,7 +172,7 @@ func TestRestSetEntityFeedback(t *testing.T) {
 func TestRestCypherQuery(t *testing.T) {
 	h := &recordingHandler{
 		t: t, status: 200,
-		respJSON: `{"columns":["name"],"rows":[["Alice"]],"stats":{"queryTime":3}}`,
+		respJSON: `{"columns":["name"],"rows":[{"name":"Alice"}],"stats":{"queryTime":3}}`,
 	}
 	c, srv := newRestClient(t, h)
 	defer srv.Close()
@@ -189,6 +189,40 @@ func TestRestCypherQuery(t *testing.T) {
 	}
 	if len(res.Columns) != 1 || res.Columns[0] != "name" {
 		t.Errorf("columns = %v, want [name]", res.Columns)
+	}
+	if len(res.Rows) != 1 || res.Rows[0]["name"] != "Alice" {
+		t.Errorf("rows = %v, want [{name: Alice}]", res.Rows)
+	}
+}
+
+func TestRestGetConversationInsertionOrder(t *testing.T) {
+	h := &recordingHandler{
+		t: t, status: 200,
+		respJSON: `{"messages":[{"id":"m2","role":"assistant","content":"second"},{"id":"m1","role":"user","content":"first"}]}`,
+	}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	conv, err := c.ShortTerm.GetConversation(context.Background(), "conv-1")
+	if err != nil {
+		t.Fatalf("GetConversation: %v", err)
+	}
+	if len(conv.Messages) != 2 || conv.Messages[0].Content != "first" || conv.Messages[1].Content != "second" {
+		t.Errorf("messages = %+v, want first then second", conv.Messages)
+	}
+}
+
+func TestRestSearchMessagesOmitsUnsetThreshold(t *testing.T) {
+	h := &recordingHandler{t: t, status: 200, respJSON: `{"messages":[]}`}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	_, err := c.ShortTerm.SearchMessages(context.Background(), "nobel", memory.WithSessionID("conv-1"))
+	if err != nil {
+		t.Fatalf("SearchMessages: %v", err)
+	}
+	if strings.Contains(string(h.body), "threshold") {
+		t.Errorf("body = %s, want no threshold", h.body)
 	}
 }
 

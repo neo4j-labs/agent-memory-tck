@@ -6,9 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 MessageRole = Literal["user", "assistant", "system"]
-ToolCallStatus = Literal[
-    "pending", "success", "failure", "error", "timeout", "cancelled"
-]
+ToolCallStatus = Literal["pending", "success", "failure", "error", "timeout", "cancelled"]
 
 
 @dataclass

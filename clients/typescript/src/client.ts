@@ -71,6 +71,11 @@ export class MemoryClient {
   async close(): Promise<void> {
     await this.transport.close();
   }
+
+  /** Delete all memory data (bridge transport only; a no-op on the hosted service). */
+  async clearAllData(): Promise<void> {
+    await this.transport.request("clear_all_data", {});
+  }
 }
 
 function isTransport(obj: unknown): obj is Transport {

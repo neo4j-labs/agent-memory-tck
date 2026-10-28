@@ -26,6 +26,8 @@ final class BridgeProcess implements AutoCloseable {
         uri = URI.create("http://127.0.0.1:" + port);
         var builder = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
                 "-cp", System.getProperty("java.class.path"), ConformanceServer.class.getName());
+        // CI exports proxy mode for the conformance job; the bridge under test must run the client.
+        builder.environment().remove("TCK_PROXY_REFERENCE");
         builder.environment().put("MEMORY_API_KEY", "test-key");
         builder.environment().put("MEMORY_ENDPOINT", endpoint);
         builder.environment().put("TCK_BRIDGE_PORT", Integer.toString(port));

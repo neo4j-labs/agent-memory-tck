@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 from abc import ABC, abstractmethod
 from typing import Any, Awaitable, Callable
@@ -159,6 +158,9 @@ def _shape_api_keys(raw: Any, _: dict[str, Any]) -> Any:
 
 def _shape_get_conversation(raw: Any, params: dict[str, Any]) -> dict[str, Any]:
     messages = raw["messages"] if isinstance(raw, dict) and "messages" in raw else raw
+    # The service lists newest first; the bridge contract is insertion order.
+    if isinstance(messages, list):
+        messages = messages[::-1]
     return {
         "id": params.get("sessionId"),
         "session_id": params.get("sessionId"),
@@ -185,25 +187,29 @@ _ROUTES: dict[str, _Route] = {
     "clear_all_data": _NOOP,
     # Short-Term legacy
     "add_message": _Route(
-        "POST", "/conversations/{sessionId}/messages",
-        path_params=("sessionId",), has_body=True),
+        "POST", "/conversations/{sessionId}/messages", path_params=("sessionId",), has_body=True
+    ),
     "get_conversation": _Route(
-        "GET", "/conversations/{sessionId}/messages",
-        path_params=("sessionId",), query_params=("limit",),
-        shape=_shape_get_conversation),
+        "GET",
+        "/conversations/{sessionId}/messages",
+        path_params=("sessionId",),
+        query_params=("limit",),
+        shape=_shape_get_conversation,
+    ),
     "list_sessions": _Route(
-        "GET", "/conversations", query_params=("limit",),
-        shape=_shape_list_sessions),
+        "GET", "/conversations", query_params=("limit",), shape=_shape_list_sessions
+    ),
     "search_messages": _Route(
-        "POST", "/conversations/{sessionId}/search",
-        path_params=("sessionId",), has_body=True, shape=_shape_messages),
-    "clear_session": _Route(
-        "DELETE", "/conversations/{sessionId}", path_params=("sessionId",)),
+        "POST",
+        "/conversations/{sessionId}/search",
+        path_params=("sessionId",),
+        has_body=True,
+        shape=_shape_messages,
+    ),
+    "clear_session": _Route("DELETE", "/conversations/{sessionId}", path_params=("sessionId",)),
     "delete_message": _UNSUPPORTED,
-
     "add_entity": _Route("POST", "/entities", has_body=True),
-    "search_entities": _Route(
-        "POST", "/entities/search", has_body=True, shape=_shape_entities),
+    "search_entities": _Route("POST", "/entities/search", has_body=True, shape=_shape_entities),
     "add_preference": _UNSUPPORTED,
     "add_fact": _UNSUPPORTED,
     "search_preferences": _UNSUPPORTED,
@@ -221,76 +227,79 @@ _ROUTES: dict[str, _Route] = {
     "list_traces": _UNSUPPORTED,
     "get_tool_stats": _UNSUPPORTED,
     "get_similar_traces": _UNSUPPORTED,
-
     # ---- Volume 5 / hosted-native ---------------------------------------
     "create_conversation": _Route("POST", "/conversations", has_body=True),
     "list_conversations": _Route(
-        "GET", "/conversations", query_params=("limit",),
-        shape=_shape_conversations),
+        "GET", "/conversations", query_params=("limit",), shape=_shape_conversations
+    ),
     "get_conversation_metadata": _Route(
-        "GET", "/conversations/{conversationId}",
-        path_params=("conversationId",)),
+        "GET", "/conversations/{conversationId}", path_params=("conversationId",)
+    ),
     "delete_conversation": _Route(
-        "DELETE", "/conversations/{conversationId}",
-        path_params=("conversationId",)),
+        "DELETE", "/conversations/{conversationId}", path_params=("conversationId",)
+    ),
     "get_context": _Route(
-        "GET", "/conversations/{conversationId}/context",
-        path_params=("conversationId",)),
+        "GET", "/conversations/{conversationId}/context", path_params=("conversationId",)
+    ),
     "bulk_add_messages": _Route(
-        "POST", "/conversations/{conversationId}/messages/bulk",
-        path_params=("conversationId",), has_body=True, shape=_shape_messages),
+        "POST",
+        "/conversations/{conversationId}/messages/bulk",
+        path_params=("conversationId",),
+        has_body=True,
+        shape=_shape_messages,
+    ),
     "get_observations": _Route(
-        "GET", "/conversations/{conversationId}/observations",
-        path_params=("conversationId",), query_params=("limit",),
-        shape=_shape_observations),
+        "GET",
+        "/conversations/{conversationId}/observations",
+        path_params=("conversationId",),
+        query_params=("limit",),
+        shape=_shape_observations,
+    ),
     "get_reflections": _Route(
-        "GET", "/conversations/{conversationId}/reflections",
-        path_params=("conversationId",), shape=_shape_reflections),
-
+        "GET",
+        "/conversations/{conversationId}/reflections",
+        path_params=("conversationId",),
+        shape=_shape_reflections,
+    ),
     "list_entities": _Route(
-        "GET", "/entities", query_params=("type", "limit"),
-        shape=_shape_entities),
-    "get_entity": _Route(
-        "GET", "/entities/{entityId}", path_params=("entityId",)),
+        "GET", "/entities", query_params=("type", "limit"), shape=_shape_entities
+    ),
+    "get_entity": _Route("GET", "/entities/{entityId}", path_params=("entityId",)),
     "update_entity": _Route(
-        "PUT", "/entities/{entityId}",
-        path_params=("entityId",), has_body=True),
-    "delete_entity": _Route(
-        "DELETE", "/entities/{entityId}", path_params=("entityId",)),
+        "PUT", "/entities/{entityId}", path_params=("entityId",), has_body=True
+    ),
+    "delete_entity": _Route("DELETE", "/entities/{entityId}", path_params=("entityId",)),
     "set_entity_feedback": _Route(
-        "PUT", "/entities/{entityId}/feedback",
-        path_params=("entityId",), has_body=True),
-    "get_entity_history": _Route(
-        "GET", "/entities/{entityId}/history",
-        path_params=("entityId",)),
+        "PUT", "/entities/{entityId}/feedback", path_params=("entityId",), has_body=True
+    ),
+    "get_entity_history": _Route("GET", "/entities/{entityId}/history", path_params=("entityId",)),
     "merge_entities": _Route(
-        "POST", "/entities/{sourceId}/merge",
-        path_params=("sourceId",), has_body=True),
+        "POST", "/entities/{sourceId}/merge", path_params=("sourceId",), has_body=True
+    ),
     "get_entity_graph": _Route("GET", "/entities/graph"),
-
-    "explain_step": _Route(
-        "GET", "/reasoning/explain/{stepId}", path_params=("stepId",)),
+    "explain_step": _Route("GET", "/reasoning/explain/{stepId}", path_params=("stepId",)),
     "get_trace_by_conversation": _Route(
-        "GET", "/reasoning/trace/{conversationId}",
-        path_params=("conversationId",)),
+        "GET", "/reasoning/trace/{conversationId}", path_params=("conversationId",)
+    ),
     "get_entity_provenance": _Route(
-        "GET", "/reasoning/provenance/{entityId}",
-        path_params=("entityId",)),
+        "GET", "/reasoning/provenance/{entityId}", path_params=("entityId",)
+    ),
     "record_step": _Route("POST", "/reasoning/steps", has_body=True),
     "list_steps": _Route(
-        "GET", "/reasoning/steps", query_params=("conversation_id",),
-        shape=_shape_steps),
+        "GET", "/reasoning/steps", query_params=("conversation_id",), shape=_shape_steps
+    ),
     "cypher_query": _Route("POST", "/query", has_body=True),
-
     "list_api_keys": _Route(
-        "GET", "/auth/api-keys", query_params=("workspace_id",),
-        shape=_shape_api_keys),
+        "GET", "/auth/api-keys", query_params=("workspace_id",), shape=_shape_api_keys
+    ),
     "create_api_key": _Route("POST", "/auth/api-keys", has_body=True),
-    "revoke_api_key": _Route(
-        "DELETE", "/auth/api-keys/{keyId}", path_params=("keyId",)),
+    "revoke_api_key": _Route("DELETE", "/auth/api-keys/{keyId}", path_params=("keyId",)),
     "reveal_api_key": _Route(
-        "GET", "/auth/api-keys/{keyId}/reveal",
-        path_params=("keyId",), query_params=("workspace_id",)),
+        "GET",
+        "/auth/api-keys/{keyId}/reveal",
+        path_params=("keyId",),
+        query_params=("workspace_id",),
+    ),
     "refresh_access_token": _Route("POST", "/auth/refresh", has_body=True),
 }
 
@@ -330,15 +339,11 @@ class RestTransport(Transport):
     async def request(self, method: str, params: dict[str, Any] | None = None) -> Any:
         route = _ROUTES.get(method)
         if route is None:
-            raise NotSupportedError(
-                f"Method '{method}' not supported by RestTransport"
-            )
+            raise NotSupportedError(f"Method '{method}' not supported by RestTransport")
         if route is _NOOP:
             return None
         if route is _UNSUPPORTED:
-            raise NotSupportedError(
-                f"Method '{method}' has no equivalent in the hosted REST API"
-            )
+            raise NotSupportedError(f"Method '{method}' has no equivalent in the hosted REST API")
         if route is _COMPOSITE:
             return await self._composite_request(method, params or {})
 
@@ -378,9 +383,7 @@ class RestTransport(Transport):
         # Body uses camelCase (matching the hosted POST/PUT body shape).
         body_obj: dict[str, Any] | None = None
         if route.has_body:
-            body_obj = {
-                k: v for k, v in camel.items() if k not in consumed and v is not None
-            }
+            body_obj = {k: v for k, v in camel.items() if k not in consumed and v is not None}
 
         url = f"{self._endpoint}{path}"
         if query:

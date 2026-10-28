@@ -8,7 +8,7 @@ requires-python = ">=3.10"
 authors = [{ name = "William Lyon" }]
 dependencies = [
     "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
+    "pytest-asyncio>=0.26.0",
     "pytest-json-report>=1.5.0",
     "pydantic>=2.0.0",
     "jinja2>=3.1.0",
@@ -39,6 +39,7 @@ tck = "tck.report.compliance_report:main"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tck/tests"]
 markers = [
     "bronze: Bronze tier - schema and short-term memory",
@@ -57,3 +58,7 @@ packages = ["tck"]
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+
+[tool.ruff.lint]
+# Pin the rule set: ruff 0.16 widened its defaults, which turned upgrades into lint failures.
+select = ["E4", "E7", "E9", "F"]

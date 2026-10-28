@@ -11,7 +11,9 @@ if TYPE_CHECKING:
     from lenny.agent import LennyDeps
 
 
-async def _memory_call(endpoint: str, method: str, params: dict, api_key: str | None = None) -> dict:
+async def _memory_call(
+    endpoint: str, method: str, params: dict, api_key: str | None = None
+) -> dict:
     """Make an HTTP call to the memory service.
 
     Sends a Bearer token when MEMORY_API_KEY is set so the demo can run

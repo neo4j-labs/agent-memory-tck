@@ -35,7 +35,6 @@ from tests.e2e._tck_provenance import (
     metadata_for as _tck_meta,
     provenance_reasoning,
     provenance_result,
-    run_info,
     tag_description,
 )
 
@@ -168,10 +167,10 @@ async def entity_factory(client: MemoryClient, _test_name: str):
     """
     created: list[str] = []
 
-    async def _make(*, name: str | None = None, entity_type: str = "concept", description: str | None = None):
-        tagged_description = tag_description(
-            _test_name, description or "tck e2e probe entity"
-        )
+    async def _make(
+        *, name: str | None = None, entity_type: str = "concept", description: str | None = None
+    ):
+        tagged_description = tag_description(_test_name, description or "tck e2e probe entity")
         ent = await client.long_term.add_entity(
             name=name or f"TCK-Probe-{uuid.uuid4().hex[:8]}",
             entity_type=entity_type,
@@ -252,9 +251,7 @@ class TestConnectionAndAuth:
 
 
 class TestConversationLifecycle:
-    async def test_create_returns_uuid_and_user_metadata(
-        self, client: MemoryClient, conv_factory
-    ):
+    async def test_create_returns_uuid_and_user_metadata(self, client: MemoryClient, conv_factory):
         uid = _user_id("create")
         c = await conv_factory(user_id=uid, metadata={"source": "e2e", "seq": "1"})
         assert c.id and len(c.id) >= 8
@@ -262,16 +259,12 @@ class TestConversationLifecycle:
         # workspace_id is server-assigned
         assert c.workspace_id
 
-    async def test_get_metadata_round_trips_user_id(
-        self, client: MemoryClient, conv
-    ):
+    async def test_get_metadata_round_trips_user_id(self, client: MemoryClient, conv):
         meta = await client.short_term.get_conversation_metadata(conv.id)
         assert meta.id == conv.id
         assert meta.user_id == conv.user_id
 
-    async def test_list_includes_freshly_created(
-        self, client: MemoryClient, conv_factory
-    ):
+    async def test_list_includes_freshly_created(self, client: MemoryClient, conv_factory):
         c = await conv_factory(user_id=_user_id("list-probe"))
         listed = await client.short_term.list_conversations(limit=200)
         assert any(x.id == c.id for x in listed), (
@@ -291,17 +284,13 @@ class TestConversationLifecycle:
 
 
 class TestMessageBasics:
-    async def test_add_message_returns_id_and_role(
-        self, client: MemoryClient, conv
-    ):
+    async def test_add_message_returns_id_and_role(self, client: MemoryClient, conv):
         msg = await client.short_term.add_message(conv.id, "user", "hello world")
         assert msg.id
         assert msg.role == "user"
         assert msg.content == "hello world"
 
-    async def test_get_conversation_returns_messages_in_order(
-        self, client: MemoryClient, conv
-    ):
+    async def test_get_conversation_returns_messages_in_order(self, client: MemoryClient, conv):
         contents = ["one", "two", "three", "four", "five"]
         for c in contents:
             await client.short_term.add_message(conv.id, "user", c)
@@ -313,18 +302,14 @@ class TestMessageBasics:
         for c in contents:
             assert c in seen
 
-    async def test_search_messages_finds_relevant_term(
-        self, client: MemoryClient, conv
-    ):
+    async def test_search_messages_finds_relevant_term(self, client: MemoryClient, conv):
         await client.short_term.add_message(
             conv.id, "user", "Marie Curie won the Nobel Prize in Physics in 1903."
         )
         await client.short_term.add_message(
             conv.id, "user", "The recipe for sourdough requires a starter."
         )
-        results = await client.short_term.search_messages(
-            "Nobel", session_id=conv.id, limit=5, threshold=0.0
-        )
+        results = await client.short_term.search_messages("Nobel", session_id=conv.id, limit=5)
         assert isinstance(results, list)
 
 
@@ -353,10 +338,8 @@ class TestMessageContentFidelity:
         assert msg.content == content
 
     async def test_metadata_round_trips(self, client: MemoryClient, conv):
-        meta = {"source": "tck-e2e", "priority": "high", "count": 42, "active": True}
-        msg = await client.short_term.add_message(
-            conv.id, "user", "with-meta", metadata=meta
-        )
+        meta = {"source": "tck-e2e", "priority": "high", "count": "42", "active": "true"}
+        msg = await client.short_term.add_message(conv.id, "user", "with-meta", metadata=meta)
         # Some hosted setups echo metadata back, others store but don't echo.
         # We only require no error + same content.
         assert msg.content == "with-meta"
@@ -378,9 +361,7 @@ class TestBulkAddMessages:
         out = await client.short_term.bulk_add_messages(conv.id, msgs)
         assert len(out) == 50
 
-    async def test_bulk_add_rejects_more_than_100(
-        self, client: MemoryClient, conv
-    ):
+    async def test_bulk_add_rejects_more_than_100(self, client: MemoryClient, conv):
         from neo4j_agent_memory_client.errors import ValidationError
 
         msgs = [BulkMessageInput(role="user", content=f"x-{i}") for i in range(101)]
@@ -412,9 +393,7 @@ class TestContextEndpoints:
         refl = await client.short_term.get_reflections(conv.id)
         assert isinstance(refl, list)
 
-    async def test_context_recent_messages_includes_added(
-        self, client: MemoryClient, conv
-    ):
+    async def test_context_recent_messages_includes_added(self, client: MemoryClient, conv):
         await client.short_term.add_message(conv.id, "user", "context-probe-message")
         ctx = await client.short_term.get_context(conv.id)
         contents = [m.content for m in ctx.recent_messages]
@@ -427,9 +406,7 @@ class TestContextEndpoints:
 
 
 class TestEntityCRUD:
-    async def test_add_entity_returns_id_and_fields(
-        self, client: MemoryClient, entity_factory
-    ):
+    async def test_add_entity_returns_id_and_fields(self, client: MemoryClient, entity_factory):
         e = await entity_factory(name="TCK Alice", description="test person")
         assert e.id and len(e.id) >= 8
         assert e.name == "TCK Alice"
@@ -448,26 +425,20 @@ class TestEntityCRUD:
         for e in ents:
             assert e.type == "person"
 
-    async def test_get_entity_includes_relationships(
-        self, client: MemoryClient, entity_factory
-    ):
+    async def test_get_entity_includes_relationships(self, client: MemoryClient, entity_factory):
         e = await entity_factory()
         full = await client.long_term.get_entity(e.id)
         assert full.id == e.id
         # relationships may be None or empty list — both are valid.
         assert full.relationships is None or isinstance(full.relationships, list)
 
-    async def test_update_entity_description(
-        self, client: MemoryClient, entity_factory
-    ):
+    async def test_update_entity_description(self, client: MemoryClient, entity_factory):
         e = await entity_factory(description="orig")
         updated = await client.long_term.update_entity(e.id, description="rewritten")
         assert updated.id == e.id
         assert updated.description == "rewritten"
 
-    async def test_update_entity_name(
-        self, client: MemoryClient, entity_factory
-    ):
+    async def test_update_entity_name(self, client: MemoryClient, entity_factory):
         e = await entity_factory(name=f"Original-{uuid.uuid4().hex[:6]}")
         new_name = f"Renamed-{uuid.uuid4().hex[:6]}"
         updated = await client.long_term.update_entity(e.id, name=new_name)
@@ -490,9 +461,7 @@ class TestEntitySearch:
         results = await client.long_term.search_entities("anything", limit=5)
         assert isinstance(results, list)
 
-    async def test_search_finds_freshly_created_entity(
-        self, client: MemoryClient, entity_factory
-    ):
+    async def test_search_finds_freshly_created_entity(self, client: MemoryClient, entity_factory):
         marker = f"TCK-Probe-{uuid.uuid4().hex[:8]}"
         e = await entity_factory(name=marker)
 
@@ -507,47 +476,33 @@ class TestEntitySearch:
             pytest.skip("entity not yet indexed for search after 12s")
         assert found.id == e.id
 
-    async def test_search_with_type_filter(
-        self, client: MemoryClient, entity_factory
-    ):
+    async def test_search_with_type_filter(self, client: MemoryClient, entity_factory):
         e = await entity_factory(entity_type="concept", name=f"TCKConcept-{uuid.uuid4().hex[:6]}")
         hits = await client.long_term.search_entities(e.name, type="concept", limit=5)
         assert isinstance(hits, list)
 
 
 class TestEntityFeedback:
-    async def test_set_feedback_returns_updated(
-        self, client: MemoryClient, entity_factory
-    ):
+    async def test_set_feedback_returns_updated(self, client: MemoryClient, entity_factory):
         e = await entity_factory()
-        result = await client.long_term.set_entity_feedback(
-            e.id, user_score=0.93, confirmed=True
-        )
+        result = await client.long_term.set_entity_feedback(e.id, user_score=0.93, confirmed=True)
         assert result.id == e.id
         assert result.updated is True
 
-    async def test_set_feedback_score_zero(
-        self, client: MemoryClient, entity_factory
-    ):
+    async def test_set_feedback_score_zero(self, client: MemoryClient, entity_factory):
         e = await entity_factory()
-        result = await client.long_term.set_entity_feedback(
-            e.id, user_score=0.0, confirmed=False
-        )
+        result = await client.long_term.set_entity_feedback(e.id, user_score=0.0, confirmed=False)
         assert result.id == e.id
 
 
 class TestEntityHistoryAndProvenance:
-    async def test_get_history_returns_shape(
-        self, client: MemoryClient, entity_factory
-    ):
+    async def test_get_history_returns_shape(self, client: MemoryClient, entity_factory):
         e = await entity_factory()
         hist = await client.long_term.get_entity_history(e.id)
         assert hist.entity_id == e.id
         assert isinstance(hist.mentions, list)
 
-    async def test_get_provenance_returns_shape(
-        self, client: MemoryClient, entity_factory
-    ):
+    async def test_get_provenance_returns_shape(self, client: MemoryClient, entity_factory):
         e = await entity_factory()
         prov = await client.reasoning.get_entity_provenance(e.id)
         assert prov.entity_id == e.id
@@ -616,9 +571,7 @@ class TestReasoningSteps:
 
 
 class TestReasoningExplain:
-    async def test_explain_step_returns_tool_calls_and_entities(
-        self, client: MemoryClient, conv
-    ):
+    async def test_explain_step_returns_tool_calls_and_entities(self, client: MemoryClient, conv):
         step = await client.reasoning.record_step(
             conversation_id=conv.id, reasoning="r", action_taken="a"
         )
@@ -636,9 +589,7 @@ class TestReasoningTrace:
         assert isinstance(trace.tool_calls, list)
 
     async def test_get_trace_with_one_step(self, client: MemoryClient, conv):
-        await client.reasoning.record_step(
-            conversation_id=conv.id, reasoning="r", action_taken="a"
-        )
+        await client.reasoning.record_step(conversation_id=conv.id, reasoning="r", action_taken="a")
         trace = await client.reasoning.get_trace_by_conversation(conv.id)
         assert any("r" in s.reasoning for s in trace.steps)
 
@@ -651,9 +602,7 @@ class TestReasoningTrace:
 class TestCypherConsole:
     async def test_count_query(self, client: MemoryClient):
         try:
-            result = await client.query.cypher(
-                "MATCH (n) RETURN count(n) AS total"
-            )
+            result = await client.query.cypher("MATCH (n) RETURN count(n) AS total")
         except AuthenticationError as e:
             pytest.skip(f"API key lacks Cypher scope: {e}")
         assert "total" in result.columns
@@ -695,9 +644,7 @@ class TestAuthApiKeys:
 
 
 class TestAgentWorkflow:
-    async def test_message_flow_to_extracted_entities(
-        self, client: MemoryClient, conv_factory
-    ):
+    async def test_message_flow_to_extracted_entities(self, client: MemoryClient, conv_factory):
         """Simulate an agent: add a message, wait for entity extraction,
         verify entities are listable + searchable."""
         c = await conv_factory(user_id=_user_id("agent-flow"))
@@ -720,9 +667,7 @@ class TestAgentWorkflow:
             pytest.skip("extracted entity not indexed within 20s")
         assert any(unique_name.lower() in e.name.lower() for e in found)
 
-    async def test_record_steps_then_get_full_trace(
-        self, client: MemoryClient, conv
-    ):
+    async def test_record_steps_then_get_full_trace(self, client: MemoryClient, conv):
         """Simulate a multi-step reasoning chain and verify it round-trips."""
         steps = []
         for i in range(3):
@@ -739,9 +684,7 @@ class TestAgentWorkflow:
         trace_ids = {s.id for s in trace.steps}
         assert recorded_ids.issubset(trace_ids)
 
-    async def test_full_conversation_then_context(
-        self, client: MemoryClient, conv
-    ):
+    async def test_full_conversation_then_context(self, client: MemoryClient, conv):
         """Add a multi-turn conversation, then fetch three-tier context."""
         turns = [
             ("user", "I'm planning a trip to Tokyo next month."),
@@ -768,16 +711,12 @@ class TestConcurrency:
         """The client + transport must safely interleave concurrent requests."""
 
         async def add(i: int):
-            return await client.short_term.add_message(
-                conv.id, "user", f"concurrent-{i}"
-            )
+            return await client.short_term.add_message(conv.id, "user", f"concurrent-{i}")
 
         results = await asyncio.gather(*(add(i) for i in range(8)))
         assert len({m.id for m in results}) == 8
 
-    async def test_concurrent_create_conversations(
-        self, client: MemoryClient, conv_factory
-    ):
+    async def test_concurrent_create_conversations(self, client: MemoryClient, conv_factory):
         async def make(i: int):
             return await conv_factory(user_id=_user_id(f"concur-{i}"))
 

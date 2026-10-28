@@ -25,7 +25,7 @@ ShortTermMemory <- R6::R6Class("ShortTermMemory",
       parse_conversation(result)
     },
 
-    search_messages = function(query, session_id = NULL, limit = 10L, threshold = 0.7) {
+    search_messages = function(query, session_id = NULL, limit = 10L, threshold = NULL) {
       result <- private$transport$request("search_messages", list(
         query = query,
         session_id = session_id,

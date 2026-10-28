@@ -171,7 +171,7 @@ export class ShortTermMemory {
       query,
       session_id: options?.sessionId,
       limit: options?.limit ?? 10,
-      threshold: options?.threshold ?? 0.7,
+      threshold: options?.threshold,
     });
     return wire.map(toMessage);
   }

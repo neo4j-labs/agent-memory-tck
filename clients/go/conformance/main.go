@@ -216,7 +216,9 @@ func handleGetConversation(ctx context.Context, body map[string]interface{}) (in
 func handleSearchMessages(ctx context.Context, body map[string]interface{}) (interface{}, error) {
 	opts := []func(*memory.SearchMessagesParams){
 		memory.WithSearchLimit(i(body, "limit", 10)),
-		memory.WithThreshold(f(body, "threshold", 0.7)),
+	}
+	if _, ok := body["threshold"]; ok {
+		opts = append(opts, memory.WithThreshold(f(body, "threshold", 0)))
 	}
 	if sid := s(body, "session_id"); sid != "" {
 		opts = append(opts, memory.WithSessionID(sid))
