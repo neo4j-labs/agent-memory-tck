@@ -258,7 +258,7 @@ jobs:
             # Skip integration + e2e here — they need a live endpoint.
             testthat::test_dir('tests/testthat', reporter = 'summary',
               stop_on_failure = TRUE,
-              filter = '^(casing|transport-selection|mcp-tools|short-term|long-term|reasoning|models|memory-client|transport)$')
+              filter = '^e2e', invert = TRUE)
           "
       - name: E2E tests (skipped if MEMORY_API_KEY unset)
         env:
