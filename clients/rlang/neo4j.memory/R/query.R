@@ -9,10 +9,10 @@ QueryConsole <- R6::R6Class("QueryConsole",
     },
 
     cypher = function(cypher, params = NULL) {
-      result <- private$transport$request("cypher_query", list(
-        cypher = cypher,
-        params = if (is.null(params)) list() else params
-      ))
+      args <- list(cypher = cypher)
+      # An empty R list serialises as a JSON array; the service needs an object.
+      if (length(params) > 0) args$params <- params
+      result <- private$transport$request("cypher_query", args)
       list(
         columns = if (is.null(result$columns)) list() else result$columns,
         rows = if (is.null(result$rows)) list() else result$rows,

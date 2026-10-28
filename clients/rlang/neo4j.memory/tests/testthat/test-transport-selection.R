@@ -47,3 +47,37 @@ test_that("RestTransport noop methods return NULL silently", {
   expect_null(rt$request("teardown"))
   expect_null(rt$request("clear_all_data"))
 })
+
+test_that("RestTransport returns the newest-first listing in insertion order", {
+  rt <- RestTransport$new("https://memory.test/v1", api_key = "k")
+  httr2::local_mocked_responses(function(req) {
+    httr2::response_json(body = list(messages = list(
+      list(id = "m2", role = "assistant", content = "second"),
+      list(id = "m1", role = "user", content = "first")
+    )))
+  })
+  conv <- rt$request("get_conversation", list(session_id = "conv-1"))
+  expect_equal(vapply(conv$messages, `[[`, "", "content"), c("first", "second"))
+})
+
+test_that("search_messages omits threshold when unset", {
+  rt <- RestTransport$new("https://memory.test/v1", api_key = "k")
+  sent <- NULL
+  httr2::local_mocked_responses(function(req) {
+    sent <<- req$body$data
+    httr2::response_json(body = list(messages = list()))
+  })
+  ShortTermMemory$new(rt)$search_messages("nobel", session_id = "conv-1")
+  expect_equal(sent, list(query = "nobel", limit = 10L))
+})
+
+test_that("QueryConsole omits empty params, which would serialise as an array", {
+  rt <- RestTransport$new("https://memory.test/v1", api_key = "k")
+  sent <- NULL
+  httr2::local_mocked_responses(function(req) {
+    sent <<- req$body$data
+    httr2::response_json(body = list(columns = list("total"), rows = list()))
+  })
+  QueryConsole$new(rt)$cypher("MATCH (n) RETURN count(n) AS total")
+  expect_equal(sent, list(cypher = "MATCH (n) RETURN count(n) AS total"))
+})

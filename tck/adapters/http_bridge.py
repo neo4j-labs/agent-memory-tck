@@ -339,7 +339,7 @@ class HTTPBridgeAdapter(BaseAdapter):
         *,
         session_id: str | None = None,
         limit: int = 10,
-        threshold: float = 0.7,
+        threshold: float | None = None,
     ) -> list[TCKMessage]:
         result = await self._call(
             "search_messages",
@@ -657,9 +657,7 @@ class HTTPBridgeAdapter(BaseAdapter):
         return [_conversation_from_dict(c) for c in result or []]
 
     async def get_conversation_metadata(self, conversation_id: UUID) -> TCKConversation:
-        result = await self._call(
-            "get_conversation_metadata", {"conversation_id": conversation_id}
-        )
+        result = await self._call("get_conversation_metadata", {"conversation_id": conversation_id})
         return _conversation_from_dict(result)
 
     async def delete_conversation(self, conversation_id: UUID) -> None:
@@ -680,8 +678,11 @@ class HTTPBridgeAdapter(BaseAdapter):
         messages: list[TCKBulkMessageInput],
     ) -> list[TCKMessage]:
         payload = [
-            {"role": m.role, "content": m.content,
-             **({"metadata": m.metadata} if m.metadata else {})}
+            {
+                "role": m.role,
+                "content": m.content,
+                **({"metadata": m.metadata} if m.metadata else {}),
+            }
             for m in messages
         ]
         result = await self._call(
@@ -703,9 +704,7 @@ class HTTPBridgeAdapter(BaseAdapter):
         return [_observation_from_dict(o) for o in result or []]
 
     async def get_reflections(self, conversation_id: UUID) -> list[TCKReflection]:
-        result = await self._call(
-            "get_reflections", {"conversation_id": conversation_id}
-        )
+        result = await self._call("get_reflections", {"conversation_id": conversation_id})
         return [_reflection_from_dict(r) for r in result or []]
 
     async def list_entities(
@@ -758,9 +757,7 @@ class HTTPBridgeAdapter(BaseAdapter):
         )
 
     async def get_entity_history(self, entity_id: UUID) -> TCKEntityHistory:
-        result = await self._call(
-            "get_entity_history", {"entity_id": entity_id}
-        )
+        result = await self._call("get_entity_history", {"entity_id": entity_id})
         result = result or {}
         return TCKEntityHistory(
             entity_id=_parse_uuid(result.get("entity_id", str(entity_id))),
@@ -827,9 +824,7 @@ class HTTPBridgeAdapter(BaseAdapter):
             ],
         )
 
-    async def get_trace_by_conversation(
-        self, conversation_id: UUID
-    ) -> TCKConversationTrace:
+    async def get_trace_by_conversation(self, conversation_id: UUID) -> TCKConversationTrace:
         result = await self._call(
             "get_trace_by_conversation",
             {"conversation_id": conversation_id},
@@ -872,9 +867,7 @@ class HTTPBridgeAdapter(BaseAdapter):
         return _agent_step_from_dict(resp)
 
     async def list_steps(self, conversation_id: UUID) -> list[TCKAgentStep]:
-        result = await self._call(
-            "list_steps", {"conversation_id": conversation_id}
-        )
+        result = await self._call("list_steps", {"conversation_id": conversation_id})
         return [_agent_step_from_dict(s) for s in result or []]
 
     async def cypher_query(

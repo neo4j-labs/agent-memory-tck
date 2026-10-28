@@ -80,8 +80,9 @@ interface ServerState {
  */
 function mountConversationHandlers(state: ServerState) {
   server.use(
+    // The service lists messages newest first.
     http.get(`${ENDPOINT}/conversations/${SESSION_ID}/messages`, () =>
-      HttpResponse.json({ messages: state.messages.map((m) => ({ ...m })) }),
+      HttpResponse.json({ messages: state.messages.map((m) => ({ ...m })).reverse() }),
     ),
     http.post(`${ENDPOINT}/conversations/${SESSION_ID}/messages`, async ({ request }) => {
       const body = (await request.json()) as {

@@ -304,7 +304,7 @@ type EntityProvenance struct {
 // CypherResult is the response from POST /v1/query.
 type CypherResult struct {
 	Columns []string                 `json:"columns"`
-	Rows    [][]interface{}          `json:"rows"`
+	Rows    []map[string]interface{} `json:"rows"`
 	Stats   map[string]interface{}   `json:"stats,omitempty"`
 }
 

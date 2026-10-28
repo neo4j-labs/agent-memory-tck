@@ -117,6 +117,41 @@ describe("RestTransport — short-term", () => {
 
     expect(observedUserId).toBe("alice");
   });
+
+  it("getConversation returns the newest-first listing in insertion order", async () => {
+    server.use(
+      http.get(`${ENDPOINT}/conversations/conv-1/messages`, () =>
+        HttpResponse.json({
+          messages: [
+            { id: "m2", role: "assistant", content: "second", createdAt: "2026-05-07T00:00:01Z" },
+            { id: "m1", role: "user", content: "first", createdAt: "2026-05-07T00:00:00Z" },
+          ],
+        }),
+      ),
+    );
+
+    const client = newClient();
+    const conv = await client.shortTerm.getConversation("conv-1");
+    await client.close();
+
+    expect(conv.messages.map((m) => m.content)).toEqual(["first", "second"]);
+  });
+
+  it("searchMessages omits threshold when unset", async () => {
+    let observedBody: unknown = null;
+    server.use(
+      http.post(`${ENDPOINT}/conversations/conv-1/search`, async ({ request }) => {
+        observedBody = await request.json();
+        return HttpResponse.json({ messages: [] });
+      }),
+    );
+
+    const client = newClient();
+    await client.shortTerm.searchMessages("nobel", { sessionId: "conv-1" });
+    await client.close();
+
+    expect(observedBody).toEqual({ query: "nobel", limit: 10 });
+  });
 });
 
 describe("RestTransport — long-term", () => {
