@@ -96,7 +96,7 @@ public class RestTransportTests
     {
         var (handler, client) = NewClient(new StubResponse(
             HttpStatusCode.OK,
-            "{\"columns\":[\"name\"],\"rows\":[[\"Alice\"]]}"));
+            "{\"columns\":[\"name\"],\"rows\":[{\"name\":\"Alice\"}]}"));
 
         var result = await client.Query.CypherAsync(
             "MATCH (n) RETURN n.name AS name LIMIT $n",
@@ -105,6 +105,7 @@ public class RestTransportTests
         Assert.EndsWith("/query", handler.LastRequest!.RequestUri!.AbsolutePath);
         Assert.Contains("MATCH", handler.LastBody);
         Assert.Equal(new[] { "name" }, result.Columns.ToArray());
+        Assert.Equal("Alice", result.Rows.Single()["name"]?.ToString());
     }
 
     [Fact]

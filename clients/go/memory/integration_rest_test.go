@@ -172,7 +172,7 @@ func TestRestSetEntityFeedback(t *testing.T) {
 func TestRestCypherQuery(t *testing.T) {
 	h := &recordingHandler{
 		t: t, status: 200,
-		respJSON: `{"columns":["name"],"rows":[["Alice"]],"stats":{"queryTime":3}}`,
+		respJSON: `{"columns":["name"],"rows":[{"name":"Alice"}],"stats":{"queryTime":3}}`,
 	}
 	c, srv := newRestClient(t, h)
 	defer srv.Close()
@@ -189,6 +189,9 @@ func TestRestCypherQuery(t *testing.T) {
 	}
 	if len(res.Columns) != 1 || res.Columns[0] != "name" {
 		t.Errorf("columns = %v, want [name]", res.Columns)
+	}
+	if len(res.Rows) != 1 || res.Rows[0]["name"] != "Alice" {
+		t.Errorf("rows = %v, want [{name: Alice}]", res.Rows)
 	}
 }
 

@@ -71,3 +71,14 @@ test_that("RestTransport does not send threshold, which the service rejects", {
                                      limit = 10L, threshold = 0))
   expect_equal(sent, list(query = "nobel", limit = 10L))
 })
+
+test_that("QueryConsole omits empty params, which would serialise as an array", {
+  rt <- RestTransport$new("https://memory.test/v1", api_key = "k")
+  sent <- NULL
+  httr2::local_mocked_responses(function(req) {
+    sent <<- req$body$data
+    httr2::response_json(body = list(columns = list("total"), rows = list()))
+  })
+  QueryConsole$new(rt)$cypher("MATCH (n) RETURN count(n) AS total")
+  expect_equal(sent, list(cypher = "MATCH (n) RETURN count(n) AS total"))
+})
