@@ -337,11 +337,13 @@ class TestGetRelatedEntities:
         bob = await adapter.add_entity(name="Bob", entity_type="PERSON")
         acme = await adapter.add_entity(name="Acme", entity_type="ORGANIZATION")
         await adapter.add_relationship(alice.id, bob.id, "KNOWS")
+        await adapter.add_relationship(alice.id, bob.id, "WORKS_WITH")
         await adapter.add_relationship(alice.id, acme.id, "WORKS_AT")
 
         related_knows = await adapter.get_related_entities(alice.id, relationship_type="KNOWS")
         related_names = [e.name for e in related_knows]
-        assert "Bob" in related_names
+        assert related_names.count("Bob") == 1
+        assert "Acme" not in related_names
 
     async def test_get_related_entities_multiple_relationships(self, adapter):
         """SPEC-3.7.4: get_related_entities MUST return all connected entities."""

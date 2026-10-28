@@ -365,7 +365,9 @@ class ReferenceAdapter(BaseAdapter):
                 {"entity_id": str(entity_id), "relationship_type": relationship_type},
             )
             matching_ids = {UUID(row["entity_id"]) for row in rows}
-            results = [(e, rel) for e, rel in results if e.id in matching_ids]
+            # The SDK returns one tuple per edge, so a qualifying neighbor can
+            # appear again through a different relationship type.
+            results = list({e.id: (e, rel) for e, rel in results if e.id in matching_ids}.values())
         return [
             TCKEntity(
                 id=e.id,
