@@ -45,9 +45,11 @@ public class RestTransport : ITransport, IDisposable
         }
     }
 
+    // IgnoredParams are bridge params the endpoint has no equivalent for; never sent.
     private record Route(string HttpMethod, string Path, string[]? PathParams = null,
         string[]? QueryParams = null, bool HasBody = false,
-        Func<object?, IDictionary<string, object?>, object?>? Shape = null);
+        Func<object?, IDictionary<string, object?>, object?>? Shape = null,
+        string[]? IgnoredParams = null);
 
     private static readonly Route Noop = new("NOOP", "");
     private static readonly Route Unsupported = new("UNSUPPORTED", "");
@@ -98,7 +100,7 @@ public class RestTransport : ITransport, IDisposable
                 return list;
             }),
         ["search_messages"] = new("POST", "/conversations/{sessionId}/search",
-            PathParams: new[] { "sessionId" }, HasBody: true,
+            PathParams: new[] { "sessionId" }, HasBody: true, IgnoredParams: new[] { "threshold" },
             Shape: (raw, _) => raw is IDictionary<string, object?> m && m.TryGetValue("messages", out var msgs) ? msgs : raw),
         ["clear_session"] = new("DELETE", "/conversations/{sessionId}", PathParams: new[] { "sessionId" }),
         ["delete_message"] = Unsupported,
@@ -221,7 +223,7 @@ public class RestTransport : ITransport, IDisposable
             throw new NotSupportedException($"Method '{method}' has no equivalent in the hosted REST API.");
 
         var camelParams = (Dictionary<string, object?>)(Casing.SnakeToCamel(parameters ?? new()) ?? new Dictionary<string, object?>());
-        var consumed = new HashSet<string>();
+        var consumed = new HashSet<string>(route.IgnoredParams ?? Array.Empty<string>());
 
         // Path
         var path = route.Path;

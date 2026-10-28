@@ -117,6 +117,22 @@ describe("RestTransport — short-term", () => {
 
     expect(observedUserId).toBe("alice");
   });
+
+  it("searchMessages does not send threshold, which the service rejects", async () => {
+    let observedBody: unknown = null;
+    server.use(
+      http.post(`${ENDPOINT}/conversations/conv-1/search`, async ({ request }) => {
+        observedBody = await request.json();
+        return HttpResponse.json({ messages: [] });
+      }),
+    );
+
+    const client = newClient();
+    await client.shortTerm.searchMessages("nobel", { sessionId: "conv-1", threshold: 0 });
+    await client.close();
+
+    expect(observedBody).toEqual({ query: "nobel", limit: 10 });
+  });
 });
 
 describe("RestTransport — long-term", () => {

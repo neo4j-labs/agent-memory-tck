@@ -128,6 +128,8 @@ type restRoute struct {
 	queryParams []string
 	hasBody     bool
 	shape       func(raw interface{}, camelParams map[string]interface{}) interface{}
+	// ignoredParams are bridge params the endpoint has no equivalent for; never sent.
+	ignoredParams []string
 }
 
 var (
@@ -178,6 +180,7 @@ var restRoutes = map[string]*restRoute{
 			return out
 		}},
 	"search_messages": {method: http.MethodPost, path: "/conversations/{sessionId}/search", pathParams: []string{"sessionId"}, hasBody: true,
+		ignoredParams: []string{"threshold"},
 		shape: func(raw interface{}, _ map[string]interface{}) interface{} {
 			if m, ok := raw.(map[string]interface{}); ok {
 				if msgs, ok := m["messages"]; ok {
@@ -324,6 +327,9 @@ func (t *restTransport) Call(ctx context.Context, method string, params map[stri
 	}
 
 	consumed := map[string]bool{}
+	for _, name := range route.ignoredParams {
+		consumed[name] = true
+	}
 
 	path := route.path
 	for _, name := range route.pathParams {

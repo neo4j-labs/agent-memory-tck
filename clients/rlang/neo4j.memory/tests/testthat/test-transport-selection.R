@@ -47,3 +47,15 @@ test_that("RestTransport noop methods return NULL silently", {
   expect_null(rt$request("teardown"))
   expect_null(rt$request("clear_all_data"))
 })
+
+test_that("RestTransport does not send threshold, which the service rejects", {
+  rt <- RestTransport$new("https://memory.test/v1", api_key = "k")
+  sent <- NULL
+  httr2::local_mocked_responses(function(req) {
+    sent <<- req$body$data
+    httr2::response_json(body = list(messages = list()))
+  })
+  rt$request("search_messages", list(query = "nobel", session_id = "conv-1",
+                                     limit = 10L, threshold = 0))
+  expect_equal(sent, list(query = "nobel", limit = 10L))
+})

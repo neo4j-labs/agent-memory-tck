@@ -192,6 +192,21 @@ func TestRestCypherQuery(t *testing.T) {
 	}
 }
 
+func TestRestSearchMessagesOmitsThreshold(t *testing.T) {
+	h := &recordingHandler{t: t, status: 200, respJSON: `{"messages":[]}`}
+	c, srv := newRestClient(t, h)
+	defer srv.Close()
+
+	_, err := c.ShortTerm.SearchMessages(context.Background(), "nobel",
+		memory.WithSessionID("conv-1"), memory.WithThreshold(0))
+	if err != nil {
+		t.Fatalf("SearchMessages: %v", err)
+	}
+	if strings.Contains(string(h.body), "threshold") {
+		t.Errorf("body = %s, want no threshold", h.body)
+	}
+}
+
 func TestRest401AuthenticationError(t *testing.T) {
 	h := &recordingHandler{
 		t: t, status: 401, respJSON: `{"error":"bad token"}`,

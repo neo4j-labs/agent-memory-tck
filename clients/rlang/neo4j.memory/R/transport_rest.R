@@ -54,7 +54,8 @@ RestTransport <- R6::R6Class("RestTransport",
       }
 
       camel <- snake_to_camel(params)
-      consumed <- character(0)
+      # Bridge params the endpoint has no equivalent for are never sent.
+      consumed <- route$ignored_params %||% character(0)
 
       path <- route$path
       for (name in route$path_params %||% character(0)) {
@@ -173,6 +174,7 @@ RestTransport <- R6::R6Class("RestTransport",
       search_messages = list(method = "POST",
         path = "/conversations/{sessionId}/search",
         path_params = c("sessionId"), has_body = TRUE,
+        ignored_params = c("threshold"),
         shape = function(raw, p) {
           if (is.list(raw) && !is.null(raw$messages)) raw$messages else raw
         }),

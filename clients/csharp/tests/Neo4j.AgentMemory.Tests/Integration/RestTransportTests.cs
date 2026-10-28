@@ -108,6 +108,16 @@ public class RestTransportTests
     }
 
     [Fact]
+    public async Task SearchMessages_DoesNotSendThreshold()
+    {
+        var (handler, client) = NewClient(new StubResponse(HttpStatusCode.OK, "{\"messages\":[]}"));
+
+        await client.ShortTerm.SearchMessagesAsync("nobel", sessionId: "conv-1", threshold: 0);
+
+        Assert.DoesNotContain("threshold", handler.LastBody);
+    }
+
+    [Fact]
     public async Task Status401_RaisesAuthenticationError()
     {
         var (_, client) = NewClient(new StubResponse(

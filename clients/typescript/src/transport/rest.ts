@@ -79,6 +79,8 @@ interface RestCall {
   queryParams?: string[];
   /** GET/DELETE → no body. */
   hasBody?: boolean;
+  /** Bridge params the endpoint has no equivalent for (camelCase) — never sent. */
+  ignoredParams?: string[];
   /** Optional response shaper for endpoints whose payload doesn't match bridge wire. */
   shape?: (raw: unknown, camelParams: Record<string, unknown>) => unknown;
 }
@@ -141,6 +143,7 @@ const ROUTES: Record<string, RestCall | "noop" | "unsupported"> = {
     path: "/conversations/{sessionId}/search",
     pathParams: ["sessionId"],
     hasBody: true,
+    ignoredParams: ["threshold"],
     shape: (raw) => (raw as { messages?: unknown[] })?.messages ?? [],
   },
   clear_session: {
@@ -454,7 +457,7 @@ export class RestTransport implements Transport {
 
     // Substitute path params (placeholders match camelCase route literals).
     let path = route.path;
-    const consumed = new Set<string>();
+    const consumed = new Set<string>(route.ignoredParams);
     for (const name of route.pathParams ?? []) {
       const v = camelParams[name];
       if (v === undefined || v === null || v === "") {
