@@ -251,11 +251,21 @@ function appendInlineMarkdown(parent, text) {
       parent.append(textElement("code", token.slice(1, -1)));
     } else {
       const link = token.match(/^\[([^\]]+)]\((https?:\/\/[^)]+)\)$/);
-      const anchor = textElement("a", link[1]);
-      anchor.href = link[2];
-      anchor.target = "_blank";
-      anchor.rel = "noopener noreferrer";
-      parent.append(anchor);
+      let url;
+      try {
+        url = new URL(link[2]);
+      } catch {
+        url = null;
+      }
+      if (url && (url.protocol === "https:" || url.protocol === "http:")) {
+        const anchor = textElement("a", link[1]);
+        anchor.href = url.href;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        parent.append(anchor);
+      } else {
+        parent.append(document.createTextNode(token));
+      }
     }
     cursor = match.index + token.length;
   }
