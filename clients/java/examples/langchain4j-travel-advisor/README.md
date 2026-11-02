@@ -17,7 +17,7 @@ flowchart LR
 Install JDK 25. From `clients/java`, build this example and the memory client together:
 
 ```bash
-mvn -pl examples/langchain4j-travel-advisor -am clean package -DskipTests
+mvn -Pexamples -pl examples/langchain4j-travel-advisor -am clean package -DskipTests
 ```
 
 Then change to `examples/langchain4j-travel-advisor` and configure both services:

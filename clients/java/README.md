@@ -289,6 +289,26 @@ event=operation.started operation=getConversation callId=8
 event=operation.completed operation=getConversation callId=8 outcome=failure durationMs=9 status=404 phase=http errorType=MemoryServiceException
 ```
 
+## Building examples
+
+The default Maven reactor builds the client and conformance modules on Java 17.
+The travel advisor examples require JDK 25 and are included through the opt-in
+`examples` profile. From `clients/java`, run:
+
+```sh
+mvn -Pexamples clean test
+```
+
+To package one example and its dependencies:
+
+```sh
+mvn -Pexamples -pl examples/langchain4j-travel-advisor -am package
+mvn -Pexamples -pl examples/spring-ai-travel-advisor -am package
+```
+
+Client Tests runs the default reactor on Java 17 and the examples profile in a
+separate Java 25 job. Release and TCK builds use the default reactor.
+
 ## Releasing
 
 A merge to `main` touching `clients/java/memory-client/src/main` runs
