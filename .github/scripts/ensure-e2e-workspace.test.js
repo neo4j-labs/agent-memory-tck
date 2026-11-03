@@ -6,7 +6,7 @@ const { join } = require('node:path');
 const { test } = require('node:test');
 
 const script = join(__dirname, 'ensure-e2e-workspace.js');
-const workspace = (status) => ({ id: 'e2e-id', name: 'github_e2e-tests', status });
+const workspace = (status) => ({ id: 'e2e-id', name: 'development-smoke-tests', status });
 const listing = (status) => ({ body: { workspaces: [workspace(status)] } });
 
 // Run the actual CLI against a local API, including real fetch cancellation.
@@ -57,14 +57,15 @@ test('E2E workspace preparation', { concurrency: true, timeout: 75_000 }, async 
       assert.match(result.stderr, /MEMORY_API_KEY is required/);
       assert.equal(result.requests.length, 0);
     }),
-    t.test('fails if the named workspace does not exist', async (t) => {
-      const result = await runScript(t, [{ body: { workspaces: [
-        { id: 'other', name: 'another-workspace', status: 'active' },
-      ] } }]);
+    ...[
+      [],
+      [workspace('active'), { id: 'other', name: 'github_e2e-tests', status: 'active' }],
+    ].map((workspaces) => t.test(`rejects a list of ${workspaces.length} workspaces`, async (t) => {
+      const result = await runScript(t, [{ body: { workspaces } }]);
       assert.equal(result.code, 1);
-      assert.match(result.stderr, /does not exist/);
+      assert.match(result.stderr, new RegExp(`Expected exactly one workspace; found ${workspaces.length}`));
       assert.equal(result.requests.length, 1);
-    }),
+    })),
     t.test('checks an already-active workspace again without reprovisioning', async (t) => {
       const result = await runScript(t, [listing('active'), listing('Active')]);
       assert.equal(result.code, 0, result.stderr);
@@ -88,7 +89,8 @@ test('E2E workspace preparation', { concurrency: true, timeout: 75_000 }, async 
       assert.equal(provision.headers.authorization, 'Bearer test-workspace-key');
       assert.equal(provision.headers['x-workspace-id'], 'e2e-id');
       assert.equal(result.requests[2].headers.authorization, 'Bearer test-workspace-key');
-      assert.match(result.stdout, /Final check passed/);
+      assert.match(result.stdout, /Found "development-smoke-tests" \(e2e-id\)/);
+      assert.match(result.stdout, /Final check passed: "development-smoke-tests" is Active/);
     }),
     t.test('retries provisioning after 202 and verifies the final state', async (t) => {
       const result = await runScript(t, [
@@ -130,10 +132,18 @@ test('E2E workspace preparation', { concurrency: true, timeout: 75_000 }, async 
       assert.equal(result.code, 1);
       assert.match(result.stderr, /Invalid workspace list response/);
     }),
+    t.test('rejects a workspace without a name', async (t) => {
+      const result = await runScript(t, [{ body: { workspaces: [
+        { id: 'e2e-id', status: 'active' },
+      ] } }]);
+      assert.equal(result.code, 1);
+      assert.match(result.stderr, /Workspace is missing its id, name or status/);
+      assert.equal(result.requests.length, 1);
+    }),
     t.test('fails if the workspace disappears before the final check', async (t) => {
       const result = await runScript(t, [listing('active'), { body: { workspaces: [] } }]);
       assert.equal(result.code, 1);
-      assert.match(result.stderr, /does not exist/);
+      assert.match(result.stderr, /Expected exactly one workspace; found 0/);
     }),
     ...[
       ['provisioning never completes', [listing('pending'), { hang: true }]],
@@ -145,7 +155,7 @@ test('E2E workspace preparation', { concurrency: true, timeout: 75_000 }, async 
     ].map(([name, responses]) => t.test(`times out when ${name}`, async (t) => {
       const result = await runScript(t, responses);
       assert.equal(result.code, 1);
-      assert.match(result.stderr, /did not become Active within 60 seconds/);
+      assert.match(result.stderr, /Workspace "development-smoke-tests" did not become Active within 60 seconds/);
       assert.doesNotMatch(result.stdout, /Final check passed/);
       // Allow process startup/exit and scheduling overhead around the 60s deadline.
       assert.ok(result.elapsedMs >= 60_000 && result.elapsedMs < 65_000, `${result.elapsedMs}ms`);
