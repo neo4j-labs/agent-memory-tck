@@ -31,7 +31,7 @@ async function runScript(t, responses, env = {}) {
       ...process.env,
       MEMORY_ENDPOINT: `http://127.0.0.1:${server.address().port}/v1/`,
       MEMORY_API_KEY: 'test-workspace-key',
-      MEMORY_ADMIN_API_KEY: 'test-admin-key',
+      MEMORY_ADMIN_API_KEY: '',
       ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -51,13 +51,11 @@ async function runScript(t, responses, env = {}) {
 
 test('E2E workspace preparation', { concurrency: true, timeout: 75_000 }, async (t) => {
   await Promise.all([
-    t.test('requires both secrets before making requests', async (t) => {
-      for (const key of ['MEMORY_API_KEY', 'MEMORY_ADMIN_API_KEY']) {
-        const result = await runScript(t, [], { [key]: '' });
-        assert.equal(result.code, 1);
-        assert.match(result.stderr, new RegExp(`${key} is required`));
-        assert.equal(result.requests.length, 0);
-      }
+    t.test('requires the workspace key before making requests', async (t) => {
+      const result = await runScript(t, [], { MEMORY_API_KEY: '' });
+      assert.equal(result.code, 1);
+      assert.match(result.stderr, /MEMORY_API_KEY is required/);
+      assert.equal(result.requests.length, 0);
     }),
     t.test('fails if the named workspace does not exist', async (t) => {
       const result = await runScript(t, [{ body: { workspaces: [
@@ -78,9 +76,8 @@ test('E2E workspace preparation', { concurrency: true, timeout: 75_000 }, async 
       for (let step = 1; step <= 4; step++) assert.ok(result.stdout.includes(`[${step}/4]`));
       assert.match(result.stdout, /reprovisioning skipped/);
       assert.ok(!result.stdout.includes('test-workspace-key'));
-      assert.ok(!result.stdout.includes('test-admin-key'));
     }),
-    t.test('reprovisions with the admin key and the selected workspace ID', async (t) => {
+    t.test('reprovisions with only the workspace key and the selected workspace ID', async (t) => {
       const result = await runScript(t, [
         listing('deprovisioned'), { body: { status: 'active' } }, listing('active'),
       ]);
@@ -88,7 +85,7 @@ test('E2E workspace preparation', { concurrency: true, timeout: 75_000 }, async 
       const provision = result.requests[1];
       assert.equal(provision.method, 'POST');
       assert.equal(provision.path, '/v1/workspace/reprovision');
-      assert.equal(provision.headers.authorization, 'Bearer test-admin-key');
+      assert.equal(provision.headers.authorization, 'Bearer test-workspace-key');
       assert.equal(provision.headers['x-workspace-id'], 'e2e-id');
       assert.equal(result.requests[2].headers.authorization, 'Bearer test-workspace-key');
       assert.match(result.stdout, /Final check passed/);
@@ -103,6 +100,9 @@ test('E2E workspace preparation', { concurrency: true, timeout: 75_000 }, async 
       ]);
       assert.equal(result.code, 0, result.stderr);
       assert.deepEqual(result.requests.map((r) => r.method), ['GET', 'POST', 'GET', 'POST', 'GET']);
+      for (const request of result.requests) {
+        assert.equal(request.headers.authorization, 'Bearer test-workspace-key');
+      }
       assert.match(result.stdout, /Reprovision retry completed/);
     }),
     t.test('repeats the final check until the list reports Active', async (t) => {
@@ -113,16 +113,16 @@ test('E2E workspace preparation', { concurrency: true, timeout: 75_000 }, async 
       assert.equal(result.code, 0, result.stderr);
       assert.deepEqual(result.requests.map((r) => r.method), ['GET', 'POST', 'GET', 'GET']);
     }),
-    t.test('reports the API error body without exposing either API key', async (t) => {
+    t.test('reports the API error body without exposing the workspace key', async (t) => {
       const result = await runScript(t, [listing('pending'), { status: 403, body: {
         error: 'insufficient scope',
-        detail: 'Rejected test-admin-key; workspace key: test-workspace-key',
+        detail: 'Rejected workspace key: test-workspace-key',
       } }]);
       assert.equal(result.code, 1);
       assert.match(result.stderr, /POST \/workspace\/reprovision failed: HTTP 403/);
       assert.match(result.stderr, /insufficient scope/);
-      assert.match(result.stderr, /Rejected \[REDACTED\]; workspace key: \[REDACTED\]/);
-      assert.doesNotMatch(result.stderr, /test-admin-key|test-workspace-key/);
+      assert.match(result.stderr, /Rejected workspace key: \[REDACTED\]/);
+      assert.doesNotMatch(result.stderr, /test-workspace-key/);
       assert.doesNotMatch(result.stdout, /Final check passed/);
     }),
     t.test('rejects malformed workspace lists', async (t) => {

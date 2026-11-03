@@ -1,17 +1,16 @@
 // Run with Node.js 20+: node .github/scripts/ensure-e2e-workspace.js
-// GitHub Actions passes MEMORY_API_KEY and MEMORY_ADMIN_API_KEY as environment variables.
+// GitHub Actions passes MEMORY_API_KEY as an environment variable.
 // API: https://memory.neo4jlabs.com/openapi.json
 const { setTimeout: sleep } = require('node:timers/promises');
 
 const WORKSPACE_NAME = 'github_e2e-tests';
 const ENDPOINT = (process.env.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1').replace(/\/+$/, '');
 const API_KEY = process.env.MEMORY_API_KEY?.trim();
-const ADMIN_API_KEY = process.env.MEMORY_ADMIN_API_KEY?.trim();
 const WAIT_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 2_000;
 
-async function request(path, apiKey, { method = 'GET', workspaceId, signal } = {}) {
-  const headers = { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' };
+async function request(path, { method = 'GET', workspaceId, signal } = {}) {
+  const headers = { Authorization: `Bearer ${API_KEY}`, Accept: 'application/json' };
   if (workspaceId) headers['X-Workspace-Id'] = workspaceId;
 
   const response = await fetch(`${ENDPOINT}${path}`, {
@@ -22,9 +21,7 @@ async function request(path, apiKey, { method = 'GET', workspaceId, signal } = {
   if (!response.ok) {
     let detail = await response.text();
     // Include the server's reason (scope, workspace role, etc.), but never echo our keys.
-    for (const key of [API_KEY, ADMIN_API_KEY]) {
-      if (key) detail = detail.replaceAll(key, '[REDACTED]');
-    }
+    detail = detail.replaceAll(API_KEY, '[REDACTED]');
     detail = detail.trim().slice(0, 2_000);
     throw new Error(
       `${method} ${path} failed: HTTP ${response.status} ${response.statusText}`
@@ -35,7 +32,7 @@ async function request(path, apiKey, { method = 'GET', workspaceId, signal } = {
 }
 
 async function findWorkspace(signal) {
-  const { workspaces } = await request('/users/me/workspaces', API_KEY, { signal });
+  const { workspaces } = await request('/users/me/workspaces', { signal });
   if (!Array.isArray(workspaces)) throw new Error('Invalid workspace list response.');
 
   const workspace = workspaces.find((item) => item.name === WORKSPACE_NAME);
@@ -53,8 +50,7 @@ function isActive(workspace) {
 
 async function main() {
   if (!API_KEY) throw new Error('MEMORY_API_KEY is required.');
-  if (!ADMIN_API_KEY) throw new Error('MEMORY_ADMIN_API_KEY is required.');
-  console.log('[1/4] API keys loaded from the environment.');
+  console.log('[1/4] API key loaded from the environment.');
 
   const workspace = await findWorkspace();
   console.log(`[2/4] Found "${WORKSPACE_NAME}" (${workspace.id}); status: ${workspace.status}.`);
@@ -67,7 +63,7 @@ async function main() {
   )), WAIT_TIMEOUT_MS);
 
   async function reprovision() {
-    return request('/workspace/reprovision', ADMIN_API_KEY, {
+    return request('/workspace/reprovision', {
       method: 'POST', workspaceId: workspace.id, signal,
     });
   }

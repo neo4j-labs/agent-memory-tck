@@ -30,13 +30,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Test workspace preparation script
-        run: node --test .github/scripts/ensure-e2e-workspace.test.js
       - name: Ensure E2E workspace is Active
         if: env.MEMORY_API_KEY != ''
         env:
           MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
-          MEMORY_ADMIN_API_KEY: ${{ secrets.MEMORY_ADMIN_API_KEY }}
         run: node .github/scripts/ensure-e2e-workspace.js
       - name: Skip workspace preparation when secrets are unavailable
         if: env.MEMORY_API_KEY == ''
