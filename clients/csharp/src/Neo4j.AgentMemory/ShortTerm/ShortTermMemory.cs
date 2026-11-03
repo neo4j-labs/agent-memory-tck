@@ -40,7 +40,7 @@ public class ShortTermMemory
     }
 
     public async Task<List<Message>> SearchMessagesAsync(
-        string query, string? sessionId = null, int limit = 10, double threshold = 0.7,
+        string query, string? sessionId = null, int limit = 10, double? threshold = null,
         CancellationToken ct = default)
     {
         var result = await _transport.RequestAsync<List<Message>>("search_messages", new()

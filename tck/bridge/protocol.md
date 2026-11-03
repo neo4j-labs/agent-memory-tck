@@ -111,6 +111,8 @@ Content-Type: application/json
 | `POST /delete_message` | `message_id` | `{"deleted": bool}` |
 | `POST /clear_session` | `session_id` | 204 |
 
+When `threshold` is omitted from `/search_messages`, the backend uses 0.7.
+
 ### Long-Term Memory (Silver)
 
 | Method | Parameters | Returns |

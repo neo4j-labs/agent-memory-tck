@@ -41,6 +41,20 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
   return JSON.parse(text) as Record<string, unknown>;
 }
 
+// Values under these keys are caller data, not wire fields, so their keys keep their casing.
+const OPAQUE_KEYS = new Set(["metadata", "arguments", "properties", "result", "params"]);
+
+/** Client results are camelCase; the bridge protocol answers in snake_case. */
+function toWire(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(toWire);
+  if (value === null || typeof value !== "object") return value;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) {
+    out[k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)] = OPAQUE_KEYS.has(k) ? v : toWire(v);
+  }
+  return out;
+}
+
 function jsonResponse(res: ServerResponse, data: unknown, status = 200): void {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(data));
@@ -57,7 +71,10 @@ const handlers: Record<string, Handler> = {
   // ---- Lifecycle --------------------------------------------------------
   setup: async () => ({ ok: true, protocol_version: "0.2.0" }),
   teardown: async () => undefined,
-  clear_all_data: async () => undefined,
+  clear_all_data: async () => {
+    await client.clearAllData();
+    return undefined;
+  },
 
   // ---- Short-Term Memory (Bronze) --------------------------------------
   add_message: async (body) =>
@@ -77,7 +94,7 @@ const handlers: Record<string, Handler> = {
     client.shortTerm.searchMessages(body["query"] as string, {
       sessionId: body["session_id"] as string | undefined,
       limit: (body["limit"] as number) ?? 10,
-      threshold: (body["threshold"] as number) ?? 0.7,
+      threshold: body["threshold"] as number | undefined,
     }),
 
   list_sessions: async (body) =>
@@ -287,7 +304,7 @@ const server = createServer(async (req, res) => {
     const body = await readBody(req);
     const result = await handler(body);
     if (result === undefined) noContent(res);
-    else jsonResponse(res, result);
+    else jsonResponse(res, toWire(result));
   } catch (error) {
     // The conformance server is a dev-only tool: log the full error
     // (including any stack) to stderr where the operator can read it, but

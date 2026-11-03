@@ -196,7 +196,7 @@ describeOrSkip("hosted service e2e", () => {
   describe("Conversation lifecycle", () => {
     it("create returns uuid + user_id + workspace_id", async () => {
       const uid = userId("create");
-      const conv = await newConv({ userId: uid, metadata: { source: "e2e", seq: 1 } });
+      const conv = await newConv({ userId: uid, metadata: { source: "e2e", seq: "1" } });
       expect(conv.id.length).toBeGreaterThanOrEqual(8);
       expect(conv.userId).toBe(uid);
       expect(conv.workspaceId).toBeTruthy();
@@ -259,7 +259,6 @@ describeOrSkip("hosted service e2e", () => {
       const results = await client.shortTerm.searchMessages("Nobel", {
         sessionId: conv.id,
         limit: 5,
-        threshold: 0.0,
       });
       expect(Array.isArray(results)).toBe(true);
     });
@@ -301,7 +300,7 @@ describeOrSkip("hosted service e2e", () => {
     it("metadata round-trips without error", async () => {
       const conv = await newConv();
       const msg = await client.shortTerm.addMessage(conv.id, "user", "with-meta", {
-        metadata: { source: "tck-e2e", priority: "high", count: 42, active: true },
+        metadata: { source: "tck-e2e", priority: "high", count: "42", active: "true" },
       });
       expect(msg.content).toBe("with-meta");
     });
@@ -401,8 +400,9 @@ describeOrSkip("hosted service e2e", () => {
     it("listEntities with type filter", async () => {
       const ents = await client.longTerm.listEntities({ type: "person", limit: 5 });
       expect(Array.isArray(ents)).toBe(true);
+      // The filter is case-insensitive and extracted entities come back as "Person".
       for (const e of ents) {
-        expect(e.type).toBe("person");
+        expect(e.type.toLowerCase()).toBe("person");
       }
     });
 

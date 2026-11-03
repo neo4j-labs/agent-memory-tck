@@ -96,7 +96,7 @@ public class RestTransportTests
     {
         var (handler, client) = NewClient(new StubResponse(
             HttpStatusCode.OK,
-            "{\"columns\":[\"name\"],\"rows\":[[\"Alice\"]]}"));
+            "{\"columns\":[\"name\"],\"rows\":[{\"name\":\"Alice\"}]}"));
 
         var result = await client.Query.CypherAsync(
             "MATCH (n) RETURN n.name AS name LIMIT $n",
@@ -105,6 +105,29 @@ public class RestTransportTests
         Assert.EndsWith("/query", handler.LastRequest!.RequestUri!.AbsolutePath);
         Assert.Contains("MATCH", handler.LastBody);
         Assert.Equal(new[] { "name" }, result.Columns.ToArray());
+        Assert.Equal("Alice", result.Rows.Single()["name"]?.ToString());
+    }
+
+    [Fact]
+    public async Task GetConversation_ReturnsNewestFirstListingInInsertionOrder()
+    {
+        var (_, client) = NewClient(new StubResponse(
+            HttpStatusCode.OK,
+            "{\"messages\":[{\"id\":\"m2\",\"role\":\"assistant\",\"content\":\"second\"},{\"id\":\"m1\",\"role\":\"user\",\"content\":\"first\"}]}"));
+
+        var conv = await client.ShortTerm.GetConversationAsync("conv-1");
+
+        Assert.Equal(new[] { "first", "second" }, conv.Messages.Select(m => m.Content).ToArray());
+    }
+
+    [Fact]
+    public async Task SearchMessages_OmitsUnsetThreshold()
+    {
+        var (handler, client) = NewClient(new StubResponse(HttpStatusCode.OK, "{\"messages\":[]}"));
+
+        await client.ShortTerm.SearchMessagesAsync("nobel", sessionId: "conv-1");
+
+        Assert.DoesNotContain("threshold", handler.LastBody);
     }
 
     [Fact]

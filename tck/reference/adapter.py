@@ -590,7 +590,7 @@ class ReferenceAdapter(BaseAdapter):
             source_id=rel.source_id,
             target_id=rel.target_id,
             relationship_type=rel.type,
-            properties=rel.properties or {},
+            properties=rel.attributes or {},
         )
 
     async def merge_duplicate_entities(

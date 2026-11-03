@@ -16,9 +16,7 @@ class TestSnakeToCamel:
         assert snake_to_camel({"userId": "x"}) == {"userId": "x"}
 
     def test_nested_dict(self):
-        assert snake_to_camel({"outer_key": {"inner_key": 1}}) == {
-            "outerKey": {"innerKey": 1}
-        }
+        assert snake_to_camel({"outer_key": {"inner_key": 1}}) == {"outerKey": {"innerKey": 1}}
 
     def test_list_of_dicts(self):
         assert snake_to_camel([{"a_b": 1}, {"c_d": 2}]) == [{"aB": 1}, {"cD": 2}]
@@ -45,9 +43,7 @@ class TestCamelToSnake:
         assert camel_to_snake({"user_id": "x"}) == {"user_id": "x"}
 
     def test_nested(self):
-        assert camel_to_snake({"outerKey": {"innerKey": 1}}) == {
-            "outer_key": {"inner_key": 1}
-        }
+        assert camel_to_snake({"outerKey": {"innerKey": 1}}) == {"outer_key": {"inner_key": 1}}
 
     def test_list(self):
         assert camel_to_snake([{"aB": 1}]) == [{"a_b": 1}]

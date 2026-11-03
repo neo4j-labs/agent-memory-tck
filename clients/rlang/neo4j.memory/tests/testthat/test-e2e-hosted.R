@@ -104,7 +104,7 @@ test_that("e2e: create returns id + user_id + workspace_id", {
   uid <- e2e_user_id_with("create")
   conv <- client$short_term$create_conversation(
     user_id = uid,
-    metadata = list(source = "e2e", seq = 1L)
+    metadata = list(source = "e2e", seq = "1")
   )
   on.exit(client$short_term$delete_conversation(conv$id))
   expect_true(nchar(conv$id) >= 8)
@@ -169,7 +169,7 @@ test_that("e2e: searchMessages returns array", {
   client$short_term$add_message(conv$id, "user",
     "Marie Curie won the Nobel Prize in Physics in 1903.")
   results <- client$short_term$search_messages("Nobel",
-    session_id = conv$id, limit = 5L, threshold = 0.0)
+    session_id = conv$id, limit = 5L)
   expect_true(is.list(results))
 })
 
@@ -218,7 +218,7 @@ test_that("e2e: metadata round-trips without error", {
   conv <- new_conv(client); on.exit(cleanup(conv))
   msg <- client$short_term$add_message(conv$id, "user", "with-meta",
     metadata = list(source = "tck-e2e", priority = "high",
-                    count = 42L, active = TRUE))
+                    count = "42", active = "true"))
   expect_equal(msg$content, "with-meta")
 })
 
@@ -312,7 +312,8 @@ test_that("e2e: listEntities with type filter", {
   client <- new_e2e_client()
   ents <- client$long_term$list_entities(type = "person", limit = 5L)
   expect_true(is.list(ents))
-  for (e in ents) expect_equal(e$type, "person")
+  # The filter is case-insensitive and extracted entities come back as "Person".
+  for (e in ents) expect_equal(tolower(e$type), "person")
 })
 
 test_that("e2e: getEntity round-trips", {

@@ -41,7 +41,12 @@ class MemoryCheckpointSaver:
             self._conversations[thread_id] = thread_id
             return thread_id
 
-    async def aput(self, config: dict[str, Any], checkpoint: dict[str, Any], metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def aput(
+        self,
+        config: dict[str, Any],
+        checkpoint: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         thread_id = config.get("configurable", {}).get("thread_id") or "default"
         conv_id = await self._conversation_id(thread_id)
         await self._client.short_term.add_message(
@@ -62,7 +67,7 @@ class MemoryCheckpointSaver:
         prefix = f"{self._prefix}:"
         for m in reversed(conv.messages):
             if m.role == "system" and m.content.startswith(prefix):
-                payload = m.content[len(prefix):]
+                payload = m.content[len(prefix) :]
                 try:
                     return json.loads(payload)
                 except json.JSONDecodeError:
@@ -81,7 +86,7 @@ class MemoryCheckpointSaver:
         for m in conv.messages:
             if m.role == "system" and m.content.startswith(prefix):
                 try:
-                    out.append(json.loads(m.content[len(prefix):]))
+                    out.append(json.loads(m.content[len(prefix) :]))
                 except json.JSONDecodeError:
                     continue
         return out

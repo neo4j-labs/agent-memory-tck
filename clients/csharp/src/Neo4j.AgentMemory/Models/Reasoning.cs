@@ -188,7 +188,7 @@ public class CypherResult
     public List<string> Columns { get; set; } = new();
 
     [JsonPropertyName("rows")]
-    public List<List<object?>> Rows { get; set; } = new();
+    public List<Dictionary<string, object?>> Rows { get; set; } = new();
 
     [JsonPropertyName("stats")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

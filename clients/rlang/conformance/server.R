@@ -116,7 +116,7 @@ pr$handle("POST", "/search_messages", function(req, res) {
     s(body, "query"),
     session_id = opt_str(body, "session_id"),
     limit = i(body, "limit", 10L),
-    threshold = d(body, "threshold", 0.7)
+    threshold = d(body, "threshold")
   )
 })
 

@@ -78,11 +78,11 @@ int I(Dictionary<string, JsonElement> body, string key, int def)
     return def;
 }
 
-double D(Dictionary<string, JsonElement> body, string key, double def)
+double? D(Dictionary<string, JsonElement> body, string key)
 {
     if (body.TryGetValue(key, out var val) && val.ValueKind == JsonValueKind.Number)
         return val.GetDouble();
-    return def;
+    return null;
 }
 
 bool? B(Dictionary<string, JsonElement> body, string key)
@@ -157,7 +157,7 @@ app.MapPost("/search_messages", async (HttpRequest req) =>
         S(body, "query"),
         string.IsNullOrEmpty(sid) ? null : sid,
         I(body, "limit", 10),
-        D(body, "threshold", 0.7));
+        D(body, "threshold"));
     return Results.Ok(msgs);
 });
 
@@ -487,7 +487,7 @@ app.MapPost("/set_entity_feedback", async (HttpRequest req) =>
     var body = await ReadBody(req);
     var fb = await client.LongTerm.SetEntityFeedbackAsync(
         S(body, "entity_id"),
-        D(body, "user_score", 0),
+        D(body, "user_score") ?? 0,
         B(body, "confirmed") ?? false);
     return Results.Ok(fb);
 });

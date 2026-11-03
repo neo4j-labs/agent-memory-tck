@@ -157,7 +157,8 @@ RestTransport <- R6::R6Class("RestTransport",
         shape = function(raw, p) {
           messages <- raw
           if (is.list(raw) && !is.null(raw$messages)) messages <- raw$messages
-          list(id = p$sessionId, sessionId = p$sessionId, messages = messages)
+          # The service lists newest first; the bridge contract is insertion order.
+          list(id = p$sessionId, sessionId = p$sessionId, messages = rev(messages))
         }),
       list_sessions = list(method = "GET", path = "/conversations",
         query_params = c("limit"),

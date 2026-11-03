@@ -71,18 +71,20 @@ func WithLimit(n int) func(*GetConversationParams) {
 
 // SearchMessages searches messages by semantic similarity.
 func (s *ShortTermMemory) SearchMessages(ctx context.Context, query string, opts ...func(*SearchMessagesParams)) ([]Message, error) {
-	p := SearchMessagesParams{limit: 10, threshold: 0.7}
+	p := SearchMessagesParams{limit: 10}
 	for _, o := range opts {
 		o(&p)
 	}
 
 	params := map[string]interface{}{
-		"query":     query,
-		"limit":     p.limit,
-		"threshold": p.threshold,
+		"query": query,
+		"limit": p.limit,
 	}
 	if p.sessionID != "" {
 		params["session_id"] = p.sessionID
+	}
+	if p.threshold != nil {
+		params["threshold"] = *p.threshold
 	}
 
 	var result []Message
@@ -98,7 +100,7 @@ func (s *ShortTermMemory) SearchMessages(ctx context.Context, query string, opts
 type SearchMessagesParams struct {
 	sessionID string
 	limit     int
-	threshold float64
+	threshold *float64
 }
 
 // WithSessionID filters search results by session.
@@ -111,9 +113,10 @@ func WithSearchLimit(n int) func(*SearchMessagesParams) {
 	return func(p *SearchMessagesParams) { p.limit = n }
 }
 
-// WithThreshold sets the similarity threshold for search.
+// WithThreshold sets the similarity threshold for search. Without it, the
+// backend applies its default.
 func WithThreshold(t float64) func(*SearchMessagesParams) {
-	return func(p *SearchMessagesParams) { p.threshold = t }
+	return func(p *SearchMessagesParams) { p.threshold = &t }
 }
 
 // ListSessions lists all active sessions.

@@ -110,7 +110,9 @@ const ROUTES: Record<string, RestCall | "noop" | "unsupported"> = {
     pathParams: ["sessionId"],
     queryParams: ["limit"],
     shape: (raw, p) => {
-      const messages = (raw as { messages?: unknown[] })?.messages ?? raw ?? [];
+      const listed = (raw as { messages?: unknown[] })?.messages ?? raw ?? [];
+      // The service lists newest first; the bridge contract is insertion order.
+      const messages = Array.isArray(listed) ? [...listed].reverse() : listed;
       return {
         id: p["sessionId"],
         session_id: p["sessionId"],

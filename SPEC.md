@@ -225,6 +225,8 @@ This document is the normative specification for the neo4j-agent-memory data mod
 
 ### 2.3 Short-Term Memory: search_messages
 
+`threshold` is optional. When a caller omits it, the backend uses 0.7.
+
 - **SPEC-2.3.1**: `search_messages` MUST return messages matching the query.
 - **SPEC-2.3.2**: `search_messages` with `session_id` MUST only return messages from that session.
 - **SPEC-2.3.3**: `search_messages` MUST NOT return more results than `limit`.

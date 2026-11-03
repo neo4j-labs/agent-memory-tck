@@ -1,0 +1,53 @@
+name: Release Java client
+
+# Releases org.neo4j:agent-memory-client as a GitHub Release whenever a merge
+# to main changes the client's main sources (clients/java ADR 0027). The
+# `revision` property in clients/java/pom.xml owns the version.
+# maven-release-plugin tags the released commit java-vX.Y.Z and commits the
+# next patch SNAPSHOT to main; JReleaser creates the GitHub Release from the
+# tag (clients/java/memory-client/pom.xml, `release` profile). Maven Central
+# publication happens outside this repository.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'clients/java/memory-client/src/main/**'
+  workflow_dispatch:
+
+# Pushes the release and bump commits and the tag, and creates the release.
+permissions:
+  contents: write
+
+# One release at a time; a queued run releases whatever main holds by then.
+concurrency:
+  group: java-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      # Check out the head of main rather than the triggering commit, so a
+      # queued run builds on top of the previous run's version bump.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: clients/java/**/pom.xml
+
+      - name: Release
+        working-directory: clients/java
+        env:
+          JRELEASER_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          mvn -B release:prepare release:perform

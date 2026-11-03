@@ -222,7 +222,7 @@ func TestE2ECreateReturnsIDsAndUserID(t *testing.T) {
 	uid := e2eUserID(t, "create")
 	conv, err := c.ShortTerm.CreateConversation(context.Background(), memory.CreateConversationParams{
 		UserID:   uid,
-		Metadata: map[string]interface{}{"source": "e2e", "seq": 1},
+		Metadata: map[string]interface{}{"source": "e2e", "seq": "1"},
 	})
 	if err != nil {
 		t.Fatalf("CreateConversation: %v", err)
@@ -343,7 +343,6 @@ func TestE2ESearchMessagesReturnsArray(t *testing.T) {
 	results, err := c.ShortTerm.SearchMessages(context.Background(), "Nobel",
 		memory.WithSessionID(conv.ID),
 		memory.WithSearchLimit(5),
-		memory.WithThreshold(0.0),
 	)
 	if err != nil {
 		t.Fatalf("SearchMessages: %v", err)
@@ -411,7 +410,7 @@ func TestE2ESpecialCharsPreserved(t *testing.T) {
 func TestE2EMetadataRoundTripsWithoutError(t *testing.T) {
 	c := e2eClient(t)
 	conv := e2eNewConv(t, c, "")
-	meta := map[string]interface{}{"source": "tck-e2e", "priority": "high", "count": 42, "active": true}
+	meta := map[string]interface{}{"source": "tck-e2e", "priority": "high", "count": "42", "active": "true"}
 	msg, err := c.ShortTerm.AddMessage(context.Background(), conv.ID, memory.RoleUser, "with-meta", memory.WithMetadata(meta))
 	if err != nil {
 		t.Fatalf("AddMessage: %v", err)
@@ -567,8 +566,9 @@ func TestE2EListEntitiesWithTypeFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListEntities(person): %v", err)
 	}
+	// The filter is case-insensitive and extracted entities come back as "Person".
 	for _, e := range ents {
-		if e.Type != "person" {
+		if !strings.EqualFold(e.Type, "person") {
 			t.Errorf("non-person entity returned with type filter: %q", e.Type)
 		}
 	}

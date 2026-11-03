@@ -88,7 +88,7 @@ public static class McpHandler
             "memory_get_context" =>
                 await client.ShortTerm.GetContextAsync(GetStr("conversation_id"), ct),
             "memory_search_messages" =>
-                await client.ShortTerm.SearchMessagesAsync(GetStr("query"), GetStr("conversation_id"), GetInt("limit", 10), 0.0, ct),
+                await client.ShortTerm.SearchMessagesAsync(GetStr("query"), GetStr("conversation_id"), GetInt("limit", 10), ct: ct),
             "memory_search_entities" =>
                 await client.LongTerm.SearchEntitiesAsync(GetStr("query"), GetInt("limit", 10), GetStr("type") is var t && t.Length > 0 ? t : null, ct),
             "memory_get_entity" =>

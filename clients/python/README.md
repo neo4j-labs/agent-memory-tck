@@ -16,6 +16,7 @@ uv add neo4j-agent-memory-client
 import asyncio
 from neo4j_agent_memory_client import MemoryClient
 
+
 async def main():
     async with MemoryClient(
         endpoint="https://memory.neo4jlabs.com/v1",
@@ -24,6 +25,7 @@ async def main():
         conv = await client.short_term.create_conversation(user_id="alice")
         await client.short_term.add_message(conv.id, "user", "Hello!")
         ctx = await client.short_term.get_context(conv.id)
+
 
 asyncio.run(main())
 ```
