@@ -16,10 +16,10 @@ jobs:
     env:
       MEMORY_API_KEY: ${{ secrets.DEV_MEMORY_API_KEY }}
     steps:
+      - uses: actions/checkout@v4
       - name: Skip workspace preparation when secrets are unavailable
         if: env.MEMORY_API_KEY == ''
         run: echo "MEMORY_API_KEY is unset; skipping workspace preparation."
-      - uses: actions/checkout@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
