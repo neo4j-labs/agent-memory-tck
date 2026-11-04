@@ -20,6 +20,25 @@ permissions:
   contents: read
 
 jobs:
+  prepare-e2e-workspace:
+    runs-on: ubuntu-latest
+    env:
+      MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Ensure E2E workspace is Active
+        if: env.MEMORY_API_KEY != ''
+        env:
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
+        run: node .github/scripts/ensure-e2e-workspace.js
+      - name: Skip workspace preparation when secrets are unavailable
+        if: env.MEMORY_API_KEY == ''
+        run: echo "MEMORY_API_KEY is unset; skipping workspace preparation."
+
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -52,7 +71,7 @@ jobs:
 
   # ---------------- Python ----------------
   python-tests:
-    needs: changes
+    needs: [changes, prepare-e2e-workspace]
     if: github.event_name == 'push' || needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -86,7 +105,7 @@ jobs:
 
   # ---------------- TypeScript ----------------
   typescript-tests:
-    needs: changes
+    needs: [changes, prepare-e2e-workspace]
     if: github.event_name == 'push' || needs.changes.outputs.typescript == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -125,7 +144,7 @@ jobs:
 
   # ---------------- Java ----------------
   java-tests:
-    needs: changes
+    needs: [changes, prepare-e2e-workspace]
     if: github.event_name == 'push' || needs.changes.outputs.java == 'true'
     runs-on: ubuntu-latest
     defaults:
@@ -155,7 +174,7 @@ jobs:
 
   # ---------------- Go ----------------
   go-tests:
-    needs: changes
+    needs: [changes, prepare-e2e-workspace]
     if: github.event_name == 'push' || needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -184,7 +203,7 @@ jobs:
 
   # ---------------- C# ----------------
   csharp-tests:
-    needs: changes
+    needs: [changes, prepare-e2e-workspace]
     if: github.event_name == 'push' || needs.changes.outputs.csharp == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -211,7 +230,7 @@ jobs:
 
   # ---------------- R ----------------
   rlang-tests:
-    needs: changes
+    needs: [changes, prepare-e2e-workspace]
     if: github.event_name == 'push' || needs.changes.outputs.rlang == 'true'
     runs-on: ubuntu-latest
     steps:

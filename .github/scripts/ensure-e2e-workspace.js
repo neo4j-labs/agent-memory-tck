@@ -1,0 +1,111 @@
+// Run with Node.js 20+: node .github/scripts/ensure-e2e-workspace.js
+// GitHub Actions passes MEMORY_API_KEY as an environment variable.
+// API: https://memory.neo4jlabs.com/openapi.json
+const { setTimeout: sleep } = require('node:timers/promises');
+
+const ENDPOINT = (process.env.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1').replace(/\/+$/, '');
+const API_KEY = process.env.MEMORY_API_KEY?.trim();
+const WAIT_TIMEOUT_MS = 60_000;
+const POLL_INTERVAL_MS = 2_000;
+
+async function request(path, { method = 'GET', workspaceId, signal } = {}) {
+  const headers = { Authorization: `Bearer ${API_KEY}`, Accept: 'application/json' };
+  if (workspaceId) headers['X-Workspace-Id'] = workspaceId;
+
+  const response = await fetch(`${ENDPOINT}${path}`, {
+    method,
+    headers,
+    signal: signal || AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) {
+    let detail = await response.text();
+    // Include the server's reason (scope, workspace role, etc.), but never echo our keys.
+    detail = detail.replaceAll(API_KEY, '[REDACTED]');
+    detail = detail.trim().slice(0, 2_000);
+    throw new Error(
+      `${method} ${path} failed: HTTP ${response.status} ${response.statusText}`
+      + (detail ? `: ${detail}` : ''),
+    );
+  }
+  return response.json();
+}
+
+async function findWorkspace(signal) {
+  const { workspaces } = await request('/users/me/workspaces', { signal });
+  if (!Array.isArray(workspaces)) throw new Error('Invalid workspace list response.');
+
+  if (workspaces.length !== 1) {
+    throw new Error(`Expected exactly one workspace; found ${workspaces.length}.`);
+  }
+  const [workspace] = workspaces;
+  if (!workspace?.id || typeof workspace.name !== 'string' || !workspace.name
+      || typeof workspace.status !== 'string') {
+    throw new Error('Workspace is missing its id, name or status.');
+  }
+  return workspace;
+}
+
+function isActive(workspace) {
+  // The API documents lowercase "active"; also accept the display spelling "Active".
+  return workspace.status.toLowerCase() === 'active';
+}
+
+async function main() {
+  if (!API_KEY) throw new Error('MEMORY_API_KEY is required.');
+  console.log('[1/4] API key loaded from the environment.');
+
+  const workspace = await findWorkspace();
+  console.log(`[2/4] Found "${workspace.name}" (${workspace.id}); status: ${workspace.status}.`);
+
+  // One deadline covers reprovisioning, retries, polling, and response-body reads.
+  const controller = new AbortController();
+  const { signal } = controller;
+  const timeout = setTimeout(() => controller.abort(new Error(
+    `Workspace "${workspace.name}" did not become Active within 60 seconds.`,
+  )), WAIT_TIMEOUT_MS);
+
+  async function reprovision() {
+    return request('/workspace/reprovision', {
+      method: 'POST', workspaceId: workspace.id, signal,
+    });
+  }
+
+  try {
+    let retryProvision = false;
+    if (isActive(workspace)) {
+      console.log('[3/4] Workspace is already Active; reprovisioning skipped.');
+    } else {
+      const result = await reprovision();
+      retryProvision = result.retry === true;
+      console.log(`[3/4] Reprovision request completed; status: ${result.status}.`);
+    }
+
+    while (true) {
+      const current = await findWorkspace(signal);
+      if (current.id !== workspace.id) throw new Error('Workspace ID changed during the check.');
+      signal.throwIfAborted();
+      if (isActive(current)) {
+        console.log(`[4/4] Final check passed: "${workspace.name}" is Active.`);
+        return;
+      }
+
+      console.log(`Waiting for "${workspace.name}"; status: ${current.status}.`);
+      await sleep(POLL_INTERVAL_MS, undefined, { signal });
+      // A 202 response with retry=true requires another call to finish provisioning.
+      if (retryProvision) {
+        const result = await reprovision();
+        retryProvision = result.retry === true;
+        console.log(`Reprovision retry completed; status: ${result.status}.`);
+      }
+    }
+  } catch (error) {
+    throw signal.aborted ? signal.reason : error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+main().catch((error) => {
+  console.error(`Workspace check failed: ${error.message}`);
+  process.exitCode = 1;
+});

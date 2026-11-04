@@ -10,6 +10,25 @@ permissions:
   contents: read
 
 jobs:
+  prepare-e2e-workspace:
+    runs-on: ubuntu-latest
+    env:
+      MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Ensure E2E workspace is Active
+        if: env.MEMORY_API_KEY != ''
+        env:
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
+        run: node .github/scripts/ensure-e2e-workspace.js
+      - name: Skip workspace preparation when secrets are unavailable
+        if: env.MEMORY_API_KEY == ''
+        run: echo "MEMORY_API_KEY is unset; skipping workspace preparation."
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -422,12 +441,14 @@ jobs:
           uv run python -c "from neo4j_agent_memory_client import MemoryClient; print('imports OK')"
 
   hosted-smoke:
+    needs: prepare-e2e-workspace
     # Gated on the MEMORY_API_KEY repo secret. Skipped on forks / when unset.
     # The `secrets` context is not allowed in job-level `if`, so the hosted
     # steps check the key through `env` instead.
     runs-on: ubuntu-latest
     env:
       MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
+      MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -446,7 +467,7 @@ jobs:
         if: env.MEMORY_API_KEY != ''
         run: |
           curl -fsS -H "Authorization: Bearer $MEMORY_API_KEY" \
-            https://memory.neo4jlabs.com/v1/conversations >/dev/null
+            "${MEMORY_ENDPOINT%/}/conversations" >/dev/null
           echo "hosted service reachable"
 
       - name: Smoke-test Python client against hosted service
@@ -458,7 +479,7 @@ jobs:
           from neo4j_agent_memory_client import MemoryClient
           async def main():
               async with MemoryClient(
-                  endpoint='https://memory.neo4jlabs.com/v1',
+                  endpoint=os.environ['MEMORY_ENDPOINT'],
                   api_key=os.environ['MEMORY_API_KEY'],
               ) as c:
                   convs = await c.short_term.list_conversations(limit=1)
