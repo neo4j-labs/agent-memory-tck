@@ -1,7 +1,7 @@
 name: Client Tests
 
 # Per-client unit + integration tests and e2e tests (gated on
-# the DEV_MEMORY_API_KEY repo secret) for the six language SDKs.
+# the MEMORY_API_KEY repo secret) for the six language SDKs.
 #
 # Forks and PRs without secret access still pass: every e2e test skips
 # gracefully when MEMORY_API_KEY is empty.
@@ -19,17 +19,13 @@ on:
 permissions:
   contents: read
 
-# Temporary development-service configuration; keep preparation and tests on the same secrets.
 jobs:
   prepare-e2e-workspace:
     runs-on: ubuntu-latest
     env:
-      MEMORY_API_KEY: ${{ secrets.DEV_MEMORY_API_KEY }}
+      MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-      - name: Skip workspace preparation when secrets are unavailable
-        if: env.MEMORY_API_KEY == ''
-        run: echo "MEMORY_API_KEY is unset; skipping workspace preparation."
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -37,8 +33,11 @@ jobs:
       - name: Ensure E2E workspace is Active
         if: env.MEMORY_API_KEY != ''
         env:
-          MEMORY_ENDPOINT: ${{ secrets.DEV_MEMORY_ENDPOINT }}
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
         run: node .github/scripts/ensure-e2e-workspace.js
+      - name: Skip workspace preparation when secrets are unavailable
+        if: env.MEMORY_API_KEY == ''
+        run: echo "MEMORY_API_KEY is unset; skipping workspace preparation."
 
   changes:
     runs-on: ubuntu-latest
@@ -98,8 +97,8 @@ jobs:
           uv run pytest -m integration -v
       - name: E2E tests (skipped if MEMORY_API_KEY unset)
         env:
-          MEMORY_ENDPOINT: ${{ secrets.DEV_MEMORY_ENDPOINT }}
-          MEMORY_API_KEY: ${{ secrets.DEV_MEMORY_API_KEY }}
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
+          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
         run: |
           cd clients/python
           uv run pytest -m e2e -v
@@ -137,8 +136,8 @@ jobs:
           npm run test:integration
       - name: E2E tests (skipped if MEMORY_API_KEY unset)
         env:
-          MEMORY_ENDPOINT: ${{ secrets.DEV_MEMORY_ENDPOINT }}
-          MEMORY_API_KEY: ${{ secrets.DEV_MEMORY_API_KEY }}
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
+          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
         run: |
           cd clients/typescript
           npm run test:e2e
@@ -164,8 +163,8 @@ jobs:
         run: mvn clean test
       - name: Verify (if MEMORY_API_KEY is set)
         env:
-          MEMORY_ENDPOINT: ${{ secrets.DEV_MEMORY_ENDPOINT }}
-          MEMORY_API_KEY: ${{ secrets.DEV_MEMORY_API_KEY }}
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
+          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
         run: |
           if [ -n "$MEMORY_API_KEY" ]; then
             mvn clean verify
@@ -194,8 +193,8 @@ jobs:
           go test -count=1 -v ./memory/
       - name: E2E tests (skipped if MEMORY_API_KEY unset)
         env:
-          MEMORY_ENDPOINT: ${{ secrets.DEV_MEMORY_ENDPOINT }}
-          MEMORY_API_KEY: ${{ secrets.DEV_MEMORY_API_KEY }}
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
+          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
         run: |
           cd clients/go
           # `-tags=e2e` enables the e2e_hosted_test.go file. Tests inside
@@ -223,8 +222,8 @@ jobs:
             --no-build --filter "Category!=E2E"
       - name: E2E tests (skipped if MEMORY_API_KEY unset)
         env:
-          MEMORY_ENDPOINT: ${{ secrets.DEV_MEMORY_ENDPOINT }}
-          MEMORY_API_KEY: ${{ secrets.DEV_MEMORY_API_KEY }}
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
+          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
         run: |
           dotnet test clients/csharp/tests/Neo4j.AgentMemory.Tests/ \
             --no-build --filter "Category=E2E"
@@ -281,8 +280,8 @@ jobs:
           "
       - name: E2E tests (skipped if MEMORY_API_KEY unset)
         env:
-          MEMORY_ENDPOINT: ${{ secrets.DEV_MEMORY_ENDPOINT }}
-          MEMORY_API_KEY: ${{ secrets.DEV_MEMORY_API_KEY }}
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
+          MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
         run: |
           cd clients/rlang/neo4j.memory
           Rscript -e "

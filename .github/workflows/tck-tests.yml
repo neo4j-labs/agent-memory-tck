@@ -9,17 +9,13 @@ on:
 permissions:
   contents: read
 
-# Temporary development-service configuration for hosted preparation and smoke tests.
 jobs:
   prepare-e2e-workspace:
     runs-on: ubuntu-latest
     env:
-      MEMORY_API_KEY: ${{ secrets.DEV_MEMORY_API_KEY }}
+      MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-      - name: Skip workspace preparation when secrets are unavailable
-        if: env.MEMORY_API_KEY == ''
-        run: echo "MEMORY_API_KEY is unset; skipping workspace preparation."
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -27,8 +23,11 @@ jobs:
       - name: Ensure E2E workspace is Active
         if: env.MEMORY_API_KEY != ''
         env:
-          MEMORY_ENDPOINT: ${{ secrets.DEV_MEMORY_ENDPOINT }}
+          MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
         run: node .github/scripts/ensure-e2e-workspace.js
+      - name: Skip workspace preparation when secrets are unavailable
+        if: env.MEMORY_API_KEY == ''
+        run: echo "MEMORY_API_KEY is unset; skipping workspace preparation."
 
   test:
     runs-on: ubuntu-latest
@@ -443,13 +442,13 @@ jobs:
 
   hosted-smoke:
     needs: prepare-e2e-workspace
-    # Gated on the DEV_MEMORY_API_KEY repo secret. Skipped on forks / when unset.
+    # Gated on the MEMORY_API_KEY repo secret. Skipped on forks / when unset.
     # The `secrets` context is not allowed in job-level `if`, so the hosted
     # steps check the key through `env` instead.
     runs-on: ubuntu-latest
     env:
-      MEMORY_API_KEY: ${{ secrets.DEV_MEMORY_API_KEY }}
-      MEMORY_ENDPOINT: ${{ secrets.DEV_MEMORY_ENDPOINT }}
+      MEMORY_API_KEY: ${{ secrets.MEMORY_API_KEY }}
+      MEMORY_ENDPOINT: ${{ vars.MEMORY_ENDPOINT || 'https://memory.neo4jlabs.com/v1' }}
     steps:
       - uses: actions/checkout@v4
 
