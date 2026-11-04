@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A thoughtful AI guide for discovering Switzerland.">
+  <meta name="theme-color" content="#ffffff">
+  <title>Swiss Travel Advisor</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Travel workspace">
+      <div class="brand-row">
+        <a class="brand" href="/" aria-label="Swiss Travel Advisor home">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <span><strong>Swiss</strong><small>travel advisor</small></span>
+        </a>
+        <button class="icon-button close-sidebar" id="close-sidebar" type="button" aria-label="Close menu">×</button>
+      </div>
+
+      <button class="new-chat" id="new-chat" type="button">
+        <span class="plus" aria-hidden="true">＋</span>
+        <span>Plan a new trip</span>
+      </button>
+
+      <section class="sidebar-section history-section" aria-labelledby="history-label">
+        <div class="section-label-row">
+          <h2 id="history-label">Previous journeys</h2>
+          <span id="history-count">0</span>
+        </div>
+        <div class="conversation-list" id="conversation-list" aria-live="polite">
+          <p class="sidebar-empty">Your conversations will appear here.</p>
+        </div>
+      </section>
+
+      <section class="sidebar-section wishlist-section" id="wishlist-section" aria-labelledby="wishlist-label">
+        <div class="section-label-row">
+          <h2 id="wishlist-label">Wishlist</h2>
+          <span id="wishlist-count">0</span>
+        </div>
+        <div class="wishlist-list" id="wishlist-list" aria-live="polite">
+          <p class="sidebar-empty">Places you save will collect here.</p>
+        </div>
+      </section>
+
+      <p class="sidebar-note"><span aria-hidden="true"></span>Conversation history is saved across app restarts; wishlists reset</p>
+    </aside>
+
+    <button class="sidebar-scrim" id="sidebar-scrim" type="button" aria-label="Close menu"></button>
+
+    <main class="chat-panel">
+      <header class="chat-header">
+        <button class="icon-button menu-button" id="menu-button" type="button" aria-label="Open conversations">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="chat-heading">
+          <p>Private travel desk</p>
+          <h1 id="conversation-title">A new Swiss adventure</h1>
+        </div>
+        <button class="wishlist-button" id="wishlist-button" type="button" aria-label="Show wishlist">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/></svg>
+          <span>Wishlist</span>
+          <b id="wishlist-button-count">0</b>
+        </button>
+      </header>
+
+      <section class="messages" id="messages" aria-live="polite" aria-busy="false">
+        <div class="welcome" id="welcome">
+          <p class="eyebrow">Grüezi · Welcome</p>
+          <h2>Where shall we<br><em>wander next?</em></h2>
+          <p class="welcome-copy">Tell me the mood, season, budget, or view you have in mind. I’ll find Swiss places, stays, and experiences that fit.</p>
+          <div class="prompt-grid" aria-label="Conversation starters">
+            <button type="button" data-prompt="Find me a quiet lakeside hotel near Lucerne under 250 CHF">
+              <span aria-hidden="true">⌁</span>
+              <strong>A quiet escape</strong>
+              <small>Lakeside stays near Lucerne</small>
+            </button>
+            <button type="button" data-prompt="Recommend scenic activities within 40 km of Interlaken">
+              <span aria-hidden="true">△</span>
+              <strong>Alpine days</strong>
+              <small>Scenic adventures near Interlaken</small>
+            </button>
+            <button type="button" data-prompt="Plan a romantic winter weekend in Zermatt">
+              <span aria-hidden="true">✦</span>
+              <strong>Winter romance</strong>
+              <small>A weekend around Zermatt</small>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div class="composer-wrap">
+        <form class="composer" id="chat-form">
+          <label class="sr-only" for="message-input">Ask your Swiss travel advisor</label>
+          <textarea id="message-input" rows="1" maxlength="2000" placeholder="Ask about a place, stay, or experience…" required></textarea>
+          <button id="send-button" type="submit" aria-label="Send message">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-4 14-3-5-7-2Zm7 2 7-9"/></svg>
+          </button>
+        </form>
+        <p class="composer-note">AI can make mistakes. Confirm important travel details before booking.</p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

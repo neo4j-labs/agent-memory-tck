@@ -10,7 +10,7 @@
     </parent>
 
     <artifactId>agent-memory-conformance</artifactId>
-    <name>Neo4j Agent Memory Conformance Server</name>
+    <name>Neo4j Agent Memory Java: Conformance Server</name>
 
     <properties>
         <jackson3.version>3.1.4</jackson3.version>

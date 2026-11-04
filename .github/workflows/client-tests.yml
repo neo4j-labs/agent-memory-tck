@@ -172,6 +172,25 @@ jobs:
             echo "Skipping verification: MEMORY_API_KEY is not set."
           fi
 
+  java-examples:
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.java == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/java
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: clients/java/**/pom.xml
+      - name: Test examples and dependencies
+        run: mvn -B -Pexamples clean test
+
   # ---------------- Go ----------------
   go-tests:
     needs: [changes, prepare-e2e-workspace]

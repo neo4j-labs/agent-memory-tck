@@ -22,6 +22,15 @@
         <module>conformance</module>
     </modules>
 
+    <profiles>
+        <profile>
+            <id>examples</id>
+            <modules>
+                <module>examples</module>
+            </modules>
+        </profile>
+    </profiles>
+
     <properties>
         <revision>0.1.2-SNAPSHOT</revision>
         <maven.compiler.release>17</maven.compiler.release>
