@@ -43,7 +43,25 @@ language-idiomatic casing.
 | `POST` | `/entities/{id}/merge` | `merge_entities` | `mergeEntities` | `MergeEntities` | `merge_entities` | `MergeEntitiesAsync`
 | `GET` | `/entities/graph` | `get_entity_graph` | `getEntityGraph` | `GetEntityGraph` | `get_entity_graph` | `GetEntityGraphAsync`
 | `POST` | `/entities/search` | `search_entities` | `searchEntities` | `SearchEntities` | `search_entities` | `SearchEntitiesAsync`
+| `GET` | `/entities/by-name` | `get_entity_by_name` | — | `GetEntityByName` | `get_entity_by_name` | —
+| `POST` | `/relationships` | `add_relationship` | — | `AddRelationship` | `add_relationship` | —
 |===
+
+`GET /entities/by-name` returns an ordered `{"entities": [...]}` list (best
+match first, empty list when nothing matches); the clients surface it as
+first-or-null. `POST /relationships` validates the relationship type against
+the workspace allowlist — an unknown type collapses to `RELATED_TO` with the
+original name preserved as the edge's `predicate` property.
+
+Two Gold-tier bridge methods have no single REST endpoint and are assembled
+client-side (Go and Python clients):
+
+* `get_related_entities` — `GET /entities/{id}` (1-hop relationships, both
+  directions) mapped to entities, with the `relationship_type` filter applied
+  client-side. `depth > 1` raises the client's not-supported error.
+* `merge_duplicate_entities` — `POST /entities/{id}/merge`, then an optional
+  `PUT /entities/{id}` rename (`canonical_name`), then `GET /entities/{id}`
+  to return the surviving entity.
 
 == Reasoning
 

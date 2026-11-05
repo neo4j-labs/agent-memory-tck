@@ -97,6 +97,9 @@ class _Route:
 
 _NOOP = _Route("NOOP", "")
 _UNSUPPORTED = _Route("UNSUPPORTED", "")
+# Methods with no single REST endpoint — assembled from multiple hosted calls
+# in RestTransport._composite_request.
+_COMPOSITE = _Route("COMPOSITE", "")
 
 
 def _shape_messages(raw: Any, _: dict[str, Any]) -> Any:
@@ -108,6 +111,16 @@ def _shape_messages(raw: Any, _: dict[str, Any]) -> Any:
 def _shape_entities(raw: Any, _: dict[str, Any]) -> Any:
     if isinstance(raw, dict) and "entities" in raw:
         return raw["entities"]
+    return raw
+
+
+def _shape_first_entity(raw: Any, _: dict[str, Any]) -> Any:
+    # GET /entities/by-name returns an ordered {"entities": [...]} envelope:
+    # the first element is the best match; an empty list means "no match" and
+    # maps to None, never an error.
+    if isinstance(raw, dict):
+        entities = raw.get("entities") or []
+        return entities[0] if entities else None
     return raw
 
 
@@ -200,10 +213,15 @@ _ROUTES: dict[str, _Route] = {
     "add_preference": _UNSUPPORTED,
     "add_fact": _UNSUPPORTED,
     "search_preferences": _UNSUPPORTED,
-    "get_entity_by_name": _UNSUPPORTED,
-    "get_related_entities": _UNSUPPORTED,
-    "add_relationship": _UNSUPPORTED,
-    "merge_duplicate_entities": _UNSUPPORTED,
+    "get_entity_by_name": _Route(
+        "GET",
+        "/entities/by-name",
+        query_params=("name", "type", "limit"),
+        shape=_shape_first_entity,
+    ),
+    "get_related_entities": _COMPOSITE,
+    "add_relationship": _Route("POST", "/relationships", has_body=True),
+    "merge_duplicate_entities": _COMPOSITE,
     "start_trace": _UNSUPPORTED,
     "add_step": _UNSUPPORTED,
     "record_tool_call": _Route("POST", "/reasoning/tool-calls", has_body=True),
@@ -329,6 +347,8 @@ class RestTransport(Transport):
             return None
         if route is _UNSUPPORTED:
             raise NotSupportedError(f"Method '{method}' has no equivalent in the hosted REST API")
+        if route is _COMPOSITE:
+            return await self._composite_request(method, params or {})
 
         original = params or {}
         camel = snake_to_camel(original)
@@ -400,6 +420,70 @@ class RestTransport(Transport):
         if route.shape is not None:
             raw = route.shape(raw, camel)
         return camel_to_snake(raw)
+
+    async def _composite_request(self, method: str, params: dict[str, Any]) -> Any:
+        """Dispatch methods that have no single REST endpoint and are instead
+        assembled from multiple hosted calls."""
+        if method == "get_related_entities":
+            return await self._get_related_entities(params)
+        if method == "merge_duplicate_entities":
+            return await self._merge_duplicate_entities(params)
+        raise NotSupportedError(f"Method '{method}' has no composite handler")
+
+    async def _get_related_entities(self, params: dict[str, Any]) -> list[dict[str, Any]]:
+        # GET /entities/{id} returns 1-hop relationships (both directions) as
+        # {relType, targetId, targetName, targetType}; map each to an entity
+        # and filter by relationship_type client-side. Depth > 1 has no
+        # hosted equivalent.
+        depth = params.get("depth")
+        if depth is not None and int(depth) > 1:
+            raise NotSupportedError(
+                "Method 'get_related_entities' with depth > 1 has no "
+                "equivalent in the hosted REST API"
+            )
+        entity = await self.request("get_entity", {"entity_id": params.get("entity_id")}) or {}
+        rel_type = params.get("relationship_type")
+        related: list[dict[str, Any]] = []
+        for rel in entity.get("relationships") or []:
+            if not isinstance(rel, dict):
+                continue
+            if rel_type and rel.get("rel_type") != rel_type:
+                continue
+            related.append(
+                {
+                    "id": rel.get("target_id"),
+                    "name": rel.get("target_name"),
+                    "type": rel.get("target_type"),
+                }
+            )
+        return related
+
+    async def _merge_duplicate_entities(self, params: dict[str, Any]) -> Any:
+        # Chain POST /entities/{id}/merge, an optional PUT rename
+        # (canonical_name), and a final GET so the caller receives the
+        # surviving entity. The merge response's target_id is
+        # canonical-resolved, so it wins over the caller-supplied one.
+        merged = (
+            await self.request(
+                "merge_entities",
+                {
+                    "source_id": params.get("source_id"),
+                    "target_id": params.get("target_id"),
+                },
+            )
+            or {}
+        )
+        target_id = merged.get("target_id") or params.get("target_id")
+        canonical_name = params.get("canonical_name")
+        if canonical_name:
+            await self.request(
+                "update_entity",
+                {
+                    "entity_id": target_id,
+                    "name": canonical_name,
+                },
+            )
+        return await self.request("get_entity", {"entity_id": target_id})
 
     async def _build_headers(self) -> dict[str, str]:
         headers = dict(self._headers)

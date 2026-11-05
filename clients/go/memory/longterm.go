@@ -178,28 +178,66 @@ func WithDepth(d int) func(*RelatedParams) {
 }
 
 // AddRelationship creates a typed relationship between two entities.
-func (l *LongTermMemory) AddRelationship(ctx context.Context, sourceID, targetID, relType string) (*Relationship, error) {
-	var result Relationship
-	if err := l.transport.Call(ctx, "add_relationship", map[string]interface{}{
+//
+// On the hosted REST API a relationship type outside the workspace allowlist
+// collapses to "RELATED_TO" (the original name is preserved server-side as
+// the edge's "predicate" property) — the returned RelationshipType is the
+// type as written.
+func (l *LongTermMemory) AddRelationship(ctx context.Context, sourceID, targetID, relType string, opts ...func(*AddRelationshipParams)) (*Relationship, error) {
+	p := AddRelationshipParams{}
+	for _, o := range opts {
+		o(&p)
+	}
+	params := map[string]interface{}{
 		"source_id":         sourceID,
 		"target_id":         targetID,
 		"relationship_type": relType,
-	}, &result); err != nil {
+	}
+	if p.properties != nil {
+		params["properties"] = p.properties
+	}
+	var result Relationship
+	if err := l.transport.Call(ctx, "add_relationship", params, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
-// MergeDuplicateEntities merges two duplicate entities.
-func (l *LongTermMemory) MergeDuplicateEntities(ctx context.Context, sourceID, targetID string) (*BaseEntity, error) {
-	var result BaseEntity
-	if err := l.transport.Call(ctx, "merge_duplicate_entities", map[string]interface{}{
+// AddRelationshipParams configures AddRelationship.
+type AddRelationshipParams struct{ properties map[string]interface{} }
+
+// WithRelProperties attaches custom properties to the relationship edge.
+func WithRelProperties(props map[string]interface{}) func(*AddRelationshipParams) {
+	return func(p *AddRelationshipParams) { p.properties = props }
+}
+
+// MergeDuplicateEntities merges two duplicate entities and returns the
+// surviving (target) entity.
+func (l *LongTermMemory) MergeDuplicateEntities(ctx context.Context, sourceID, targetID string, opts ...func(*MergeDuplicateParams)) (*BaseEntity, error) {
+	p := MergeDuplicateParams{}
+	for _, o := range opts {
+		o(&p)
+	}
+	params := map[string]interface{}{
 		"source_id": sourceID,
 		"target_id": targetID,
-	}, &result); err != nil {
+	}
+	if p.canonicalName != "" {
+		params["canonical_name"] = p.canonicalName
+	}
+	var result BaseEntity
+	if err := l.transport.Call(ctx, "merge_duplicate_entities", params, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
+}
+
+// MergeDuplicateParams configures MergeDuplicateEntities.
+type MergeDuplicateParams struct{ canonicalName string }
+
+// WithCanonicalName renames the surviving entity after the merge.
+func WithCanonicalName(name string) func(*MergeDuplicateParams) {
+	return func(p *MergeDuplicateParams) { p.canonicalName = name }
 }
 
 // ============================================================================
