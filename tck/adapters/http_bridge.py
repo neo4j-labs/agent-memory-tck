@@ -57,6 +57,34 @@ from tck.adapters.base_adapter import (
 )
 
 
+OPTIONAL_PLATINUM_METHODS = frozenset(
+    {
+        "create_conversation",
+        "list_conversations",
+        "get_conversation_metadata",
+        "delete_conversation",
+        "get_context",
+        "bulk_add_messages",
+        "get_observations",
+        "get_reflections",
+        "list_entities",
+        "get_entity",
+        "update_entity",
+        "delete_entity",
+        "set_entity_feedback",
+        "get_entity_history",
+        "merge_entities",
+        "get_entity_graph",
+        "record_step",
+        "list_steps",
+        "explain_step",
+        "get_trace_by_conversation",
+        "get_entity_provenance",
+        "cypher_query",
+    }
+)
+
+
 def _parse_datetime(val: str | None) -> datetime:
     """Parse an ISO 8601 datetime string."""
     if val is None:
@@ -275,6 +303,10 @@ class HTTPBridgeAdapter(BaseAdapter):
                 except Exception:
                     error_body = {"error": response.text}
                 error_msg = error_body.get("error", f"HTTP {response.status_code}")
+                if response.status_code == 501 or (
+                    response.status_code == 404 and method in OPTIONAL_PLATINUM_METHODS
+                ):
+                    raise NotImplementedError(error_msg)
                 raise RuntimeError(f"Bridge call {method} failed: {error_msg}")
 
             if response.status_code == 204 or not response.content:

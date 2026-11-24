@@ -74,6 +74,12 @@ class BridgeServer:
             return await handler(request)
         except web.HTTPException:
             raise
+        except NotImplementedError as exc:
+            logger.info("Not implemented while handling %s: %s", request.path, exc)
+            return web.json_response(
+                {"error": f"{type(exc).__name__}: {exc}"},
+                status=501,
+            )
         except Exception as exc:
             logger.exception(f"Error handling {request.path}")
             return web.json_response(
